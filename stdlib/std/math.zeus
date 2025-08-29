@@ -1,0 +1,23 @@
+
+fn abs(a : i32, b : i32) : i32 {
+    if a < b {
+        return b - a;
+    } else {
+        return a - b;
+    }
+}
+fn max(a : i32, b : i32) : i32 {
+    if a > b {
+        return a;
+    } else {
+        return b;
+    }
+}
+
+fn min(a : i32, b : i32) : i32 {
+    if a < b {
+        return a;
+    } else {
+        return b;
+    }
+}

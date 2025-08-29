@@ -1,0 +1,7 @@
+
+// A simple "Hello, World!" program in Zeus language
+// This program prints "Hello, World!" to the console
+fn main() : i32 {
+    println("Hello, World!");
+    return 0;
+}
