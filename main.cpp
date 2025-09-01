@@ -37,11 +37,12 @@ int main() {
     message.msg(std::cerr, true);
   }
   compiler::CompilerOptions options;
+
   options.outputDirectory = std::filesystem::temp_directory_path();
   options.colorOutput = true;
   options.printLLVMIR = true;
   options.runProgram = true;
-  compiler::compile(options, "MyModule", parse_result.nodes);
+  compiler::compile(options, path.filename().replace_extension().string(), parse_result.nodes);
 
 
   return 0;

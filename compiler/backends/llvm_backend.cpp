@@ -39,6 +39,7 @@
 #include <llvm/Transforms/Utils/LoopSimplify.h>
 #include "command.h"
 #include "linker.h"
+#include "llvm_intrinsics.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
@@ -75,6 +76,20 @@ namespace llvm_backend {
         InitializeNativeTargetAsmParser();
         InitializeNativeTargetAsmPrinter();
     }
+
+    llvm::GlobalVariable *getOrCreateGlobalString(LLVMBackendState &llvmState, const std::string &value,
+                                                  const std::string &name) {
+        auto _name = name;
+        if (_name.empty()) {
+            auto hash = std::hash<std::string>{}(value);
+            _name = "string." + std::to_string(hash);
+        }
+
+        if (const auto var = llvmState.TheModule->getGlobalVariable(_name, true))
+            return var;
+        return llvmState.Builder->CreateGlobalString(value, _name);
+    }
+
 
     llvm::Value *codegen(ast::ReturnStatement *node, LLVMBackendState &llvmState);
 
@@ -116,20 +131,22 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::StringConstant *node, LLVMBackendState &llvmState) {
-        return nullptr;
+        return getOrCreateGlobalString(llvmState, node->expressionToken().lexical(), "");
     }
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState) {
         if (node->functionName() == "println") {
-            // Example: calling printf for println
-            auto printfFunc = llvmState.TheModule->getFunction("printf");
+            const auto printfFunc = llvmState.TheModule->getFunction("printf");
             if (!printfFunc) {
                 return nullptr; // Error handling
             }
             std::vector<llvm::Value *> args;
+            args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
+            assert(node->args().size() == 1 && "println expects exactly one argument");
             for (const auto &arg: node->args()) {
                 args.push_back(codegen_base(arg.get(), llvmState));
             }
+            return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
         }
         return nullptr; // Placeholder
     }
@@ -179,9 +196,9 @@ namespace llvm_backend {
         }
     }
 
-    void init_context(LLVMBackendState &context) {
+    void init_context(LLVMBackendState &context, const std::string &moduleName) {
         context.TheContext = std::make_unique<llvm::LLVMContext>();
-        context.TheModule = std::make_unique<llvm::Module>("my_module", *context.TheContext);
+        context.TheModule = std::make_unique<llvm::Module>(moduleName, *context.TheContext);
         context.Builder = std::make_unique<llvm::IRBuilder<> >(*context.TheContext);
         context.TheFPM = std::make_unique<llvm::FunctionPassManager>();
         context.TheMPM = std::make_unique<llvm::ModulePassManager>();
@@ -240,7 +257,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
                                       const std::vector<std::unique_ptr<ast::ASTNode> > &nodes) {
     initializeLLVMBackend();
     LLVMBackendState context;
-    init_context(context);
+    init_context(context, moduleName);
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
     std::string Error;
 
@@ -256,6 +273,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, llvm::Reloc::PIC_);
     llvm::Triple target(TargetTriple);
 
+    createPrintfCall(*context.TheContext, *context.TheModule);
 
     for (auto &node: nodes) {
         if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {

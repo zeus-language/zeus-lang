@@ -33,5 +33,7 @@ add_executable(${PROJECT_NAME} main.cpp
         compiler/Compiler.cpp
         compiler/backends/llvm_backend.cpp
         compiler/backends/llvm_backend.h
+        compiler/backends/llvm_intrinsics.h
+        compiler/backends/llvm_intrinsics.cpp
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC parser ${llvm_libs})
