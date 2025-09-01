@@ -4,7 +4,7 @@
 #include "lexer/Lexer.h"
 #include "magic_enum/magic_enum.hpp"
 #include "parser/Parser.h"
-#include "compiler/Compiler.h"
+#include "../compiler/Compiler.h"
 
 std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
   std::ifstream file;
@@ -42,7 +42,7 @@ int main() {
   options.colorOutput = true;
   options.printLLVMIR = true;
   options.runProgram = true;
-  compiler::compile(options, path.filename().replace_extension().string(), parse_result.nodes);
+  compiler::compile(options, path.filename().replace_extension().string(), std::cerr, std::cout, parse_result.nodes);
 
 
   return 0;

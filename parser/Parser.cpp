@@ -140,8 +140,6 @@ namespace parser {
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
             while (!canConsume(Token::CLOSE_BRACE)) {
-                std::cout << "consumed a token in block " << std::string(magic_enum::enum_name(current().type)) << "\n";
-
                 if (tryConsume(Token::SEMICOLON)) {
                 } else if (auto functionCall = parseFunctionCall()) {
                     nodes.push_back(std::move(functionCall.value()));
