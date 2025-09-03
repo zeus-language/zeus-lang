@@ -12,7 +12,7 @@ namespace compiler {
         BuildMode buildMode = BuildMode::Debug;
 
         std::filesystem::path outputDirectory;
-        std::vector<std::filesystem::path> rtlDirectories;
+        std::vector<std::filesystem::path> stdlibDirectories;
         std::string compilerPath;
         bool runProgram = false;
         bool printLLVMIR = false;

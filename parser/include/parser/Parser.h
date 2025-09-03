@@ -4,8 +4,9 @@
 
 #ifndef ZEUS_LANG_PARSER_H
 #define ZEUS_LANG_PARSER_H
+#include <algorithm>
 #include <vector>
-
+#include <utility>
 #include "../lexer/Lexer.h"
 #include "ast/ASTNode.h"
 
@@ -17,7 +18,7 @@ namespace parser {
     };
 
     namespace Color {
-        enum Code {
+        enum Code :uint16_t {
             FG_RED = 31,
             FG_GREEN = 32,
             FG_BLUE = 34,
@@ -36,7 +37,7 @@ namespace parser {
             }
 
             friend std::ostream &operator<<(std::ostream &os, const Modifier &mod) {
-                return os << "\033[" << mod.code << "m";
+                return os << "\033[" << static_cast<uint16_t>(mod.code) << "m";
             }
         };
     } // namespace Color
@@ -53,6 +54,11 @@ namespace parser {
     struct ParseResult {
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
         std::vector<ParserMessasge> messages;
+
+        [[nodiscard]] bool hasError() const {
+            return std::ranges::any_of(
+                messages, [](const auto &msg) { return msg.outputType == OutputType::ERROR; });
+        }
     };
 
     ParseResult parse_tokens(const std::vector<Token> &tokens);

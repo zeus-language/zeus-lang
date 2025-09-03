@@ -43,12 +43,13 @@ namespace compiler {
         //       .row
         //       << ", Column: " << token.source_location.col << std::endl;
         // }
-        auto [nodes, messages] = parser::parse_tokens(tokens);
-        for (const auto &message: messages) {
-            message.msg(std::cerr, true);
+        auto result = parser::parse_tokens(tokens);
+        for (const auto &message: result.messages) {
+            message.msg(std::cout, true);
         }
-
-        compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
-                nodes);
+        if (!result.hasError()) {
+            compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
+                    result.nodes);
+        }
     }
 }

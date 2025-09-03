@@ -1,0 +1,30 @@
+
+
+fn main()  : i32{
+    let MY_CONST :i32 = 234;
+    let TEST_CONST : i32 = 500;
+    let mut test_var : i32;
+    let mut    x : i32 = 25;
+    test_var = -5000;
+    println(test_var);
+
+    test_var = test_var * 2;
+
+    println(test_var);
+
+    test_var = test_var + 4000;
+    println(test_var);
+    test_var = 500;
+    println(test_var);
+    test_var = 0;
+    println(test_var);
+
+    // test more complex integer math
+    test_var = (TEST_CONST + 10) * x  + MY_CONST;
+    println(test_var);
+    test_var = TEST_CONST + 10 * x + MY_CONST;
+    println(test_var);
+    test_var = TEST_CONST + (10 * x) + MY_CONST;
+    println(test_var);
+    return 0;
+}

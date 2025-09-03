@@ -40,10 +40,14 @@
 #include "command.h"
 #include "linker.h"
 #include "llvm_intrinsics.h"
+#include "ast/BinaryExpression.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/VariableAccess.h"
+#include "ast/VariableAssignment.h"
+#include "ast/VariableDeclaration.h"
 
 namespace llvm_backend {
     struct LLVMBackendState {
@@ -95,22 +99,42 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState);
 
-    llvm::Value *codegen(ast::NumberConstant *node, LLVMBackendState &llvmState);
+    llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::StringConstant *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::VariableDeclaration *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::VariableAssignment *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::VariableAccess *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
-        if (auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
+        if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
         }
-        if (auto functionCall = dynamic_cast<ast::FunctionCallNode *>(node)) {
+        if (const auto functionCall = dynamic_cast<ast::FunctionCallNode *>(node)) {
             return llvm_backend::codegen(functionCall, llvmState);
         }
-        if (auto number = dynamic_cast<ast::NumberConstant *>(node)) {
+        if (const auto number = dynamic_cast<ast::NumberConstant *>(node)) {
             return llvm_backend::codegen(number, llvmState);
         }
-        if (auto string = dynamic_cast<ast::StringConstant *>(node)) {
+        if (const auto string = dynamic_cast<ast::StringConstant *>(node)) {
             return llvm_backend::codegen(string, llvmState);
+        }
+        if (const auto varDecl = dynamic_cast<ast::VariableDeclaration *>(node)) {
+            return llvm_backend::codegen(varDecl, llvmState);
+        }
+        if (const auto assignment = dynamic_cast<ast::VariableAssignment *>(node)) {
+            return llvm_backend::codegen(assignment, llvmState);
+        }
+        if (const auto varAccess = dynamic_cast<ast::VariableAccess *>(node)) {
+            return llvm_backend::codegen(varAccess, llvmState);
+        }
+        if (const auto binExpr = dynamic_cast<ast::BinaryExpression *>(node)) {
+            return llvm_backend::codegen(binExpr, llvmState);
         }
 
         // Handle other node types or throw an error
@@ -118,7 +142,130 @@ namespace llvm_backend {
         return nullptr; // Placeholder
     }
 
-    llvm::Value *codegen(ast::NumberConstant *node, LLVMBackendState &llvmState) {
+    llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState) {
+        auto lhs = codegen_base(node->lhs().get(), llvmState);
+        auto rhs = codegen_base(node->rhs().get(), llvmState);
+
+        switch (node->binoperator()) {
+            case ast::BinaryOperator::ADD:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAdd(lhs, rhs, "addtmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFAdd(lhs, rhs, "faddtmp");
+                }
+                break;
+            case ast::BinaryOperator::SUB:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSub(lhs, rhs, "subtmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFSub(lhs, rhs, "fsubtmp");
+                }
+                break;
+            case ast::BinaryOperator::MUL:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateMul(lhs, rhs, "multmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFMul(lhs, rhs, "fmultmp");
+                }
+                break;
+            case ast::BinaryOperator::DIV:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSDiv(lhs, rhs, "divtmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFDiv(lhs, rhs, "fdivtmp");
+                }
+                break;
+            default:
+                assert(false && "Unsupported binary operator");
+        }
+        assert(false && "Type mismatch in binary expression");
+    }
+
+
+    llvm::Value *codegen(ast::VariableAccess *node, LLVMBackendState &llvmState) {
+        ;
+        if (const auto alloca = llvmState.NamedAllocations[node->expressionToken().lexical()]) {
+            return llvmState.Builder->CreateLoad(alloca->getAllocatedType(), alloca, node->expressionToken().lexical());
+        }
+        if (const auto value = llvmState.NamedValues[node->expressionToken().lexical()]) {
+            return value;
+        }
+        assert(false && "Variable not declared before access");
+        return nullptr;
+    }
+
+    llvm::Value *codegen(ast::VariableAssignment *node, LLVMBackendState &llvmState) {
+        const auto alloca = llvmState.NamedAllocations[node->expressionToken().lexical()];
+        if (!alloca) {
+            assert(false && "Variable not declared before assignment");
+            return nullptr;
+        }
+        llvmState.Builder->CreateStore(codegen_base(node->expression().get(), llvmState), alloca);
+
+
+        return alloca; // Return the allocation instruction
+    }
+
+    llvm::Value *codegen(ast::VariableDeclaration *node, LLVMBackendState &llvmState) {
+        llvm::Type *varType = nullptr;
+        if (node->type().lexical() == "i32") {
+            varType = llvmState.Builder->getInt32Ty();
+        } else if (node->type().lexical() == "f64") {
+            varType = llvmState.Builder->getDoubleTy();
+        } else if (node->type().lexical() == "string") {
+            varType = llvmState.Builder->getPtrTy();
+        } else {
+            assert(false && "Unsupported variable type");
+            return nullptr;
+        }
+
+        if (node->constant()) {
+            llvmState.NamedValues[node->expressionToken().lexical()] = nullptr;
+            // Handle constant variable declaration if needed
+            if (const auto initialValue = node->initialValue()) {
+                if (llvm::Value *initValue = codegen_base(initialValue.value().get(), llvmState)) {
+                    llvmState.NamedValues[node->expressionToken().lexical()] = initValue;
+                } else {
+                    assert(false && "Failed to generate initial value for variable");
+                    return nullptr;
+                }
+            }
+            return llvmState.NamedValues[node->expressionToken().lexical()];
+        }
+
+
+        llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr, node->expressionToken().lexical());
+        llvmState.NamedAllocations[node->expressionToken().lexical()] = alloca;
+
+        if (auto initialValue = node->initialValue()) {
+            if (llvm::Value *initValue = codegen_base(initialValue.value().get(), llvmState)) {
+                llvmState.Builder->CreateStore(initValue, alloca);
+            } else {
+                assert(false && "Failed to generate initial value for variable");
+                return nullptr;
+            }
+        } else {
+            // Default initialization
+            if (varType->isIntegerTy()) {
+                llvm::Value *defaultValue = llvm::ConstantInt::get(varType, 0);
+                llvmState.Builder->CreateStore(defaultValue, alloca);
+            } else if (varType->isFloatingPointTy()) {
+                llvm::Value *defaultValue = llvm::ConstantFP::get(varType, 0.0);
+                llvmState.Builder->CreateStore(defaultValue, alloca);
+            } else if (varType->isPointerTy()) {
+                llvm::Value *defaultValue = llvm::ConstantPointerNull::get(
+                    llvm::cast<llvm::PointerType>(varType));
+                llvmState.Builder->CreateStore(defaultValue, alloca);
+            } else {
+                assert(false && "Unsupported variable type for default initialization");
+                return nullptr;
+            }
+        }
+
+        return alloca; // Return the allocation instruction
+    }
+
+    llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState) {
         switch (node->numberType()) {
             case ast::NumberType::INTEGER:
                 return llvm::ConstantInt::get(*llvmState.TheContext,
@@ -141,10 +288,26 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
             std::vector<llvm::Value *> args;
-            args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
+
             assert(node->args().size() == 1 && "println expects exactly one argument");
             for (const auto &arg: node->args()) {
-                args.push_back(codegen_base(arg.get(), llvmState));
+                auto value = codegen_base(arg.get(), llvmState);
+                if (value->getType()->isIntegerTy(32)) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%d\n", "i32_format"));
+                } else if (value->getType()->isIntegerTy(64)) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%ld\n", "i64_format"));
+                } else if (value->getType()->isDoubleTy()) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "double_format"));
+                } else if (value->getType()->isFloatTy()) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "float_format"));
+                } else if (value->getType()->isPointerTy()) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
+                } else {
+                    assert(false && "Unsupported argument type for println");
+                    return nullptr;
+                }
+
+                args.push_back(value);
             }
             return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
         }
@@ -196,7 +359,8 @@ namespace llvm_backend {
         }
     }
 
-    void init_context(LLVMBackendState &context, const std::string &moduleName) {
+    void init_context(LLVMBackendState &context, const std::string &moduleName,
+                      const compiler::CompilerOptions &options) {
         context.TheContext = std::make_unique<llvm::LLVMContext>();
         context.TheModule = std::make_unique<llvm::Module>(moduleName, *context.TheContext);
         context.Builder = std::make_unique<llvm::IRBuilder<> >(*context.TheContext);
@@ -212,29 +376,30 @@ namespace llvm_backend {
         context.TheSI->registerCallbacks(*context.ThePIC, context.TheMAM.get());
 
         // Add transform passes.
+        if (options.buildMode == compiler::BuildMode::Release) {
+            // Combine redundant instructions.
+            context.TheFPM->addPass(llvm::InstCombinePass());
+            // Reassociate expressions.
+            context.TheFPM->addPass(llvm::ReassociatePass());
+            // Eliminate Common SubExpressions.
+            context.TheFPM->addPass(llvm::GVNPass());
+            // Simplify the control flow graph (deleting unreachable blocks, etc).
+            context.TheFPM->addPass(llvm::SimplifyCFGPass());
 
-        context.TheFPM->addPass(llvm::InstCombinePass());
-        // Reassociate expressions.
-        context.TheFPM->addPass(llvm::ReassociatePass());
-        // Eliminate Common SubExpressions.
-        context.TheFPM->addPass(llvm::GVNPass());
-        // Simplify the control flow graph (deleting unreachable blocks, etc).
-        context.TheFPM->addPass(llvm::SimplifyCFGPass());
+            context.TheFPM->addPass(llvm::SCCPPass());
 
-        context.TheFPM->addPass(llvm::SCCPPass());
+            context.TheFPM->addPass(llvm::LoopSimplifyPass());
 
-        context.TheFPM->addPass(llvm::LoopSimplifyPass());
+            context.TheFPM->addPass(llvm::MemCpyOptPass());
 
-        context.TheFPM->addPass(llvm::MemCpyOptPass());
-
-        context.TheFPM->addPass(llvm::DCEPass());
-        context.TheMPM->addPass(llvm::AlwaysInlinerPass());
+            context.TheFPM->addPass(llvm::DCEPass());
+            context.TheMPM->addPass(llvm::AlwaysInlinerPass());
 
 
-        context.TheMPM->addPass(llvm::PartialInlinerPass());
-        context.TheMPM->addPass(llvm::ModuleInlinerPass());
-        context.TheMPM->addPass(llvm::GlobalDCEPass());
-
+            context.TheMPM->addPass(llvm::PartialInlinerPass());
+            context.TheMPM->addPass(llvm::ModuleInlinerPass());
+            context.TheMPM->addPass(llvm::GlobalDCEPass());
+        }
         // how do i remove unused functions?
 
 
@@ -256,7 +421,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
                                       const std::vector<std::unique_ptr<ast::ASTNode> > &nodes) {
     initializeLLVMBackend();
     LLVMBackendState context;
-    init_context(context, moduleName);
+    init_context(context, moduleName, options);
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
     std::string Error;
 

@@ -11,6 +11,11 @@ add_library(${PROJECT_NAME} STATIC
         include/ast/StringConstant.h
         include/ast/NumberConstant.h
         include/ast/FunctionDefinition.h
+        include/ast/VariableDeclaration.h
+        include/ast/LogicalExpression.h
+        include/ast/VariableAssignment.h
+        include/ast/BinaryExpression.h
+
         #include/parser/parser.h
 )
 target_sources(${PROJECT_NAME} PRIVATE
@@ -21,7 +26,9 @@ target_sources(${PROJECT_NAME} PRIVATE
         ast/ReturnStatement.cpp
         ast/StringConstant.cpp
         ast/NumberConstant.cpp
-        ast/FunctionDefinition.cpp)
-        
+        ast/FunctionDefinition.cpp
+        ast/VariableDeclaration.cpp
+        ast/VariableAssignment.cpp)
+
 
 target_include_directories(${PROJECT_NAME} PUBLIC include)

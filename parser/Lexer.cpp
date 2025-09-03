@@ -7,7 +7,7 @@
 
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
-        "fn", "return"
+        "fn", "return", "let", "mut"
     };
 
 
@@ -176,7 +176,7 @@ namespace lexer {
 
             found = find_number(source_code, start, &endPosition);
             if (found) {
-                const size_t offset = endPosition - start;
+                const size_t offset = endPosition - start + 1;
 
 
                 SourceLocation source_location = {

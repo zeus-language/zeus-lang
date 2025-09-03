@@ -140,7 +140,7 @@ jobs:
             ${{ env.CMAKE_BUILD_DIR }}/zeus-${{ steps.version-linux.outputs.version }}-Linux.tar.gz
           token: ${{ github.token }}
         env:
-          GITHUB_REPOSITORY: hisoka999/zeus-compiler
+          GITHUB_REPOSITORY: hisoka999/zeus-lang
         if: matrix.triplet == 'x64-linux'
       - name: Set CMAKE_BUILD_DIR with forward slashes (PowerShell)
         run: |
@@ -154,7 +154,7 @@ jobs:
           files: ${{ env.CMAKE_BUILD_DIR }}zeus-${{ steps.version-windows.outputs.version }}-${{matrix.winarch}}.zip
           token: ${{ github.token }}
         env:
-          GITHUB_REPOSITORY: hisoka999/zeus-compiler
+          GITHUB_REPOSITORY: hisoka999/zeus-lang
         if: matrix.os == 'windows-latest'
 
   

@@ -52,7 +52,7 @@ TEST_P(CompilerTest, TestNoError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.rtlDirectories.emplace_back("rtl");
+    options.stdlibDirectories.emplace_back("rtl");
 
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
@@ -224,7 +224,7 @@ TEST_P(CompilerTest, TestNoError) {
 // }
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
-                         testing::Values("helloworld"));
+                         testing::Values("helloworld","math"));
 
 // INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
 //                          testing::Values());

@@ -52,5 +52,6 @@ endif ()
 
 
 add_executable(${PROJECT_NAME} main.cpp ${SRC}
+        src/compiler/CompilerOptions.cpp
 )
 target_link_libraries(${PROJECT_NAME} PUBLIC parser ${llvm_libs})

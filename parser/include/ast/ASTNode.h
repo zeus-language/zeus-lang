@@ -11,10 +11,11 @@ namespace ast {
     private:
         Token m_token;
 
-    public:
+    protected:
         explicit ASTNode(Token token) : m_token(std::move(token)) {
         }
 
+    public:
         virtual ~ASTNode() = default;
 
 

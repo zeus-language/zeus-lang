@@ -8,11 +8,16 @@
 #include <iomanip>
 #include <iostream>
 
+#include "ast/BinaryExpression.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/LogicalExpression.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/VariableAccess.h"
+#include "ast/VariableAssignment.h"
+#include "ast/VariableDeclaration.h"
 #include "magic_enum/magic_enum.hpp"
 
 namespace parser {
@@ -113,7 +118,220 @@ namespace parser {
             if (auto string = parseString()) {
                 return std::move(string.value());
             }
+            if (auto functionCall = parseFunctionCall()) {
+                return std::move(functionCall.value());
+            }
+            if (auto varAccess = parseVariableAccess()) {
+                return std::move(varAccess.value());
+            }
             return std::nullopt;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAccess() {
+            if (!canConsume(Token::IDENTIFIER)) {
+                return std::nullopt;
+            }
+            Token nameToken = current();
+            consume(Token::IDENTIFIER);
+            return std::make_unique<ast::VariableAccess>(std::move(nameToken));
+        }
+
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseBaseExpression(
+            std::optional<std::unique_ptr<ast::ASTNode> > origLhs = std::nullopt, bool includeCompare = true) {
+            auto lhs = (origLhs.has_value()) ? std::move(origLhs) : tryParseToken();
+
+
+            Token operatorToken = current();
+            if (lhs) {
+                if (tryConsume(Token::PLUS)) {
+                    auto rhs = tryParseToken();
+
+                    if (canConsume(Token::MUL) or canConsume(Token::DIV) or canConsume(Token::LEFT_CURLY)) {
+                        rhs = parseBaseExpression(std::move(rhs), false);
+                    }
+                    if (!rhs) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '+' operator",
+                        });
+                        return lhs;
+                    }
+
+                    return parseExpression(
+                        std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::ADD,
+                                                                std::move(lhs.value()),
+                                                                std::move(rhs.value())));
+                }
+                if (tryConsume(Token::MINUS)) {
+                    auto rhs = tryParseToken();
+                    if (canConsume(Token::MUL) or canConsume(Token::DIV) or canConsume(Token::LEFT_CURLY)) {
+                        rhs = parseBaseExpression(std::move(rhs), false);
+                    }
+
+                    return parseExpression(
+                        std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::SUB,
+                                                                std::move(lhs.value()), std::move(rhs.value())));
+                }
+                if (tryConsume(Token::MUL)) {
+                    auto rhs = tryParseToken();
+                    return parseExpression(
+                        std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::MUL,
+                                                                std::move(lhs.value()), std::move(rhs.value())));
+                }
+                if (tryConsume(Token::DIV)) {
+                    auto rhs = tryParseToken();
+                    return parseExpression(
+                        std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::DIV,
+                                                                std::move(lhs.value()), std::move(rhs.value())));
+                }
+            }
+
+            if (canConsume(Token::LEFT_CURLY)) {
+                consume(Token::LEFT_CURLY);
+                auto result = parseExpression(std::nullopt);
+                consume(Token::RIGHT_CURLY);
+                if (lhs.has_value())
+                    if (auto binOp = dynamic_cast<ast::BinaryExpression *>(lhs.value().get())) {
+                        result = std::make_unique<ast::BinaryExpression>(binOp->expressionToken(), binOp->binoperator(),
+                                                                         binOp->lhs(),
+                                                                         std::move(result.value()));
+                    }
+                return parseExpression(std::move(result));
+            }
+
+            if (includeCompare) {
+                // if (canConsume(Token::GREATER)) {
+                //     consume(Token::GREATER);
+                //     auto operatorToken = current();
+                //     if (canConsume(Token::EQUAL)) {
+                //         consume(Token::EQUAL);
+                //         auto rhs = parseBaseExpression();
+                //         return std::make_shared<ast::Comparrision>(operatorToken, CMPOperator::GREATER_EQUAL, lhs, rhs);
+                //     }
+                //     auto rhs = parseBaseExpression();
+                //     return parseExpression(
+                //         std::make_shared<ComparrisionNode>(
+                //             operatorToken, CMPOperator::GREATER, lhs, rhs));
+                // }
+                //
+                // if (canConsume(Token::LESS)) {
+                //     consume(Token::LESS);
+                //     auto operatorToken = current();
+                //     if (canConsume(Token::EQUAL)) {
+                //         consume(Token::EQUAL);
+                //         auto rhs = parseBaseExpression();
+                //         return std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::LESS_EQUAL, lhs, rhs);
+                //     } else if (canConsume(Token::GREATER)) {
+                //         consume(Token::GREATER);
+                //         auto rhs = parseBaseExpression();
+                //         return parseExpression(
+                //             std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs,
+                //                                                rhs));
+                //     }
+                //     auto rhs = parseBaseExpression();
+                //     return parseExpression(
+                //         std::make_shared<ComparrisionNode>(
+                //             operatorToken, CMPOperator::LESS, lhs, rhs));
+                // }
+                //
+                // if (canConsume(Token::BANG) && canConsume(Token::EQUAL, 2)) {
+                //     consume(Token::BANG);
+                //     consume(Token::EQUAL);
+                //     auto operatorToken = current();
+                //     auto rhs = parseBaseExpression();
+                //     return parseExpression(
+                //         std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs, rhs));
+                // }
+                //
+                // if (canConsume(Token::EQUAL)) {
+                //     consume(Token::EQUAL);
+                //     auto operatorToken = current();
+                //     auto rhs = parseBaseExpression();
+                //     return parseExpression(
+                //         std::make_shared<Comparrision>(
+                //             operatorToken, CMPOperator::EQUALS, lhs, rhs));
+                // }
+            }
+
+            return lhs;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseLogicalExpression(
+            std::optional<std::unique_ptr<ast::ASTNode> > lhs) {
+            if (canConsumeKeyWord("not")) {
+                consumeKeyWord("not");
+                auto token = current();
+                auto rhs = parseExpression();
+                return parseExpression(
+                    std::make_unique<ast::LogicalExpression>(token, ast::LogicalOperator::NOT,
+                                                             std::move(rhs.value())));
+            }
+
+            if (!lhs)
+                return std::nullopt;
+
+            if (canConsumeKeyWord("or")) {
+                consumeKeyWord("or");
+                auto token = current();
+                auto rhs = parseExpression();
+                return parseExpression(
+                    std::make_unique<ast::LogicalExpression>(token, ast::LogicalOperator::OR,
+                                                             std::move(lhs.value()),
+                                                             std::move(rhs.value())));
+            }
+            if (canConsumeKeyWord("and")) {
+                consumeKeyWord("and");
+                auto token = current();
+                auto rhs = parseExpression();
+                return parseExpression(
+                    std::make_unique<
+                        ast::LogicalExpression>(token, ast::LogicalOperator::AND, std::move(lhs.value()),
+                                                std::move(rhs.value())));
+            }
+            return lhs;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseExpression(
+            std::optional<std::unique_ptr<ast::ASTNode> > origLhs = std::nullopt) {
+            auto lhs = parseLogicalExpression(std::move(origLhs));
+            if (!lhs)
+                lhs = std::move(origLhs);
+
+            if (!lhs)
+                lhs = parseBaseExpression();
+            if (!lhs)
+                return std::nullopt;
+
+            if (auto rhs = parseLogicalExpression(parseBaseExpression(std::move(lhs))))
+                return rhs;
+
+            return lhs;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAssignment() {
+            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::EQUAL, 1)) {
+                return std::nullopt;
+            }
+            Token nameToken = current();
+            consume(Token::IDENTIFIER);
+            if (!tryConsume(Token::EQUAL)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = nameToken,
+                    .message = "expected '=' after variable name in assignment!"
+                });
+                return std::nullopt;
+            }
+            auto value = parseExpression();
+            if (!value) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected expression after '=' in variable assignment!"
+                });
+                return std::nullopt;
+            }
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::VariableAssignment>(std::move(nameToken), std::move(value.value()));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseVariableDeclaration() {
@@ -121,19 +339,27 @@ namespace parser {
                 return std::nullopt;
             }
             consumeKeyWord("let");
-            consume(Token::Type::IDENTIFIER);
-            Token nameToken = current();
-            consume(Token::Type::COLON);
-            consume(Token::Type::IDENTIFIER);
-            Token typeToken = current();
-            if (tryConsume(Token::EQUAL)) {
-                // TODO parse expression
-                while (!canConsume(Token::SEMICOLON) && hasNext()) {
-                    next();
-                }
+            bool constant = true;
+            if (tryConsumeKeyWord("mut")) {
+                constant = false;
             }
-            consume(Token::Type::SEMICOLON);
-            return std::nullopt;
+            Token nameToken = current();
+            consume(Token::Type::IDENTIFIER);
+
+            consume(Token::Type::COLON);
+            Token typeToken = current();
+            consume(Token::Type::IDENTIFIER);
+
+            std::optional<std::unique_ptr<ast::ASTNode> > value = std::nullopt;
+            if (tryConsume(Token::EQUAL)) {
+                value = tryParseToken();
+                consume(Token::Type::SEMICOLON);
+            } else {
+                consume(Token::Type::SEMICOLON);
+            }
+
+            return std::make_unique<ast::VariableDeclaration>(std::move(nameToken), std::move(typeToken), constant,
+                                                              std::move(value));
         }
 
         std::vector<std::unique_ptr<ast::ASTNode> > parseBlock() {
@@ -145,6 +371,10 @@ namespace parser {
                     nodes.push_back(std::move(functionCall.value()));
                 } else if (auto returnStatement = parseReturnStatement()) {
                     nodes.push_back(std::move(returnStatement.value()));
+                } else if (auto varDecl = parseVariableDeclaration()) {
+                    nodes.push_back(std::move(varDecl.value()));
+                } else if (auto varAssign = parseVariableAssignment()) {
+                    nodes.push_back(std::move(varAssign.value()));
                 } else {
                     next();
                     m_messages.push_back(ParserMessasge{
@@ -182,7 +412,7 @@ namespace parser {
         }
 
         std::optional<std::unique_ptr<ast::FunctionCallNode> > parseFunctionCall() {
-            if (!canConsume(Token::IDENTIFIER) && !canConsume(Token::Type::LEFT_CURLY)) {
+            if ((!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::LEFT_CURLY, 1))) {
                 return std::nullopt;
             }
             Token nameToken = current();
@@ -229,8 +459,8 @@ namespace parser {
             return m_tokens[m_current];
         }
 
-        bool consume(const Token::Type tokenType) {
-            if (canConsume(tokenType)) {
+        bool consume(const Token::Type Token) {
+            if (canConsume(Token)) {
                 ++m_current;
                 return true;
             }
@@ -238,15 +468,15 @@ namespace parser {
             m_messages.push_back(ParserMessasge{
 
                 .token = m_tokens.at(m_current),
-                .message = "expected token '" + std::string(magic_enum::enum_name(tokenType)) + "' but found " +
+                .message = "expected token '" + std::string(magic_enum::enum_name(Token)) + "' but found " +
                            std::string(magic_enum::enum_name(m_tokens[m_current].type)) + "!"
             });
 
             return false;
         }
 
-        bool tryConsume(const Token::Type tokenType) {
-            if (canConsume(tokenType)) {
+        bool tryConsume(const Token::Type Token) {
+            if (canConsume(Token)) {
                 ++m_current;
                 return true;
             }
@@ -255,12 +485,12 @@ namespace parser {
 
         [[nodiscard]] bool hasNext() const { return m_current < m_tokens.size() - 1; }
 
-        [[nodiscard]] bool canConsume(const Token::Type tokenType) const {
-            return canConsume(tokenType, 0);;
+        [[nodiscard]] bool canConsume(const Token::Type Token) const {
+            return canConsume(Token, 0);;
         }
 
-        [[nodiscard]] bool canConsume(const Token::Type tokenType, const size_t next) const {
-            return hasNext() && m_tokens[m_current + next].type == tokenType;
+        [[nodiscard]] bool canConsume(const Token::Type Token, const size_t next) const {
+            return hasNext() && m_tokens[m_current + next].type == Token;
         }
 
         bool consumeKeyWord(const std::string &keyword) {
