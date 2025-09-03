@@ -391,7 +391,10 @@ namespace parser {
             return nodes;
         }
 
-        std::unique_ptr<ast::ASTNode> parseFunctionDefinition() {
+        std::optional<std::unique_ptr<ast::ASTNode> > parseFunctionDefinition() {
+            if (!canConsumeKeyWord("fn")) {
+                return std::nullopt;
+            }
             consumeKeyWord("fn");
             Token nameToken = current();
             consume(Token::Type::IDENTIFIER);
@@ -441,7 +444,8 @@ namespace parser {
 
         ParseResult parse() {
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
-            nodes.push_back(std::move(parseFunctionDefinition()));
+            while (auto functionDef = parseFunctionDefinition())
+                nodes.push_back(std::move(functionDef.value()));
             return ParseResult{
                 .nodes = std::move(nodes),
                 .messages = m_messages

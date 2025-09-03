@@ -1,0 +1,10 @@
+fn get_constant() : i32 {
+    return 42;
+}
+
+fn main() : i32 {
+    let const_value : i32 = get_constant();
+    println("The constant value is: ");
+    println(const_value);
+    return 0;
+}

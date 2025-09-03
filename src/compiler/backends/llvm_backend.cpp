@@ -226,7 +226,7 @@ namespace llvm_backend {
                 if (llvm::Value *initValue = codegen_base(initialValue.value().get(), llvmState)) {
                     llvmState.NamedValues[node->expressionToken().lexical()] = initValue;
                 } else {
-                    assert(false && "Failed to generate initial value for variable");
+                    assert(false && "Failed to generate initial value for constant");
                     return nullptr;
                 }
             }
@@ -311,7 +311,13 @@ namespace llvm_backend {
             }
             return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
         }
-        return nullptr; // Placeholder
+        const auto functionCall = llvmState.TheModule->getFunction(node->functionName());
+        assert(functionCall && "Function not declared before call");
+        if (!functionCall) {
+            return nullptr; // Error handling
+        }
+        std::vector<llvm::Value *> args;
+        return llvmState.Builder->CreateCall(functionCall, args, "funcCall");
     }
 
     llvm::Value *codegen(ast::ReturnStatement *node, LLVMBackendState &llvmState) {
@@ -335,6 +341,9 @@ namespace llvm_backend {
         }
         llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
         auto linkage = llvm::Function::ExternalLinkage;
+        if (node->functionName() != "main") {
+            linkage = llvm::Function::PrivateLinkage;
+        }
 
 
         auto functionDefinition = llvm::Function::Create(FT, linkage, node->functionName(),
@@ -348,7 +357,12 @@ namespace llvm_backend {
         for (auto &stmt: node->statements()) {
             llvm_backend::codegen_base(stmt.get(), llvmState);
         }
+        functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
 
+
+        llvm::AttrBuilder b(*llvmState.TheContext);
+        b.addAttribute("frame-pointer", "all");
+        functionDefinition->addFnAttrs(b);
         // if (!m_returnType)
         // {
         //     context->builder()->CreateRetVoid();
@@ -399,12 +413,18 @@ namespace llvm_backend {
             context.TheMPM->addPass(llvm::PartialInlinerPass());
             context.TheMPM->addPass(llvm::ModuleInlinerPass());
             context.TheMPM->addPass(llvm::GlobalDCEPass());
+            context.TheMPM->addPass(llvm::createModuleToFunctionPassAdaptor(
+                llvm::DCEPass())); // Remove dead functions and global variables.
         }
         // how do i remove unused functions?
+        // Register analysis passes used in these transform passes.
+        llvm::PassBuilder PB;
+        const auto TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
+        const auto TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
 
-
-        context.TheMPM->addPass(llvm::createModuleToFunctionPassAdaptor(
-            llvm::DCEPass())); // Remove dead functions and global variables.
+        PB.registerModuleAnalyses(*context.TheMAM);
+        PB.registerFunctionAnalyses(*context.TheFAM);
+        PB.crossRegisterProxies(*TheLAM, *context.TheFAM, *TheCGAM, *context.TheMAM);
     }
 
     // Register analysis passes used in these transform passes.
@@ -444,7 +464,11 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
             llvm_backend::codegen(funcDef, context);
         }
     }
-
+    if (!llvm::verifyModule(*context.TheModule, &llvm::errs())) {
+        if (options.buildMode == compiler::BuildMode::Release) {
+            context.TheMPM->run(*context.TheModule, *context.TheMAM);
+        }
+    }
 
     auto basePath = options.outputDirectory;
 
