@@ -1,5 +1,5 @@
-#include "linker.h"
-#include "command.h"
+#include "linker/linker.h"
+#include "os/command.h"
 #include "llvm/Support/CommandLine.h"
 
 bool link_modules(std::ostream &errStream, const std::filesystem::path &baseDir, const std::string &program_name,

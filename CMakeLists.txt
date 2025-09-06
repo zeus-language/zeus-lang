@@ -11,7 +11,7 @@ find_package(LLVM 18.1.0 REQUIRED CONFIG)
 message(STATUS " Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID}")
-include_directories(${LLVM_INCLUDE_DIRS} src/os src/linker)
+include_directories(${LLVM_INCLUDE_DIRS} src)
 add_definitions(${LLVM_DEFINITIONS})
 # Find and link LLD libraries
 llvm_map_components_to_libnames(llvm_libs support core irreader native nativecodegen passes)
