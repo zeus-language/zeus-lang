@@ -10,7 +10,8 @@
 namespace ast {
     struct FunctionArgument {
         std::string name;
-        std::string type; //TODO
+        std::string typeName;
+        std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
     };
 
     class FunctionDefinition final : public ASTNode {

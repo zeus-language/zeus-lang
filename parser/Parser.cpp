@@ -107,7 +107,7 @@ namespace parser {
 
             consumeKeyWord("return");
             auto returnToken = current();
-            auto returnValue = tryParseToken();
+            auto returnValue = parseExpression();
             return std::make_unique<ast::ReturnStatement>(returnToken, std::move(returnValue));
         }
 
@@ -150,7 +150,7 @@ namespace parser {
                     if (canConsume(Token::MUL) or canConsume(Token::DIV) or canConsume(Token::LEFT_CURLY)) {
                         rhs = parseBaseExpression(std::move(rhs), false);
                     }
-                    if (!rhs) {
+                    if (!rhs || !rhs.value()) {
                         m_messages.push_back(ParserMessasge{
                             .token = current(),
                             .message = "missing right hand side expression after '+' operator",
@@ -194,7 +194,7 @@ namespace parser {
                 if (lhs.has_value())
                     if (auto binOp = dynamic_cast<ast::BinaryExpression *>(lhs.value().get())) {
                         result = std::make_unique<ast::BinaryExpression>(binOp->expressionToken(), binOp->binoperator(),
-                                                                         binOp->lhs(),
+                                                                         binOp->movelhs(),
                                                                          std::move(result.value()));
                     }
                 return parseExpression(std::move(result));
@@ -391,6 +391,21 @@ namespace parser {
             return nodes;
         }
 
+        std::optional<ast::FunctionArgument> tryParseFunctionArgument() {
+            if (!canConsume(Token::IDENTIFIER))
+                return std::nullopt;
+            Token nameToken = current();
+            consume(Token::Type::IDENTIFIER);
+            consume(Token::Type::COLON);
+            Token typeToken = current();
+            consume(Token::Type::IDENTIFIER);
+
+            return ast::FunctionArgument{
+                .name = std::move(nameToken.lexical()),
+                .typeName = std::move(typeToken.lexical())
+            };
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseFunctionDefinition() {
             if (!canConsumeKeyWord("fn")) {
                 return std::nullopt;
@@ -403,7 +418,10 @@ namespace parser {
             // todo parse parameters
             std::vector<ast::FunctionArgument> functionArgs;
             while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
-                next(); //TODO
+                if (auto arg = tryParseFunctionArgument()) {
+                    functionArgs.push_back(std::move(arg.value()));
+                    tryConsume(Token::COMMA);
+                }
             }
             consume(Token::Type::RIGHT_CURLY);
             consume(Token::COLON);

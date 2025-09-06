@@ -17,7 +17,7 @@ namespace ast {
     public:
         explicit ReturnStatement(Token returnToken, std::optional<std::unique_ptr<ASTNode> > returnValue);
 
-        std::optional<ASTNode *> returnValue() const {
+        [[nodiscard]] std::optional<ASTNode *> returnValue() const {
             return m_returnValue.has_value() ? std::make_optional(m_returnValue.value().get()) : std::nullopt;
         }
 

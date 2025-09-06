@@ -172,6 +172,7 @@ namespace lexer {
                 };
                 tokens.emplace_back(Token::KEYWORD, source_location);
                 start = endPosition;
+                col += offset;
             }
 
             found = find_number(source_code, start, &endPosition);
@@ -185,6 +186,7 @@ namespace lexer {
                 };
                 tokens.emplace_back(Token::NUMBER, source_location);
                 start = endPosition;
+                col += offset;
             }
             found = find_token(source_code, start, &endPosition);
             if (found) {

@@ -6,6 +6,7 @@
 #include <parser/Parser.h>
 
 #include "backends/llvm_backend.h"
+#include "types/TypeChecker.h"
 
 namespace compiler {
     void compile(CompilerOptions options, const std::string &moduleName,
@@ -47,7 +48,15 @@ namespace compiler {
         for (const auto &message: result.messages) {
             message.msg(std::cout, true);
         }
-        if (!result.hasError()) {
+
+        types::TypeCheckResult typeCheckResult;
+        types::type_check(result.nodes, typeCheckResult);
+        for (const auto &message: typeCheckResult.messages) {
+            message.msg(std::cout, true);
+        }
+
+
+        if (!result.hasError() && !typeCheckResult.hasError()) {
             compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
                     result.nodes);
         }

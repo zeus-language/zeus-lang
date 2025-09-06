@@ -28,9 +28,9 @@ namespace ast {
         ~BinaryExpression() override = default;
 
         [[nodiscard]] BinaryOperator binoperator() const { return m_operator; }
-
-        std::unique_ptr<ASTNode> lhs() { return std::move(m_lhs); }
-        std::unique_ptr<ASTNode> rhs() { return std::move(m_rhs); }
+        [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
+        [[nodiscard]] std::unique_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
+        [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
 
         BinaryExpression(BinaryExpression &&) = default;
 

@@ -18,8 +18,8 @@ namespace ast {
     public:
         explicit VariableAssignment(Token name, std::unique_ptr<ASTNode> expression);
 
-        std::unique_ptr<ASTNode> expression() {
-            return std::move(m_expression);
+        [[nodiscard]] ASTNode *expression() const {
+            return m_expression.get();
         }
 
         ~VariableAssignment() override = default;

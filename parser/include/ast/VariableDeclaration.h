@@ -9,11 +9,12 @@
 
 #include "ASTNode.h"
 #include "lexer/Lexer.h"
+#include "types/VariableType.h"
 
 namespace ast {
     class VariableDeclaration final : public ASTNode {
     private:
-        Token m_type;
+        Token m_typeToken;
         bool m_constant;
         std::optional<std::unique_ptr<ASTNode> > m_initialValue;
 
@@ -23,11 +24,12 @@ namespace ast {
 
         ~VariableDeclaration() override = default;
 
-        std::optional<std::unique_ptr<ASTNode> > initialValue();
+        [[nodiscard]] std::optional<ASTNode *> initialValue() const;
 
         [[nodiscard]] Token type() const;
 
         [[nodiscard]] bool constant() const;
+
 
         VariableDeclaration(VariableDeclaration &&) = default;
 

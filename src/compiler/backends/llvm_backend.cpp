@@ -81,6 +81,29 @@ namespace llvm_backend {
         InitializeNativeTargetAsmPrinter();
     }
 
+    llvm::Type *resolveLlvmType(std::shared_ptr<types::VariableType> value, LLVMBackendState &context) {
+        if (auto intType = std::dynamic_pointer_cast<types::IntegerType>(value)) {
+            return llvm::Type::getIntNTy(*context.TheContext, intType->size() * 8);
+        }
+
+        switch (value->typeKind()) {
+            case types::TypeKind::INT:
+                break;
+            case types::TypeKind::FLOAT:
+                return llvm::Type::getFloatTy(*context.TheContext);
+            case types::TypeKind::STRING:
+                return llvm::PointerType::getUnqual(*context.TheContext);
+            case types::TypeKind::BOOL:
+                return llvm::Type::getInt1Ty(*context.TheContext);
+            case types::TypeKind::VOID:
+                return llvm::Type::getVoidTy(*context.TheContext);
+            case types::TypeKind::STRUCT:
+                break;
+        }
+        assert(false && "Unknown type");
+        return nullptr;
+    }
+
     llvm::GlobalVariable *getOrCreateGlobalString(LLVMBackendState &llvmState, const std::string &value,
                                                   const std::string &name) {
         auto _name = name;
@@ -103,7 +126,7 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::StringConstant *node, LLVMBackendState &llvmState);
 
-    llvm::Value *codegen(ast::VariableDeclaration *node, LLVMBackendState &llvmState);
+    llvm::Value *codegen(const ast::VariableDeclaration *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::VariableAssignment *node, LLVMBackendState &llvmState);
 
@@ -143,8 +166,8 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState) {
-        auto lhs = codegen_base(node->lhs().get(), llvmState);
-        auto rhs = codegen_base(node->rhs().get(), llvmState);
+        auto lhs = codegen_base(node->lhs(), llvmState);
+        auto rhs = codegen_base(node->rhs(), llvmState);
 
         switch (node->binoperator()) {
             case ast::BinaryOperator::ADD:
@@ -200,30 +223,20 @@ namespace llvm_backend {
             assert(false && "Variable not declared before assignment");
             return nullptr;
         }
-        llvmState.Builder->CreateStore(codegen_base(node->expression().get(), llvmState), alloca);
+        llvmState.Builder->CreateStore(codegen_base(node->expression(), llvmState), alloca);
 
 
         return alloca; // Return the allocation instruction
     }
 
-    llvm::Value *codegen(ast::VariableDeclaration *node, LLVMBackendState &llvmState) {
-        llvm::Type *varType = nullptr;
-        if (node->type().lexical() == "i32") {
-            varType = llvmState.Builder->getInt32Ty();
-        } else if (node->type().lexical() == "f64") {
-            varType = llvmState.Builder->getDoubleTy();
-        } else if (node->type().lexical() == "string") {
-            varType = llvmState.Builder->getPtrTy();
-        } else {
-            assert(false && "Unsupported variable type");
-            return nullptr;
-        }
+    llvm::Value *codegen(const ast::VariableDeclaration *node, LLVMBackendState &llvmState) {
+        llvm::Type *varType = resolveLlvmType(node->expressionType().value(), llvmState);
 
         if (node->constant()) {
             llvmState.NamedValues[node->expressionToken().lexical()] = nullptr;
             // Handle constant variable declaration if needed
             if (const auto initialValue = node->initialValue()) {
-                if (llvm::Value *initValue = codegen_base(initialValue.value().get(), llvmState)) {
+                if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
                     llvmState.NamedValues[node->expressionToken().lexical()] = initValue;
                 } else {
                     assert(false && "Failed to generate initial value for constant");
@@ -237,8 +250,8 @@ namespace llvm_backend {
         llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr, node->expressionToken().lexical());
         llvmState.NamedAllocations[node->expressionToken().lexical()] = alloca;
 
-        if (auto initialValue = node->initialValue()) {
-            if (llvm::Value *initValue = codegen_base(initialValue.value().get(), llvmState)) {
+        if (const auto initialValue = node->initialValue()) {
+            if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
                 llvmState.Builder->CreateStore(initValue, alloca);
             } else {
                 assert(false && "Failed to generate initial value for variable");
@@ -317,6 +330,13 @@ namespace llvm_backend {
             return nullptr; // Error handling
         }
         std::vector<llvm::Value *> args;
+        for (const auto &arg: node->args()) {
+            if (auto value = codegen_base(arg.get(), llvmState)) {
+                args.push_back(value);
+            } else {
+                return nullptr; // Error handling
+            }
+        }
         return llvmState.Builder->CreateCall(functionCall, args, "funcCall");
     }
 
@@ -332,12 +352,14 @@ namespace llvm_backend {
         }
     }
 
+
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         // Placeholder for actual LLVM IR generation logic
         auto resultType = llvmState.Builder->getInt32Ty();
         std::vector<llvm::Type *> params;
         for (const auto &param: node->args()) {
-            //TODO
+            auto paramType = resolveLlvmType(param.type.value(), llvmState);
+            params.push_back(paramType);
         }
         llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
         auto linkage = llvm::Function::ExternalLinkage;
@@ -354,6 +376,17 @@ namespace llvm_backend {
                                                                        functionDefinition);
 
         llvmState.Builder->SetInsertPoint(functionBaseBlock);
+
+        for (auto &arg: functionDefinition->args()) {
+            arg.setName(node->args()[arg.getArgNo()].name);
+            // Create an alloca for this variable.
+            llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(arg.getType(), nullptr, arg.getName() + ".addr");
+            // Store the initial value into the alloca.
+            llvmState.Builder->CreateStore(&arg, alloca);
+            // Add arguments to variable symbol table.
+            llvmState.NamedAllocations[std::string(arg.getName())] = alloca;
+        }
+
         for (auto &stmt: node->statements()) {
             llvm_backend::codegen_base(stmt.get(), llvmState);
         }

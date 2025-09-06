@@ -4,12 +4,16 @@
 
 #ifndef ZEUS_LANG_ASTNODE_H
 #define ZEUS_LANG_ASTNODE_H
+#include <optional>
+
 #include "lexer/Lexer.h"
+#include "types/VariableType.h"
 
 namespace ast {
     class ASTNode {
     private:
         Token m_token;
+        std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
 
     protected:
         explicit ASTNode(Token token) : m_token(std::move(token)) {
@@ -27,9 +31,14 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-
-        virtual void type_check() {
+        [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
+            return m_expressionType;
         }
+
+        void setExpressionType(std::shared_ptr<types::VariableType> type) {
+            m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
+        }
+
 
         [[nodiscard]] Token expressionToken() const { return m_token; }
     };

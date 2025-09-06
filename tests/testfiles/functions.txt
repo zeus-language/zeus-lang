@@ -1,0 +1,4 @@
+The constant value is:
+42
+Adding 10 and 20 gives:
+30

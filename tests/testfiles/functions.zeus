@@ -1,10 +1,15 @@
 fn get_constant() : i32 {
     return 42;
 }
-
+fn add(a : i32, b : i32) : i32 {
+    return a + b;
+}
 fn main() : i32 {
     let const_value : i32 = get_constant();
-    println("The constant value is: ");
+    println("The constant value is:");
     println(const_value);
+    println("Adding 10 and 20 gives:");
+    let sum : i32 = add(10, 20);
+    println(sum);
     return 0;
 }
