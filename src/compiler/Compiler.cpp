@@ -37,7 +37,7 @@ namespace compiler {
                            std::ostream &errorStream,
                            std::ostream &outputStream) {
         const auto content = read_file(inputPath);
-        const auto tokens = lexer::lex_file(inputPath, content.value());
+        const auto tokens = lexer::lex_file(inputPath.string(), content.value());
         // for (const auto &token: tokens) {
         //   std::cout << "Token Type: " << std::string(
         //         magic_enum::enum_name(token.type)) << " Lexical: " << token.lexical() << " at Line: " << token.source_location
