@@ -1,10 +1,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include "lexer/Lexer.h"
 #include "magic_enum/magic_enum.hpp"
 #include "parser/Parser.h"
-#include "../compiler/Compiler.h"
+#include "compiler/Compiler.h"
 
 std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
   std::ifstream file;
