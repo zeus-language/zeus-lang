@@ -338,10 +338,7 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::ReturnStatement *node, LLVMBackendState &llvmState) {
         if (auto returnValue = node->returnValue()) {
-            // Generate code for the return expression
-            // Placeholder for actual expression code generation
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
-            // Example: returning 0
             return llvmState.Builder->CreateRet(retValue);
         } else {
             return llvmState.Builder->CreateRetVoid();
@@ -485,6 +482,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     llvm::TargetOptions opt;
     auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, llvm::Reloc::PIC_);
     llvm::Triple target(TargetTriple);
+    context.TheModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     createPrintfCall(*context.TheContext, *context.TheModule);
 
@@ -556,7 +554,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
 
     if (target.getOS() == llvm::Triple::Win32) {
         executableName += ".exe";
-        flags.erase(std::ranges::find(flags, "-lc"));
+        //flags.erase(std::ranges::find(flags, "-lc"));
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {
