@@ -224,7 +224,7 @@ TEST_P(CompilerTest, TestNoError) {
 // }
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
-                         testing::Values("helloworld","math","functions","conditions"));
+                         testing::Values("helloworld","math","functions","conditions","whileloop"));
 
 // INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
 //                          testing::Values());

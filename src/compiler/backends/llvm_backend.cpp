@@ -47,6 +47,7 @@
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
+#include "ast/WhileLoop.h"
 
 namespace llvm_backend {
     struct LLVMBackendState {
@@ -135,6 +136,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::IfCondition *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::WhileLoop *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen(ast::LogicalExpression *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState);
@@ -173,13 +176,15 @@ namespace llvm_backend {
         if (const auto comp = dynamic_cast<ast::Comparisson *>(node)) {
             return llvm_backend::codegen(comp, llvmState);
         }
+        if (const auto whileLoop = dynamic_cast<ast::WhileLoop *>(node)) {
+            return llvm_backend::codegen(whileLoop, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
     }
-
-    llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState) {
+     llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState) {
         auto lhs = codegen_base(node->lhs(), llvmState);
         assert(lhs && "lhs of the comparison is null");
         auto rhs = codegen_base(node->rhs(), llvmState);
@@ -269,6 +274,38 @@ namespace llvm_backend {
             default:
                 assert(false && "unknown logical operator");
         }
+    }
+
+    llvm::Value *codegen(ast::WhileLoop *node, LLVMBackendState &llvmState) {
+        llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
+
+        llvm::BasicBlock *CondBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loopcond", TheFunction);
+        llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop", TheFunction);
+        llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "afterloop", TheFunction);
+
+        llvmState.Builder->CreateBr(CondBB);
+
+        llvmState.Builder->SetInsertPoint(CondBB);
+        auto condition = codegen_base(node->condition(), llvmState);
+        if (!condition) {
+            assert(false && "Failed to generate condition for while loop");
+            return nullptr;
+        }
+        condition = llvmState.Builder->CreateICmpEQ(condition, llvmState.Builder->getTrue(), "whilecond");
+
+        llvmState.Builder->CreateCondBr(condition, LoopBB, AfterBB);
+
+        llvmState.Builder->SetInsertPoint(LoopBB);
+
+        for (auto &exp: node->block()) {
+            codegen_base(exp.get(), llvmState);
+        }
+
+        llvmState.Builder->CreateBr(CondBB);
+
+        llvmState.Builder->SetInsertPoint(AfterBB);
+
+        return AfterBB;
     }
 
     llvm::Value *codegen(ast::IfCondition *node, LLVMBackendState &llvmState) {

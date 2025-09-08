@@ -14,6 +14,7 @@
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
+#include "ast/WhileLoop.h"
 #include "types/TypeRegistry.h"
 
 namespace types {
@@ -46,6 +47,8 @@ namespace types {
     void type_check(ast::IfCondition *node, Context &context);
 
     void type_check(ast::Comparisson *node, Context &context);
+
+    void type_check(ast::WhileLoop *node, Context &context);
 
     void type_check(ast::StringConstant *node, Context &context) {
         node->setExpressionType(context.registry.getTypeByName("string").value());
@@ -99,12 +102,22 @@ namespace types {
         if (const auto comp = dynamic_cast<ast::Comparisson *>(node)) {
             return type_check(comp, context);
         }
+        if (const auto whileLoop = dynamic_cast<ast::WhileLoop *>(node)) {
+            return type_check(whileLoop, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::WhileLoop *node, Context &context) {
+        type_check_base(node->condition(), context);
+        for (auto &stmt: node->block()) {
+            type_check_base(stmt.get(), context);
+        }
     }
 
     void type_check(ast::IfCondition *node, Context &context) {

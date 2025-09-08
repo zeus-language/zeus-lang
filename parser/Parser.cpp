@@ -20,6 +20,7 @@
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
+#include "ast/WhileLoop.h"
 #include "magic_enum/magic_enum.hpp"
 
 namespace parser {
@@ -394,6 +395,24 @@ namespace parser {
                                                       std::move(elseBlock));
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseWhileLoop() {
+            if (!canConsumeKeyWord("while")) {
+                return std::nullopt;
+            }
+            Token whileToken = current();
+            consumeKeyWord("while");
+            auto condition = parseExpression();
+            if (!condition) {
+                m_messages.push_back(ParserMessasge{
+                    .token = whileToken,
+                    .message = "expected condition expression after 'while'!"
+                });
+                return std::nullopt;
+            }
+            auto block = parseBlock();
+            return std::make_unique<ast::WhileLoop>(whileToken, std::move(condition.value()), std::move(block));
+        }
+
         std::vector<std::unique_ptr<ast::ASTNode> > parseBlock() {
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
@@ -409,6 +428,8 @@ namespace parser {
                     nodes.push_back(std::move(varAssign.value()));
                 } else if (auto ifCondition = parseIfCondition()) {
                     nodes.push_back(std::move(ifCondition.value()));
+                } else if (auto whileLoop = parseWhileLoop()) {
+                    nodes.push_back(std::move(whileLoop.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),

@@ -20,6 +20,7 @@ add_library(${PROJECT_NAME} STATIC
         include/types/TypeChecker.h
         include/ast/Comparisson.h
         include/ast/IfCondition.h
+        include/ast/WhileLoop.h
 
         #include/parser/parser.h
 )
