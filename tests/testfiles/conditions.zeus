@@ -1,0 +1,34 @@
+
+
+fn main() : i32 {
+    let a : i32 = 10;
+    let b : i32 = 20;
+
+    if a < b {
+        println("a is less than b");
+    } else if a > b {
+        println("a is greater than b");
+    } else {
+        println("a is equal to b");
+    }
+
+    let mut max_value : i32;
+    if a > b {
+        max_value = a;
+    } else {
+        max_value = b;
+    }
+    println("The maximum value is:");
+    println(max_value);
+
+    let mut min_value : i32;
+    if a < b {
+        min_value = a;
+    } else {
+        min_value = b;
+    }
+    println("The minimum value is:");
+    println(min_value);
+
+    return 0;
+}

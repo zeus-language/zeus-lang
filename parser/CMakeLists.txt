@@ -18,7 +18,8 @@ add_library(${PROJECT_NAME} STATIC
         include/types/VariableType.h
         include/types/TypeRegistry.h
         include/types/TypeChecker.h
-        TypeChecker.cpp
+        include/ast/Comparisson.h
+        include/ast/IfCondition.h
 
         #include/parser/parser.h
 )
@@ -26,6 +27,7 @@ target_sources(${PROJECT_NAME} PRIVATE
         Lexer.cpp
         Parser.cpp
         TypeRegistry.cpp
+        TypeChecker.cpp
         ast/ASTNode.cpp
         ast/FunctionCallNode.cpp
         ast/ReturnStatement.cpp

@@ -1,0 +1,5 @@
+a is less than b
+The maximum value is:
+20
+The minimum value is:
+10

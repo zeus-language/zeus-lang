@@ -37,7 +37,10 @@
 #include "linker/linker.h"
 #include "llvm_intrinsics.h"
 #include "ast/BinaryExpression.h"
+#include "ast/Comparisson.h"
 #include "ast/FunctionCallNode.h"
+#include "ast/IfCondition.h"
+#include "ast/LogicalExpression.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -130,6 +133,12 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::IfCondition *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::LogicalExpression *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -155,15 +164,166 @@ namespace llvm_backend {
         if (const auto binExpr = dynamic_cast<ast::BinaryExpression *>(node)) {
             return llvm_backend::codegen(binExpr, llvmState);
         }
+        if (const auto ifCond = dynamic_cast<ast::IfCondition *>(node)) {
+            return llvm_backend::codegen(ifCond, llvmState);
+        }
+        if (const auto logExpr = dynamic_cast<ast::LogicalExpression *>(node)) {
+            return llvm_backend::codegen(logExpr, llvmState);
+        }
+        if (const auto comp = dynamic_cast<ast::Comparisson *>(node)) {
+            return llvm_backend::codegen(comp, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
     }
 
-    llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState) {
+    llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState) {
         auto lhs = codegen_base(node->lhs(), llvmState);
+        assert(lhs && "lhs of the comparison is null");
         auto rhs = codegen_base(node->rhs(), llvmState);
+        assert(rhs && "rhs of the comparison is null");
+
+        llvm::CmpInst::Predicate pred = llvm::CmpInst::ICMP_EQ;
+        if (lhs->getType()->isDoubleTy() || lhs->getType()->isFloatTy()) {
+            pred = llvm::CmpInst::FCMP_OEQ;
+            switch (node->cmpoperator()) {
+                case ast::CMPOperator::NOT_EQUALS:
+                    pred = llvm::CmpInst::FCMP_ONE;
+                    break;
+                case ast::CMPOperator::EQUALS:
+
+                    break;
+                case ast::CMPOperator::GREATER:
+                    pred = llvm::CmpInst::FCMP_OGT;
+                    break;
+                case ast::CMPOperator::GREATER_EQUAL:
+                    pred = llvm::CmpInst::FCMP_OGE;
+                    break;
+                case ast::CMPOperator::LESS:
+                    pred = llvm::CmpInst::FCMP_OLT;
+                    break;
+                case ast::CMPOperator::LESS_EQUAL:
+                    pred = llvm::CmpInst::FCMP_OLE;
+                    break;
+                default:
+                    break;
+            }
+        } else {
+            switch (node->cmpoperator()) {
+                case ast::CMPOperator::NOT_EQUALS:
+                    pred = llvm::CmpInst::ICMP_NE;
+                    break;
+                case ast::CMPOperator::EQUALS:
+
+                    break;
+                case ast::CMPOperator::GREATER:
+                    pred = llvm::CmpInst::ICMP_SGT;
+                    break;
+                case ast::CMPOperator::GREATER_EQUAL:
+                    pred = llvm::CmpInst::ICMP_SGE;
+                    break;
+                case ast::CMPOperator::LESS:
+                    pred = llvm::CmpInst::ICMP_SLT;
+                    break;
+                case ast::CMPOperator::LESS_EQUAL:
+                    pred = llvm::CmpInst::ICMP_SLE;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        const auto lhsType = node->lhs()->expressionType().value();
+        const auto rhsType = node->rhs()->expressionType().value();
+        if (lhsType && rhsType) {
+            if (lhsType->name() == rhsType->name() && lhsType->typeKind() == types::TypeKind::INT) {
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    const unsigned maxBitWith =
+                            std::max(lhs->getType()->getIntegerBitWidth(), rhs->getType()->getIntegerBitWidth());
+                    if (maxBitWith != lhs->getType()->getIntegerBitWidth()) {
+                        lhs = llvmState.Builder->CreateIntCast(
+                            lhs, llvm::IntegerType::getIntNTy(*llvmState.TheContext, maxBitWith), true, "lhs_cast");
+                    }
+                    if (maxBitWith != rhs->getType()->getIntegerBitWidth()) {
+                        rhs = llvmState.Builder->CreateIntCast(
+                            rhs, llvm::IntegerType::getIntNTy(*llvmState.TheContext, maxBitWith), true, "rhs_cast");
+                    }
+                }
+            }
+        }
+        return llvmState.Builder->CreateCmp(pred, lhs, rhs);
+    }
+
+    llvm::Value *codegen(ast::LogicalExpression *node, LLVMBackendState &llvmState) {
+        const auto lhs = node->lhs();
+        const auto rhs = node->rhs();
+        switch (node->logical_operator()) {
+            case ast::LogicalOperator::AND:
+                return llvmState.Builder->CreateAnd(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+            case ast::LogicalOperator::OR:
+                return llvmState.Builder->CreateOr(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+            case ast::LogicalOperator::NOT:
+                return llvmState.Builder->CreateNot(codegen_base(rhs, llvmState));
+            default:
+                assert(false && "unknown logical operator");
+        }
+    }
+
+    llvm::Value *codegen(ast::IfCondition *node, LLVMBackendState &llvmState) {
+        auto condition = codegen_base(node->condition(), llvmState);
+        if (!condition) {
+            assert(false && "Failed to generate condition for if statement");
+            return nullptr;
+        }
+        condition = llvmState.Builder->CreateICmpEQ(condition, llvmState.Builder->getTrue(), "ifcond");
+
+        llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
+        llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*llvmState.TheContext, "then", TheFunction);
+        const bool hasElse = !node->elseBlock().empty();
+        llvm::BasicBlock *ElseBB = (hasElse) ? llvm::BasicBlock::Create(*llvmState.TheContext, "else") : nullptr;
+
+        llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*llvmState.TheContext, "ifcont");
+
+        if (hasElse)
+            llvmState.Builder->CreateCondBr(condition, ThenBB, ElseBB);
+        else
+            llvmState.Builder->CreateCondBr(condition, ThenBB, MergeBB);
+
+        llvmState.Builder->SetInsertPoint(ThenBB);
+
+        for (auto &exp: node->ifBlock()) {
+            codegen_base(exp.get(), llvmState);
+        }
+
+        // if (!context->breakBlock().BlockUsed)
+        llvmState.Builder->CreateBr(MergeBB);
+        //context->breakBlock().BlockUsed = false;
+        if (ElseBB) {
+            TheFunction->insert(TheFunction->end(), ElseBB);
+            llvmState.Builder->SetInsertPoint(ElseBB);
+
+            for (auto &exp: node->elseBlock()) {
+                codegen_base(exp.get(), llvmState);
+            }
+            llvmState.Builder->CreateBr(MergeBB);
+            // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+            ElseBB = llvmState.Builder->GetInsertBlock();
+        }
+
+
+        // Emit merge block.
+        TheFunction->insert(TheFunction->end(), MergeBB);
+        llvmState.Builder->SetInsertPoint(MergeBB);
+
+
+        return condition;
+    }
+
+    llvm::Value *codegen(ast::BinaryExpression *node, LLVMBackendState &llvmState) {
+        const auto lhs = codegen_base(node->lhs(), llvmState);
+        const auto rhs = codegen_base(node->rhs(), llvmState);
 
         switch (node->binoperator()) {
             case ast::BinaryOperator::ADD:
@@ -391,7 +551,7 @@ namespace llvm_backend {
         functionDefinition->addFnAttrs(b);
         // if (!m_returnType)
         // {
-        //     context->builder()->CreateRetVoid();
+        //     llvmState.TheBuilder->CreateRetVoid();
         // }
 
         if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {

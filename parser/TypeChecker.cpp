@@ -4,8 +4,10 @@
 #include <map>
 
 #include "ast/BinaryExpression.h"
+#include "ast/Comparisson.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/IfCondition.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -40,6 +42,10 @@ namespace types {
     void type_check(ast::ReturnStatement *node, Context &context);
 
     void type_check(ast::BinaryExpression *node, Context &context);
+
+    void type_check(ast::IfCondition *node, Context &context);
+
+    void type_check(ast::Comparisson *node, Context &context);
 
     void type_check(ast::StringConstant *node, Context &context) {
         node->setExpressionType(context.registry.getTypeByName("string").value());
@@ -87,7 +93,12 @@ namespace types {
         if (const auto varAccess = dynamic_cast<ast::VariableAccess *>(node)) {
             return type_check(varAccess, context);
         }
-
+        if (const auto ifCond = dynamic_cast<ast::IfCondition *>(node)) {
+            return type_check(ifCond, context);
+        }
+        if (const auto comp = dynamic_cast<ast::Comparisson *>(node)) {
+            return type_check(comp, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
@@ -95,6 +106,43 @@ namespace types {
             "Unknown AST node that can not be type checked yet."
         });
     }
+
+    void type_check(ast::IfCondition *node, Context &context) {
+        type_check_base(node->condition(), context);
+        for (auto &stmt: node->ifBlock()) {
+            type_check_base(stmt.get(), context);
+        }
+        for (auto &stmt: node->elseBlock()) {
+            type_check_base(stmt.get(), context);
+        }
+    }
+
+    void type_check(ast::Comparisson *node, Context &context) {
+        const auto lhs = node->lhs();
+        const auto rhs = node->rhs();
+        type_check_base(lhs, context);
+        type_check_base(rhs, context);
+        if (lhs->expressionType() && rhs->expressionType()) {
+            if (lhs->expressionType().value()->name() != rhs->expressionType().value()->name()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type mismatch in comparison: left is of type '" +
+                    lhs->expressionType().value()->name() + "', right is of type '" +
+                    rhs->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+            node->setExpressionType(context.registry.getTypeByName("bool").value());
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine types of operands in comparison."
+            });
+        }
+    }
+
 
     void type_check(ast::VariableAccess *node, Context &context) {
         const auto it = context.currentVariables.find(node->expressionToken().lexical());

@@ -30,6 +30,14 @@ namespace ast {
                                                                    m_lhs(nullptr), m_rhs(std::move(rhs)) {
         }
 
+        [[nodiscard]] LogicalOperator logical_operator() const {
+            return m_operator;
+        }
+
+        [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
+
+        [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
+
         ~LogicalExpression() override = default;
 
         LogicalExpression(LogicalExpression &&) = default;

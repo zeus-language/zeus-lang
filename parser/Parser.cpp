@@ -9,8 +9,10 @@
 #include <iostream>
 
 #include "ast/BinaryExpression.h"
+#include "ast/Comparisson.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
@@ -201,57 +203,59 @@ namespace parser {
             }
 
             if (includeCompare) {
-                // if (canConsume(Token::GREATER)) {
-                //     consume(Token::GREATER);
-                //     auto operatorToken = current();
-                //     if (canConsume(Token::EQUAL)) {
-                //         consume(Token::EQUAL);
-                //         auto rhs = parseBaseExpression();
-                //         return std::make_shared<ast::Comparrision>(operatorToken, CMPOperator::GREATER_EQUAL, lhs, rhs);
-                //     }
-                //     auto rhs = parseBaseExpression();
-                //     return parseExpression(
-                //         std::make_shared<ComparrisionNode>(
-                //             operatorToken, CMPOperator::GREATER, lhs, rhs));
-                // }
-                //
-                // if (canConsume(Token::LESS)) {
-                //     consume(Token::LESS);
-                //     auto operatorToken = current();
-                //     if (canConsume(Token::EQUAL)) {
-                //         consume(Token::EQUAL);
-                //         auto rhs = parseBaseExpression();
-                //         return std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::LESS_EQUAL, lhs, rhs);
-                //     } else if (canConsume(Token::GREATER)) {
-                //         consume(Token::GREATER);
-                //         auto rhs = parseBaseExpression();
-                //         return parseExpression(
-                //             std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs,
-                //                                                rhs));
-                //     }
-                //     auto rhs = parseBaseExpression();
-                //     return parseExpression(
-                //         std::make_shared<ComparrisionNode>(
-                //             operatorToken, CMPOperator::LESS, lhs, rhs));
-                // }
-                //
-                // if (canConsume(Token::BANG) && canConsume(Token::EQUAL, 2)) {
-                //     consume(Token::BANG);
-                //     consume(Token::EQUAL);
-                //     auto operatorToken = current();
-                //     auto rhs = parseBaseExpression();
-                //     return parseExpression(
-                //         std::make_shared<ComparrisionNode>(operatorToken, CMPOperator::NOT_EQUALS, lhs, rhs));
-                // }
-                //
-                // if (canConsume(Token::EQUAL)) {
-                //     consume(Token::EQUAL);
-                //     auto operatorToken = current();
-                //     auto rhs = parseBaseExpression();
-                //     return parseExpression(
-                //         std::make_shared<Comparrision>(
-                //             operatorToken, CMPOperator::EQUALS, lhs, rhs));
-                // }
+                if (canConsume(Token::GREATER)) {
+                    consume(Token::GREATER);
+                    auto operatorToken = current();
+                    if (canConsume(Token::EQUAL)) {
+                        consume(Token::EQUAL);
+                        auto rhs = parseBaseExpression();
+                        return std::make_unique<ast::Comparisson>(operatorToken, ast::CMPOperator::GREATER_EQUAL,
+                                                                  std::move(lhs.value()), std::move(rhs.value()));
+                    }
+                    auto rhs = parseBaseExpression();
+                    return parseExpression(
+                        std::make_unique<ast::Comparisson>(
+                            operatorToken, ast::CMPOperator::GREATER, std::move(lhs.value()), std::move(rhs.value())));
+                }
+                if (canConsume(Token::LESS)) {
+                    consume(Token::LESS);
+                    auto operatorToken = current();
+                    if (canConsume(Token::EQUAL)) {
+                        consume(Token::EQUAL);
+                        auto rhs = parseBaseExpression();
+                        return std::make_unique<ast::Comparisson>(operatorToken, ast::CMPOperator::LESS_EQUAL,
+                                                                  std::move(lhs.value()), std::move(rhs.value()));
+                    } else if (canConsume(Token::GREATER)) {
+                        consume(Token::GREATER);
+                        auto rhs = parseBaseExpression();
+                        return parseExpression(
+                            std::make_unique<ast::Comparisson>(operatorToken, ast::CMPOperator::NOT_EQUALS,
+                                                               std::move(lhs.value()), std::move(rhs.value())));
+                    }
+                    auto rhs = parseBaseExpression();
+                    return parseExpression(
+                        std::make_unique<ast::Comparisson>(
+                            operatorToken, ast::CMPOperator::LESS, std::move(lhs.value()), std::move(rhs.value())));
+                }
+
+                if (canConsume(Token::BANG) && canConsume(Token::EQUAL, 2)) {
+                    consume(Token::BANG);
+                    consume(Token::EQUAL);
+                    auto operatorToken = current();
+                    auto rhs = parseBaseExpression();
+                    return parseExpression(
+                        std::make_unique<ast::Comparisson>(operatorToken, ast::CMPOperator::NOT_EQUALS,
+                                                           std::move(lhs.value()), std::move(rhs.value())));
+                }
+
+                if (canConsume(Token::EQUAL)) {
+                    consume(Token::EQUAL);
+                    auto operatorToken = current();
+                    auto rhs = parseBaseExpression();
+                    return parseExpression(
+                        std::make_unique<ast::Comparisson>(
+                            operatorToken, ast::CMPOperator::EQUALS, std::move(lhs.value()), std::move(rhs.value())));
+                }
             }
 
             return lhs;
@@ -362,6 +366,34 @@ namespace parser {
                                                               std::move(value));
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseIfCondition() {
+            if (!canConsumeKeyWord("if")) {
+                return std::nullopt;
+            }
+            Token ifToken = current();
+            consumeKeyWord("if");
+
+            auto condition = parseExpression();
+            if (!condition) {
+                m_messages.push_back(ParserMessasge{
+                    .token = ifToken,
+                    .message = "expected condition expression after 'if'!"
+                });
+                return std::nullopt;
+            }
+            auto ifBlock = parseBlock();
+            std::vector<std::unique_ptr<ast::ASTNode> > elseBlock;
+            if (tryConsumeKeyWord("else")) {
+                if (auto elseIf = parseIfCondition()) {
+                    elseBlock.push_back(std::move(elseIf.value()));
+                } else {
+                    elseBlock = parseBlock();
+                }
+            }
+            return std::make_unique<ast::IfCondition>(ifToken, std::move(condition.value()), std::move(ifBlock),
+                                                      std::move(elseBlock));
+        }
+
         std::vector<std::unique_ptr<ast::ASTNode> > parseBlock() {
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
@@ -375,13 +407,15 @@ namespace parser {
                     nodes.push_back(std::move(varDecl.value()));
                 } else if (auto varAssign = parseVariableAssignment()) {
                     nodes.push_back(std::move(varAssign.value()));
+                } else if (auto ifCondition = parseIfCondition()) {
+                    nodes.push_back(std::move(ifCondition.value()));
                 } else {
-                    next();
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
                         .message = "unexpected token found " +
                                    std::string(magic_enum::enum_name(current().type)) + "!"
                     });
+                    next();
                     if (current().type == Token::Type::END_OF_FILE) {
                         break;
                     }
