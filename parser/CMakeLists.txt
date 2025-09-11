@@ -21,6 +21,8 @@ add_library(${PROJECT_NAME} STATIC
         include/ast/Comparisson.h
         include/ast/IfCondition.h
         include/ast/WhileLoop.h
+        include/ast/ForLoop.h
+        include/ast/BreakStatement.h
 
         #include/parser/parser.h
 )

@@ -9,7 +9,9 @@
 #include <iostream>
 
 #include "ast/BinaryExpression.h"
+#include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
@@ -395,6 +397,71 @@ namespace parser {
                                                       std::move(elseBlock));
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseBreak() {
+            if (!canConsumeKeyWord("break")) {
+                return std::nullopt;
+            }
+            Token breakToken = current();
+            consumeKeyWord("break");
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::BreakStatement>(breakToken);
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseForLoop() {
+            if (!canConsumeKeyWord("for")) {
+                return std::nullopt;
+            }
+            Token forToken = current();
+            consumeKeyWord("for");
+            auto isConstant = tryConsumeKeyWord("let");
+
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected identifier after 'for'!"
+                });
+                return std::nullopt;
+            }
+            Token iteratorToken = current();
+            consume(Token::IDENTIFIER);
+            if (!canConsumeKeyWord("in")) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected 'in' after iterator in 'for' loop!"
+                });
+                return std::nullopt;
+            }
+            consumeKeyWord("in");
+            auto rangeStart = parseExpression();
+            if (!rangeStart) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected start expression after 'in' in 'for' loop!"
+                });
+                return std::nullopt;
+            }
+            if (!canConsume(Token::RANGE)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected '..' after start expression in 'for' loop!"
+                });
+                return std::nullopt;
+            }
+            consume(Token::RANGE);
+            auto inclusive = tryConsume(Token::EQUAL);
+            auto rangeEnd = parseExpression();
+            if (!rangeEnd) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected end expression after '..' in 'for' loop!"
+                });
+                return std::nullopt;
+            }
+            auto block = parseBlock();
+            return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken), std::move(rangeStart.value()),
+                                                  std::move(rangeEnd.value()), isConstant, inclusive, std::move(block));
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseWhileLoop() {
             if (!canConsumeKeyWord("while")) {
                 return std::nullopt;
@@ -430,6 +497,10 @@ namespace parser {
                     nodes.push_back(std::move(ifCondition.value()));
                 } else if (auto whileLoop = parseWhileLoop()) {
                     nodes.push_back(std::move(whileLoop.value()));
+                } else if (auto forLoop = parseForLoop()) {
+                    nodes.push_back(std::move(forLoop.value()));
+                } else if (auto breakStmt = parseBreak()) {
+                    nodes.push_back(std::move(breakStmt.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),

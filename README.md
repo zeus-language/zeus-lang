@@ -8,7 +8,7 @@ For now only `linux-x86-64` and `win64` are supported.
 # Usage
 
 ```sh
-wirthx examples/helloworld.zeus
+zeus examples/helloworld.zeus
 ```
 
 ## Executing the compiler
@@ -16,7 +16,7 @@ wirthx examples/helloworld.zeus
 The compiler will generate a native executable based on the program name defined in the program unit.
 
 ```sh
-wirthx -c testfiles/hello.pas
+zeus -c testfiles/hello.zeus
 ```
 
 # Examples
@@ -39,5 +39,31 @@ fn min(a : i32, b : i32) : i32 {
     } else {
         return b;
     }
+}
+```
+
+## Variables
+
+```rust
+fn main() : i32 {
+    let x : i32 = 10;
+    let y : i32 = 20;
+    let z : i32 = x + y;
+    println("The sum value is: ");
+    println(z);
+    return 0;
+} 
+``` 
+
+## Control Flow
+
+```rust
+fn main() : i32 {
+    let mut i : i32 = 0;
+    while i < 10 {
+        println(i);
+        i = i + 1;
+    }
+    return 0;   
 }
 ```

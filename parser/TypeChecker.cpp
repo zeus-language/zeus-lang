@@ -4,7 +4,9 @@
 #include <map>
 
 #include "ast/BinaryExpression.h"
+#include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
@@ -49,6 +51,11 @@ namespace types {
     void type_check(ast::Comparisson *node, Context &context);
 
     void type_check(ast::WhileLoop *node, Context &context);
+
+    void type_check(ast::ForLoop *node, Context &context);
+
+    void type_check(ast::BreakStatement *node, Context &context) {
+    }
 
     void type_check(ast::StringConstant *node, Context &context) {
         node->setExpressionType(context.registry.getTypeByName("string").value());
@@ -105,12 +112,64 @@ namespace types {
         if (const auto whileLoop = dynamic_cast<ast::WhileLoop *>(node)) {
             return type_check(whileLoop, context);
         }
+        if (const auto forLoop = dynamic_cast<ast::ForLoop *>(node)) {
+            return type_check(forLoop, context);
+        }
+        if (const auto breakStmt = dynamic_cast<ast::BreakStatement *>(node)) {
+            return type_check(breakStmt, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::ForLoop *node, Context &context) {
+        type_check_base(node->rangeStart(), context);
+        type_check_base(node->rangeEnd(), context);
+        if (node->rangeStart()->expressionType() && node->rangeEnd()->expressionType()) {
+            if (node->rangeStart()->expressionType().value()->name() != node->rangeEnd()->expressionType().value()->
+                name()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type mismatch in 'for' loop range: start is of type '" +
+                    node->rangeStart()->expressionType().value()->name() + "', end is of type '" +
+                    node->rangeEnd()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+            if (node->rangeStart()->expressionType().value()->name() != "i32" &&
+                node->rangeStart()->expressionType().value()->name() != "i64") {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "'for' loop range must be of integer type, but got '" +
+                    node->rangeStart()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+            node->setExpressionType(node->rangeStart()->expressionType().value());
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine types of 'for' loop range."
+            });
+            return;
+        }
+        // Create a new scope for the loop variable
+        auto varType = node->rangeStart()->expressionType().value();
+        context.currentVariables.emplace(node->iteratorToken().lexical(),
+                                         Variable{
+                                             node->iteratorToken().lexical(), varType,
+                                             false
+                                         });
+        for (auto &stmt: node->block()) {
+            type_check_base(stmt.get(), context);
+        }
     }
 
     void type_check(ast::WhileLoop *node, Context &context) {

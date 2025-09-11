@@ -59,7 +59,8 @@ struct Token {
         AT,
         UNKNOWN,
         OPEN_BRACE,
-        CLOSE_BRACE
+        CLOSE_BRACE,
+        RANGE
     } type;
 
     SourceLocation source_location;

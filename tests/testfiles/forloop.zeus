@@ -1,0 +1,21 @@
+
+fn main() : i32 {
+    let mut sum : i32 = 0;
+    let  count : i32;
+    for count in 1 ..=100 {
+        sum = sum + count;
+        if count >= 38 {
+            break;
+        }
+    }
+    println("Count: ");
+    println(count);
+    println("Sum: ");
+    println(sum);
+    println("Printing numbers from 1 to 9:");
+    for let i in 1 .. 10 {
+        println(i);
+    }
+
+    return 0;
+}
