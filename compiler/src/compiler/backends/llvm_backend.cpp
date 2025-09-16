@@ -36,6 +36,8 @@
 #include "os/command.h"
 #include "linker/linker.h"
 #include "llvm_intrinsics.h"
+#include "ast/ArrayAccess.h"
+#include "ast/ArrayInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -53,8 +55,8 @@
 
 namespace llvm_backend {
     struct BreakBlock {
-        llvm::BasicBlock *afterLoop;
-        llvm::BasicBlock *currentLoop;
+        llvm::BasicBlock *afterLoop = nullptr;
+        llvm::BasicBlock *currentLoop = nullptr;
     };
 
     struct LLVMBackendState {
@@ -73,7 +75,18 @@ namespace llvm_backend {
         std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
+
+        llvm::Value *findVariable(const std::string &name) {
+            if (NamedValues.contains(name)) {
+                return NamedValues[name];
+            }
+            if (NamedAllocations.contains(name)) {
+                return Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name], name);
+            }
+            return nullptr;
+        }
     };
+
 
     void initializeLLVMBackend() {
         using namespace llvm;
@@ -107,6 +120,15 @@ namespace llvm_backend {
                 return llvm::Type::getVoidTy(*context.TheContext);
             case types::TypeKind::STRUCT:
                 break;
+            case types::TypeKind::ARRAY:
+                if (auto arrayType = std::dynamic_pointer_cast<types::ArrayType>(value)) {
+                    auto baseType = resolveLlvmType(arrayType->baseType(), context);
+                    if (baseType == nullptr) return nullptr;
+                    return llvm::ArrayType::get(baseType, arrayType->size());
+                }
+                break;
+            case types::TypeKind::POINTER:
+                return llvm::PointerType::getUnqual(*context.TheContext);
         }
         assert(false && "Unknown type");
         return nullptr;
@@ -154,6 +176,10 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::BreakStatement *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::ArrayInitializer *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::ArrayAccess *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -197,17 +223,201 @@ namespace llvm_backend {
         if (const auto breakStmt = dynamic_cast<ast::BreakStatement *>(node)) {
             return llvm_backend::codegen(breakStmt, llvmState);
         }
+        if (const auto arrayInit = dynamic_cast<ast::ArrayInitializer *>(node)) {
+            return llvm_backend::codegen(arrayInit, llvmState);
+        }
+        if (const auto arrayAccess = dynamic_cast<ast::ArrayAccess *>(node)) {
+            return llvm_backend::codegen(arrayAccess, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
     }
 
+    llvm::Value *codegen(ast::ArrayInitializer *node, LLVMBackendState &llvmState) {
+        if (node->elements().empty()) {
+            return llvm::Constant::getNullValue(llvm::ArrayType::get(
+                llvm::Type::getInt8Ty(*llvmState.TheContext), 0));
+        } else {
+            std::vector<llvm::Constant *> elements;
+            for (auto &element: node->elements()) {
+                auto elemValue = codegen_base(element.get(), llvmState);
+                if (!elemValue) {
+                    assert(false && "Failed to generate element value for array initializer");
+                    return nullptr;
+                }
+                if (auto constElem = llvm::dyn_cast<llvm::Constant>(elemValue)) {
+                    elements.push_back(constElem);
+                } else {
+                    assert(false && "Array initializer element is not a constant");
+                    return nullptr;
+                }
+            }
+            auto firstElemType = elements[0]->getType();
+            for (const auto &elem: elements) {
+                if (elem->getType() != firstElemType) {
+                    assert(false && "Array initializer elements have different types");
+                    return nullptr;
+                }
+            }
+            auto arrayType = llvm::ArrayType::get(firstElemType, elements.size());
+            auto arrayConstant = llvm::ConstantArray::get(arrayType, elements);
+            auto hash = std::hash<std::string>{}(node->expressionToken().lexical());
+            std::string arrayName = "array." + std::to_string(hash);
+            auto arrayVar = new llvm::GlobalVariable(
+                *llvmState.TheModule,
+                arrayType,
+                true,
+                llvm::GlobalValue::PrivateLinkage,
+                arrayConstant,
+                arrayName
+            );
+            return arrayVar;
+        }
+    }
+
+    llvm::Value *codegen(ast::ArrayAccess *node, LLVMBackendState &llvmState) {
+        auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical());
+        auto arrayType = resolveLlvmType(node->arrayType().value(), llvmState);
+        auto indexValue = codegen_base(node->index(), llvmState);
+        if (!indexValue) {
+            assert(false && "Failed to generate index value for array access");
+            return nullptr;
+        }
+        if (!indexValue->getType()->isIntegerTy()) {
+            assert(false && "Array index is not an integer");
+            return nullptr;
+        }
+        std::vector<llvm::Value *> indices;
+        auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
+        indices.push_back(zero);
+        if (indexValue->getType() != llvm::Type::getInt32Ty(*llvmState.TheContext)) {
+            indexValue = llvmState.Builder->CreateIntCast(indexValue, llvm::Type::getInt32Ty(*llvmState.TheContext),
+                                                          true, "array_index_cast");
+        }
+        indices.push_back(indexValue);
+
+
+        auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
+        auto loadedValue = llvmState.Builder->CreateLoad(arrayType->getArrayElementType(),
+                                                         elementPtr,
+                                                         "array_elem");
+        return loadedValue;
+    }
+
     llvm::Value *codegen(ast::BreakStatement *node, LLVMBackendState &llvmState) {
         return llvmState.Builder->CreateBr(llvmState.currentBreakBlock.afterLoop);
     }
 
-    llvm::Value *codegen(ast::ForLoop *node, LLVMBackendState &llvmState) {
+    llvm::Value *codegen_iterator_for(ast::ForLoop *node, LLVMBackendState &llvmState) {
+        llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
+
+        llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
+        llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop", TheFunction);
+        llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "afterloop", TheFunction);
+
+        // Insert an explicit fall through from the current block to the LoopBB.
+        llvmState.Builder->CreateBr(LoopBB);
+
+        // Start insertion in LoopBB.
+        llvmState.Builder->SetInsertPoint(LoopBB);
+
+        // Create the PHI node to hold the loop variable.
+        const auto varType = node->expressionType();
+        if (!varType) {
+            assert(false && "Could not determine type of iterator variable in for loop");
+            return nullptr;
+        }
+        auto llvmVarType = resolveLlvmType(varType.value(), llvmState);
+        if (!llvmVarType) {
+            assert(false && "Could not resolve LLVM type of iterator variable in for loop");
+            return nullptr;
+        }
+
+        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2);
+
+
+        auto iterableValue = codegen_base(node->rangeStart(), llvmState);
+        auto iterableType = node->rangeStart()->expressionType();
+        if (!iterableValue) {
+            assert(false && "Failed to generate iterable value for for loop");
+            return nullptr;
+        }
+        size_t arraySize = 0;
+        if (auto arrayType = std::dynamic_pointer_cast<types::ArrayType>(iterableType.value())) {
+            arraySize = arrayType->size();
+        } else {
+            assert(false && "Iterable in for loop is not an array");
+            return nullptr;
+        }
+
+        llvm::Value *startValue = llvmState.Builder->getInt32(0);
+
+        // load array value
+        auto arrayType = resolveLlvmType(node->rangeStart()->expressionType().value(), llvmState);
+        auto arrayAllocation = llvmState.findVariable(node->rangeStart()->expressionToken().lexical());
+
+        if (startValue->getType() != llvmVarType) {
+            startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
+        } {
+            std::vector<llvm::Value *> indices;
+            auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
+            indices.push_back(zero);
+            indices.push_back(Variable);
+            auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayAllocation, indices,
+                                                           "elem_ptr");
+            llvm::Value *loadedValue = llvmState.Builder->CreateLoad(
+                arrayType->getArrayElementType(),
+                elementPtr,
+                "array_elem");
+            if (loadedValue->getType() != llvmVarType) {
+                loadedValue = llvmState.Builder->CreateIntCast(loadedValue, llvmVarType, true, "for_elem_cast");
+            }
+            if (node->isConstant()) {
+                llvmState.NamedValues[node->iteratorToken().lexical()] = loadedValue;
+            }
+        }
+
+
+        llvmState.currentBreakBlock.currentLoop = LoopBB;
+        llvmState.currentBreakBlock.afterLoop = AfterBB;
+        // Generate the loop body.
+        for (auto &exp: node->block()) {
+            llvmState.Builder->SetInsertPoint(LoopBB);
+
+            codegen_base(exp.get(), llvmState);
+        }
+
+        // Step: increment the loop variable.
+        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
+        const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
+
+        Variable->addIncoming(startValue, PreheaderBB);
+
+        // Compute the end condition.
+        llvm::Value *endValue = llvmState.Builder->getInt32(arraySize);
+        if (!endValue) {
+            assert(false && "Failed to generate end value for for loop");
+            return nullptr;
+        }
+        if (endValue->getType() != llvmVarType) {
+            endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
+        }
+        llvm::Value *endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
+
+        llvm::BasicBlock *loopEndBB = llvmState.Builder->GetInsertBlock();
+
+        // Create the "after loop" block and insert it.
+        llvmState.Builder->CreateCondBr(endCond, LoopBB, AfterBB);
+        llvmState.Builder->SetInsertPoint(AfterBB);
+
+        // Add the incoming value for the PHI node from the backedge.
+        Variable->addIncoming(nextVar, loopEndBB);
+        return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*llvmState.TheContext));
+    }
+
+    llvm::Value *codegen_range_for(ast::ForLoop *node, LLVMBackendState &llvmState) {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
         llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
@@ -255,8 +465,8 @@ namespace llvm_backend {
         }
 
         // Step: increment the loop variable.
-        auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
-        auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
+        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
+        const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
         // Compute the end condition.
         auto endValue = codegen_base(node->rangeEnd(), llvmState);
         if (!endValue) {
@@ -281,6 +491,14 @@ namespace llvm_backend {
         Variable->addIncoming(nextVar, loopEndBB);
         return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*llvmState.TheContext));
     }
+
+    llvm::Value *codegen(ast::ForLoop *node, LLVMBackendState &llvmState) {
+        if (!node->rangeEnd())
+            return codegen_iterator_for(node, llvmState);
+
+        return codegen_range_for(node, llvmState);
+    }
+
 
     llvm::Value *codegen(ast::Comparisson *node, LLVMBackendState &llvmState) {
         auto lhs = codegen_base(node->lhs(), llvmState);
@@ -500,19 +718,26 @@ namespace llvm_backend {
 
 
     llvm::Value *codegen(ast::VariableAccess *node, LLVMBackendState &llvmState) {
-        ;
-        if (const auto alloca = llvmState.NamedAllocations[node->expressionToken().lexical()]) {
-            return llvmState.Builder->CreateLoad(alloca->getAllocatedType(), alloca, node->expressionToken().lexical());
-        }
-        if (const auto value = llvmState.NamedValues[node->expressionToken().lexical()]) {
+        std::string name = node->expressionToken().lexical();
+        auto &NamedValues = llvmState.NamedValues;
+        auto &NamedAllocations = llvmState.NamedAllocations;
+
+        if (NamedValues.contains(name)) {
+            auto value = NamedValues[name];
+            if (auto globalVar = llvm::dyn_cast<llvm::GlobalVariable>(value)) {
+                return llvmState.Builder->CreateLoad(globalVar->getValueType(), globalVar, name);
+            }
             return value;
         }
-        assert(false && "Variable not declared before access");
+        if (NamedAllocations.contains(name)) {
+            return llvmState.Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name],
+                                                 name);
+        }
         return nullptr;
     }
 
     llvm::Value *codegen(ast::VariableAssignment *node, LLVMBackendState &llvmState) {
-        const auto alloca = llvmState.NamedAllocations[node->expressionToken().lexical()];
+        const auto alloca = llvmState.NamedAllocations.at(node->expressionToken().lexical());
         if (!alloca) {
             assert(false && "Variable not declared before assignment");
             return nullptr;
@@ -667,7 +892,7 @@ namespace llvm_backend {
                                                                        functionDefinition);
 
         llvmState.Builder->SetInsertPoint(functionBaseBlock);
-
+        std::vector<std::string> argNames;
         for (auto &arg: functionDefinition->args()) {
             arg.setName(node->args()[arg.getArgNo()].name);
             // Create an alloca for this variable.
@@ -676,12 +901,16 @@ namespace llvm_backend {
             llvmState.Builder->CreateStore(&arg, alloca);
             // Add arguments to variable symbol table.
             llvmState.NamedAllocations[std::string(arg.getName())] = alloca;
+            argNames.push_back(arg.getName().str());
         }
 
         for (auto &stmt: node->statements()) {
             llvm_backend::codegen_base(stmt.get(), llvmState);
         }
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
+        for (auto &argName: argNames) {
+            llvmState.NamedAllocations.erase(argName);
+        }
 
 
         llvm::AttrBuilder b(*llvmState.TheContext);

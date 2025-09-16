@@ -8,7 +8,9 @@ namespace types {
         STRING,
         BOOL,
         VOID,
-        STRUCT
+        STRUCT,
+        POINTER,
+        ARRAY
     };
 
     class VariableType {
@@ -42,5 +44,34 @@ namespace types {
         [[nodiscard]] size_t size() const { return m_size; }
 
         [[nodiscard]] bool isSigned() const { return m_signed; }
+    };
+
+    class PointerType final : public VariableType {
+    private:
+        std::shared_ptr<VariableType> m_baseType;
+
+    public:
+        PointerType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
+                std::move(name), TypeKind::POINTER),
+            m_baseType(std::move(baseType)) {
+        }
+
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+    };
+
+    class ArrayType final : public VariableType {
+    private:
+        size_t m_size;
+        std::shared_ptr<VariableType> m_baseType;
+
+    public:
+        ArrayType(std::string name, const size_t size, std::shared_ptr<VariableType> baseType) : VariableType(
+                std::move(name), TypeKind::ARRAY),
+            m_size(size), m_baseType(std::move(baseType)) {
+        }
+
+        [[nodiscard]] size_t size() const { return m_size; }
+
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
     };
 }

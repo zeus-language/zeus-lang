@@ -1,7 +1,3 @@
-//
-// Created by stefan on 29.08.25.
-//
-
 #pragma once
 
 #include <memory>

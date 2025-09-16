@@ -11,6 +11,19 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
 }
 
+std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
+    const std::shared_ptr<VariableType> &base_type) {
+    return std::make_optional(
+        std::make_shared<types::PointerType>("ptr<" + base_type->name() + ">", base_type));
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArrayType(
+    const std::shared_ptr<VariableType> &base_type, size_t size) {
+    return std::make_optional(
+        std::make_shared<types::ArrayType>("array[" + base_type->name() + "; " + std::to_string(size) + "]",
+                                           size, base_type));
+}
+
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(const std::string &name) const {
     for (const auto &type: m_types) {
         if (type->name() == name) {

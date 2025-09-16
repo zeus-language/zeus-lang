@@ -3,6 +3,8 @@
 #include <cassert>
 #include <map>
 
+#include "ast/ArrayAccess.h"
+#include "ast/ArrayInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -30,7 +32,23 @@ namespace types {
         TypeRegistry registry;
         std::map<std::string, std::optional<Variable> > currentVariables;
         std::vector<parser::ParserMessasge> messages;
+        std::vector<ast::FunctionDefinition *> functions;
     };
+
+
+    std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType, TypeRegistry &registry) {
+        if (rawType->isPointer) {
+            auto baseType = registry.getTypeByName(rawType->typeToken.lexical());
+            if (!baseType) return std::nullopt;
+            return types::TypeRegistry::getPointerType(baseType.value());
+        } else if (auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
+            auto baseType = resolveFromRawType(arrayType->baseType.get(), registry);
+            if (!baseType) return std::nullopt;
+            return types::TypeRegistry::getArrayType(baseType.value(), arrayType->size);
+        } else {
+            return registry.getTypeByName(rawType->typeToken.lexical());
+        }
+    }
 
     void type_check(ast::FunctionDefinition *node, Context &context);
 
@@ -53,6 +71,10 @@ namespace types {
     void type_check(ast::WhileLoop *node, Context &context);
 
     void type_check(ast::ForLoop *node, Context &context);
+
+    void type_check(ast::ArrayInitializer *node, Context &context);
+
+    void type_check(ast::ArrayAccess *node, Context &context);
 
     void type_check(ast::BreakStatement *node, Context &context) {
     }
@@ -118,6 +140,12 @@ namespace types {
         if (const auto breakStmt = dynamic_cast<ast::BreakStatement *>(node)) {
             return type_check(breakStmt, context);
         }
+        if (const auto arrayInit = dynamic_cast<ast::ArrayInitializer *>(node)) {
+            return type_check(arrayInit, context);
+        }
+        if (const auto arrayAccess = dynamic_cast<ast::ArrayAccess *>(node)) {
+            return type_check(arrayAccess, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
@@ -126,8 +154,7 @@ namespace types {
         });
     }
 
-    void type_check(ast::ForLoop *node, Context &context) {
-        type_check_base(node->rangeStart(), context);
+    bool type_check_range_for(ast::ForLoop *node, Context &context) {
         type_check_base(node->rangeEnd(), context);
         if (node->rangeStart()->expressionType() && node->rangeEnd()->expressionType()) {
             if (node->rangeStart()->expressionType().value()->name() != node->rangeEnd()->expressionType().value()->
@@ -139,7 +166,7 @@ namespace types {
                     node->rangeStart()->expressionType().value()->name() + "', end is of type '" +
                     node->rangeEnd()->expressionType().value()->name() + "'."
                 });
-                return;
+                return true;
             }
             if (node->rangeStart()->expressionType().value()->name() != "i32" &&
                 node->rangeStart()->expressionType().value()->name() != "i64") {
@@ -149,7 +176,7 @@ namespace types {
                     "'for' loop range must be of integer type, but got '" +
                     node->rangeStart()->expressionType().value()->name() + "'."
                 });
-                return;
+                return true;
             }
             node->setExpressionType(node->rangeStart()->expressionType().value());
         } else {
@@ -158,10 +185,33 @@ namespace types {
                 node->expressionToken(),
                 "Could not determine types of 'for' loop range."
             });
-            return;
+            return true;
+        }
+        return false;
+    }
+
+    bool type_check_iterator_loop(ast::ForLoop *node, Context &context) {
+        auto varType = node->rangeStart()->expressionType();
+        if (!varType) {
+            return true;
+        }
+        if (auto arrayType = dynamic_cast<ArrayType *>(varType.value().get())) {
+            node->setExpressionType(arrayType->baseType());
+        }
+
+        return false;
+    }
+
+    void type_check(ast::ForLoop *node, Context &context) {
+        type_check_base(node->rangeStart(), context);
+        if (node->rangeEnd()) {
+            if (type_check_range_for(node, context)) return;
+        } else {
+            if (type_check_iterator_loop(node, context)) return;
         }
         // Create a new scope for the loop variable
-        auto varType = node->rangeStart()->expressionType().value();
+        const auto varType = node->rangeStart()->expressionType().value();
+
         context.currentVariables.emplace(node->iteratorToken().lexical(),
                                          Variable{
                                              node->iteratorToken().lexical(), varType,
@@ -215,6 +265,100 @@ namespace types {
         }
     }
 
+    void type_check(ast::ArrayInitializer *node, Context &context) {
+        auto elementType = std::shared_ptr<VariableType>(nullptr);
+        for (auto &element: node->elements()) {
+            if (elementType == nullptr) {
+                type_check_base(element.get(), context);
+                if (element->expressionType()) {
+                    elementType = element->expressionType().value();
+                } else {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not determine type of array element."
+                    });
+                    return;
+                }
+            } else {
+                type_check_base(element.get(), context);
+                if (element->expressionType()) {
+                    if (element->expressionType().value()->name() != elementType->name()) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Type mismatch in array initializer: expected element of type '" +
+                            elementType->name() + "', but got '" + element->expressionType().value()->name() + "'."
+                        });
+                        return;
+                    }
+                } else {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not determine type of array element."
+                    });
+                    return;
+                }
+            }
+        }
+        if (node->elements().empty()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Array initializer cannot be empty."
+            });
+            return;
+        }
+    }
+
+    void type_check(ast::ArrayAccess *node, Context &context) {
+        const auto it = context.currentVariables.find(node->expressionToken().lexical());
+        if (it == context.currentVariables.end()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
+            });
+            return;
+        }
+        if (it->second.has_value()) {
+            if (it->second->type->typeKind() != TypeKind::ARRAY) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Variable '" + node->expressionToken().lexical() + "' is not an array."
+                });
+                return;
+            }
+            type_check_base(node->index(), context);
+            if (!node->index()->expressionType() || node->index()->expressionType().value()->name() != "i32") {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->index()->expressionToken(),
+                    "Array index must be of type 'i32'."
+                });
+                return;
+            }
+            if (auto arrayType = std::dynamic_pointer_cast<ArrayType>(it->second->type)) {
+                node->setExpressionType(arrayType->baseType());
+                node->setArrayType(arrayType);
+            } else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Internal error: variable '" + node->expressionToken().lexical() +
+                    "' type information is corrupted."
+                });
+            }
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variable '" + node->expressionToken().lexical() + "' has no type information."
+            });
+        }
+    }
 
     void type_check(ast::VariableAccess *node, Context &context) {
         const auto it = context.currentVariables.find(node->expressionToken().lexical());
@@ -268,6 +412,68 @@ namespace types {
         for (auto &arg: node->args()) {
             type_check_base(arg.get(), context);
         }
+        //  find function
+        if (node->functionName() == "println") {
+            if (node->args().size() != 1) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "'println' expects exactly one argument."
+                });
+                return;
+            }
+            // 'println' can accept any type for now
+            node->setExpressionType(context.registry.getTypeByName("void").value());
+            return;
+        }
+        for (const auto funcDef: context.functions) {
+            if (funcDef->functionName() == node->functionName()) {
+                if (funcDef->args().size() != node->args().size()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Function '" + node->functionName() + "' expects " +
+                        std::to_string(funcDef->args().size()) + " arguments, but got " +
+                        std::to_string(node->args().size()) + "."
+                    });
+                    return;
+                }
+                bool argsMatch = true;
+                for (size_t i = 0; i < funcDef->args().size(); ++i) {
+                    if (!node->args()[i]->expressionType() ||
+                        funcDef->args()[i].type == nullptr ||
+                        node->args()[i]->expressionType().value()->name() !=
+                        funcDef->args()[i].type.value()->name()) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            node->args()[i]->expressionToken(),
+                            "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
+                            node->functionName() + "': expected '" +
+                            (funcDef->args()[i].type ? funcDef->args()[i].type.value()->name() : "unknown") +
+                            "', but got '" +
+                            (node->args()[i]->expressionType()
+                                 ? node->args()[i]->expressionType().value()->name()
+                                 : "unknown") + "'."
+                        });
+                        argsMatch = false;
+                    }
+                }
+                if (!argsMatch) return;
+                if (funcDef->returnType()) {
+                    node->setExpressionType(
+                        resolveFromRawType(funcDef->returnType().value(), context.registry).value());
+                } else {
+                    node->setExpressionType(context.registry.getTypeByName("void").value());
+                }
+                return;
+            }
+        }
+        context.messages.push_back({
+            parser::OutputType::ERROR,
+            node->expressionToken(),
+            "Function '" + node->functionName() + "' is not declared."
+        });
+
         // Further type checking logic would go here...
     }
 
@@ -278,13 +484,15 @@ namespace types {
         // Further type checking logic would go here...
     }
 
+
     void type_check(ast::VariableDeclaration *node, Context &context) {
-        auto varType = context.registry.getTypeByName(node->type().lexical());
+        auto varType = resolveFromRawType(node->type(), context.registry);
         if (!varType) {
             context.messages.push_back({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
-                "Unknown type '" + node->type().lexical() + "' for variable '" + node->expressionToken().lexical() +
+                "Unknown type '" + node->type()->typeToken.lexical() + "' for variable '" + node->expressionToken().
+                lexical() +
                 "'."
             });
             return;
@@ -345,12 +553,12 @@ namespace types {
         }
 
         for (auto &arg: node->args()) {
-            arg.type = context.registry.getTypeByName(arg.typeName);
+            arg.type = resolveFromRawType(arg.rawType.get(), context.registry);
             if (!arg.type) {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.typeName + "' for argument '" + arg.name + "'."
+                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name + "'."
                 });
             }
             context.currentVariables.emplace(arg.name, Variable{arg.name, arg.type.value_or(nullptr), false});
@@ -364,6 +572,13 @@ namespace types {
 
     void type_check(const std::vector<std::unique_ptr<ast::ASTNode> > &nodes, TypeCheckResult &result) {
         Context context;
+        // collect function definitions first
+        for (const auto &node: nodes) {
+            if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
+                context.functions.push_back(funcDef);
+            }
+        }
+
         for (auto &node: nodes) {
             type_check_base(node.get(), context);
         }

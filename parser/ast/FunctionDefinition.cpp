@@ -6,8 +6,10 @@
 
 namespace ast {
     FunctionDefinition::FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+                                           std::optional<std::unique_ptr<RawType> > returnType,
                                            std::vector<std::unique_ptr<ASTNode> > statements)
-        : ASTNode(std::move(functionName)), m_args(std::move(args)), m_statements(std::move(statements)) {
+        : ASTNode(std::move(functionName)), m_args(std::move(args)), m_returnType(std::move(returnType)),
+          m_statements(std::move(statements)) {
     }
 
     std::string FunctionDefinition::functionName() const {

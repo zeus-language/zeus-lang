@@ -4,22 +4,30 @@
 #include <vector>
 
 #include "ASTNode.h"
+#include "VariableDeclaration.h"
 #include "lexer/Lexer.h"
 
 
 namespace ast {
     struct FunctionArgument {
         std::string name;
-        std::string typeName;
+        std::unique_ptr<RawType> rawType;
+
         std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
+
+        FunctionArgument(std::string name, std::unique_ptr<RawType> type)
+            : name(std::move(name)), rawType(std::move(type)) {
+        }
     };
 
     class FunctionDefinition final : public ASTNode {
         std::vector<FunctionArgument> m_args;
+        std::optional<std::unique_ptr<RawType> > m_returnType;
         std::vector<std::unique_ptr<ASTNode> > m_statements;
 
     public:
         explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+                                    std::optional<std::unique_ptr<RawType> > returnType,
                                     std::vector<std::unique_ptr<ASTNode> > statements);
 
         ~FunctionDefinition() override = default;
@@ -29,6 +37,10 @@ namespace ast {
         std::vector<FunctionArgument> &args();
 
         std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
+
+        [[nodiscard]] std::optional<RawType *> returnType() const {
+            return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
+        }
 
         FunctionDefinition(FunctionDefinition &&) = default;
 

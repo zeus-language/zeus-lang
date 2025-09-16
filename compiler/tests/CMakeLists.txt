@@ -25,7 +25,7 @@ message(STATUS "parser sources: ${parser_SOURCE_DIR}")
 macro(package_add_test TESTNAME)
     #INCLUDE_DIRECTORIES()
 
-    include_directories(${PROJECT_SOURCE_DIR}/src/ ${parser_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS} ${PROJECT_BINARY_DIR})
+    include_directories(../src ${parser_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS} ${PROJECT_BINARY_DIR})
     # create an exectuable in which the tests will be stored
     add_executable(${TESTNAME} ${TEST_SRC} ${ARGN})
     # link the Google test infrastructure, mocking library, and a default main fuction to
@@ -64,7 +64,7 @@ message(STATUS $<TARGET_FILE_DIR:zeus_test>)
 message(STATUS ${CMAKE_SOURCE_DIR})
 add_custom_command(TARGET zeus_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/tests/testfiles/ $<TARGET_FILE_DIR:zeus_test>/testfiles/)
+        ${CMAKE_SOURCE_DIR}/compiler/tests/testfiles/ $<TARGET_FILE_DIR:zeus_test>/testfiles/)
 
 
 
