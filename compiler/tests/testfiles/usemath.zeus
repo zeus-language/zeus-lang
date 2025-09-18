@@ -1,0 +1,18 @@
+use std::math;
+
+fn main() : i32{
+    let x : i32 = 12;
+    let y : i32 = 34;
+    let a : i32 = std::math::abs(x, y);
+    let b : i32 = std::math::max(x, y);
+    let c : i32 = std::math::min(x, y);
+
+    println("abs($x, $y) =");
+    println(a);
+    println("max($x, $y) =");
+    println(b);
+    println("min($x, $y) =");
+    println(c);
+
+    return 0;
+}

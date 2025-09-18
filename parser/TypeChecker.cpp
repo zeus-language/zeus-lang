@@ -471,7 +471,7 @@ namespace types {
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
-            "Function '" + node->functionName() + "' is not declared."
+            "Function '" + node->functionSignature() + "' is not declared."
         });
 
         // Further type checking logic would go here...

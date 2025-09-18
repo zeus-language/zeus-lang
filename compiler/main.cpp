@@ -59,7 +59,7 @@ int main(int args, char **argv) {
   compiler::CompilerOptions options = compiler::parseCompilerOptions(argList);
 
   std::filesystem::path programPath(program);
-  options.stdlibDirectories.push_back(programPath.parent_path() / "rtl");
+  options.stdlibDirectories.push_back(programPath.parent_path() / "stdlib");
   if (argList.empty()) {
     std::cerr << "input file is missing\n";
     printHelp(program);

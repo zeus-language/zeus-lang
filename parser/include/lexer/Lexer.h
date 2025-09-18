@@ -60,7 +60,8 @@ struct Token {
         UNKNOWN,
         OPEN_BRACE,
         CLOSE_BRACE,
-        RANGE
+        RANGE,
+        NS_SEPARATOR
     } type;
 
     SourceLocation source_location;

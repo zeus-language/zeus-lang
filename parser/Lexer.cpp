@@ -7,7 +7,7 @@
 
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
-        "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue"
+        "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use"
     };
 
 
@@ -199,13 +199,24 @@ namespace lexer {
                 start = endPosition;
                 col += offset;
                 continue;
-            } else if (source_code[start] == '.' && source_code[start + 1] == '.') {
+            }
+            if (source_code[start] == '.' && source_code[start + 1] == '.') {
                 SourceLocation source_location = {
                     .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2, .row = row,
                     .col = col
                 };
                 tokens.emplace_back(Token::RANGE, source_location);
-                start += 2;
+                start++;
+                col += 2;
+                continue;
+            }
+            if (source_code[start] == ':' && source_code[start + 1] == ':') {
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2, .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(Token::NS_SEPARATOR, source_location);
+                start++;
                 col += 2;
                 continue;
             } else {

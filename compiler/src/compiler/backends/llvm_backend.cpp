@@ -76,6 +76,7 @@ namespace llvm_backend {
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
 
+
         llvm::Value *findVariable(const std::string &name) {
             if (NamedValues.contains(name)) {
                 return NamedValues[name];
@@ -649,6 +650,8 @@ namespace llvm_backend {
         for (auto &exp: node->ifBlock()) {
             codegen_base(exp.get(), llvmState);
             if (auto brk = dynamic_cast<ast::BreakStatement *>(exp.get())) {
+                containsBreak = true;
+            } else if (auto ret = dynamic_cast<ast::ReturnStatement *>(exp.get())) {
                 containsBreak = true;
             }
         }

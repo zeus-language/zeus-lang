@@ -25,7 +25,7 @@ namespace compiler {
                 options.runProgram = true;
             } else if (arg == "--output"sv) {
                 options.outputDirectory = shiftarg(argList);
-            } else if (arg == "--rtl"sv) {
+            } else if (arg == "--stdlib"sv) {
                 options.stdlibDirectories.emplace(options.stdlibDirectories.begin(), shiftarg(argList));
             } else if (arg == "--release") {
                 options.buildMode = BuildMode::Release;

@@ -24,6 +24,7 @@ namespace ast {
         std::vector<FunctionArgument> m_args;
         std::optional<std::unique_ptr<RawType> > m_returnType;
         std::vector<std::unique_ptr<ASTNode> > m_statements;
+        std::vector<Token> m_namespacePrefix;
 
     public:
         explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
@@ -41,6 +42,16 @@ namespace ast {
         [[nodiscard]] std::optional<RawType *> returnType() const {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
         }
+
+        void setModulePath(const std::vector<Token> &module_path) {
+            m_namespacePrefix = module_path;
+        }
+
+        [[nodiscard]] std::vector<Token> modulePath() const {
+            return m_namespacePrefix;
+        }
+
+        [[nodiscard]] std::string functionSignature() const;
 
         FunctionDefinition(FunctionDefinition &&) = default;
 

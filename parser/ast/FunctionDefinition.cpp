@@ -19,4 +19,22 @@ namespace ast {
     std::vector<FunctionArgument> &FunctionDefinition::args() {
         return m_args;
     }
+
+    std::string FunctionDefinition::functionSignature() const {
+        std::string signature;
+        for (auto &ns: m_namespacePrefix) {
+            signature += ns.lexical() + "::";
+        }
+
+        signature += functionName() + "(";
+        for (size_t i = 0; i < m_args.size(); ++i) {
+            signature += m_args[i].rawType->typeToken.lexical();
+
+            if (i < m_args.size() - 1) {
+                signature += ", ";
+            }
+        }
+        signature += ")";
+        return signature;
+    }
 } // ast

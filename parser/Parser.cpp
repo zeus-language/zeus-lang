@@ -21,6 +21,7 @@
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/UseModule.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
@@ -243,7 +244,9 @@ namespace parser {
                 return std::nullopt;
             }
             consume(Token::RIGHT_CURLY);
-            return std::make_unique<ast::FunctionCallNode>(funcNameToken, std::move(args));
+            std::vector<Token> namespacePrefix;
+
+            return std::make_unique<ast::FunctionCallNode>(funcNameToken, namespacePrefix, std::move(args));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAccess() {
@@ -714,7 +717,6 @@ namespace parser {
             consume(Token::Type::IDENTIFIER);
 
             consume(Token::Type::LEFT_CURLY);
-            // todo parse parameters
             std::vector<ast::FunctionArgument> functionArgs;
             while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
                 if (auto arg = tryParseFunctionArgument()) {
@@ -735,13 +737,28 @@ namespace parser {
         }
 
         std::optional<std::unique_ptr<ast::FunctionCallNode> > parseFunctionCall() {
-            if ((!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::LEFT_CURLY, 1))) {
+            if ((!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::LEFT_CURLY, 1))
+                && (!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::NS_SEPARATOR, 1))
+            ) {
                 return std::nullopt;
             }
             Token nameToken = current();
+            std::vector<Token> namespacePrefix;
             consume(Token::Type::IDENTIFIER);
+            while (canConsume(Token::NS_SEPARATOR)) {
+                namespacePrefix.push_back(nameToken);
+                consume(Token::Type::NS_SEPARATOR);
+                nameToken = current();
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected identifier after '::' in function call!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::Type::IDENTIFIER);
+            }
             consume(Token::Type::LEFT_CURLY);
-            // todo parse parameters
             std::vector<std::unique_ptr<ast::ASTNode> > args;
             while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
                 if (auto arg = parseExpression()) {
@@ -759,13 +776,53 @@ namespace parser {
                 }
             }
             consume(Token::Type::RIGHT_CURLY);
-            return std::make_unique<ast::FunctionCallNode>(nameToken, std::move(args));
+            return std::make_unique<ast::FunctionCallNode>(nameToken, namespacePrefix, std::move(args));
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseUseModule() {
+            if (!canConsumeKeyWord("use")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("use");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected module name after 'use'!"
+                });
+                return std::nullopt;
+            }
+            std::vector<Token> modulePath;
+            while (canConsume(Token::IDENTIFIER)) {
+                Token moduleName = current();
+                consume(Token::IDENTIFIER);
+                modulePath.push_back(moduleName);
+                if (canConsume(Token::NS_SEPARATOR)) {
+                    consume(Token::NS_SEPARATOR);
+                } else {
+                    break;
+                }
+            }
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::UseModule>(modulePath);
         }
 
         ParseResult parse() {
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
-            while (auto functionDef = parseFunctionDefinition())
-                nodes.push_back(std::move(functionDef.value()));
+            while (!canConsume(Token::END_OF_FILE) && hasNext()) {
+                if (auto functionDef = parseFunctionDefinition()) {
+                    nodes.push_back(std::move(functionDef.value()));
+                } else if (auto useModule = parseUseModule()) {
+                    nodes.push_back(std::move(useModule.value()));
+                } else {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "unexpected token found " +
+                                   std::string(magic_enum::enum_name(current().type)) + "!"
+                    });
+                    next();
+                }
+            }
+
             return ParseResult{
                 .nodes = std::move(nodes),
                 .messages = m_messages
@@ -844,7 +901,6 @@ namespace parser {
 
     ParseResult parse_tokens(const std::vector<Token> &tokens) {
         Parser parser(tokens);
-
         return parser.parse();
     }
 }
