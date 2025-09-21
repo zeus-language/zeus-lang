@@ -2,10 +2,8 @@
 fn fib(n : i32) : i32 {
     if n <= 1 {
         return n;
-    }else {
-        return fib(n - 1) + fib(n - 2);
     }
-    return 0;
+    return fib(n - 1) + fib(n - 2);
 }
 
 fn main() : i32 {
@@ -19,7 +17,6 @@ fn main() : i32 {
 
         if f % 2 == 0 {
             sum = sum + f;
-
         }
     }
     println(sum);

@@ -58,6 +58,7 @@ namespace llvm_backend {
     struct BreakBlock {
         llvm::BasicBlock *afterLoop = nullptr;
         llvm::BasicBlock *currentLoop = nullptr;
+        bool BlockUsed = false;
     };
 
     struct LLVMBackendState {
@@ -363,6 +364,7 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::BreakStatement *node, LLVMBackendState &llvmState) {
+        llvmState.currentBreakBlock.BlockUsed = true;
         return llvmState.Builder->CreateBr(llvmState.currentBreakBlock.afterLoop);
     }
 
@@ -438,13 +440,14 @@ namespace llvm_backend {
 
         llvmState.currentBreakBlock.currentLoop = LoopBB;
         llvmState.currentBreakBlock.afterLoop = AfterBB;
+        llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
+        llvmState.Builder->SetInsertPoint(LoopBB);
         for (auto &exp: node->block()) {
-            llvmState.Builder->SetInsertPoint(LoopBB);
-
             codegen_base(exp.get(), llvmState);
         }
-
+        llvmState.currentBreakBlock.currentLoop = nullptr;
+        llvmState.currentBreakBlock.afterLoop = nullptr;
         // Step: increment the loop variable.
         const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
@@ -477,8 +480,8 @@ namespace llvm_backend {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
         llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
-        llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop", TheFunction);
-        llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "afterloop", TheFunction);
+        llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.body", TheFunction);
+        llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.cleanup", TheFunction);
 
         // Insert an explicit fall through from the current block to the LoopBB.
         llvmState.Builder->CreateBr(LoopBB);
@@ -511,16 +514,17 @@ namespace llvm_backend {
             startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
         }
         Variable->addIncoming(startValue, PreheaderBB);
-        llvmState.currentBreakBlock.currentLoop = LoopBB;
         llvmState.currentBreakBlock.afterLoop = AfterBB;
+        llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
-        for (auto &exp: node->block()) {
-            llvmState.Builder->SetInsertPoint(LoopBB);
+        llvmState.Builder->SetInsertPoint(LoopBB);
 
+        for (auto &exp: node->block()) {
             codegen_base(exp.get(), llvmState);
         }
         llvmState.currentBreakBlock.currentLoop = nullptr;
         llvmState.currentBreakBlock.afterLoop = nullptr;
+
         // Step: increment the loop variable.
         const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
@@ -669,11 +673,11 @@ namespace llvm_backend {
         llvmState.Builder->CreateCondBr(condition, LoopBB, AfterBB);
 
         llvmState.Builder->SetInsertPoint(LoopBB);
-
+        llvmState.currentBreakBlock.BlockUsed = false;
         for (auto &exp: node->block()) {
             codegen_base(exp.get(), llvmState);
         }
-
+        llvmState.currentBreakBlock.BlockUsed = false;
         llvmState.Builder->CreateBr(CondBB);
 
         llvmState.Builder->SetInsertPoint(AfterBB);
@@ -702,20 +706,15 @@ namespace llvm_backend {
             llvmState.Builder->CreateCondBr(condition, ThenBB, MergeBB);
 
         llvmState.Builder->SetInsertPoint(ThenBB);
-        bool containsBreak = false;
 
         for (auto &exp: node->ifBlock()) {
             codegen_base(exp.get(), llvmState);
-            if (auto brk = dynamic_cast<ast::BreakStatement *>(exp.get())) {
-                containsBreak = true;
-            } else if (auto ret = dynamic_cast<ast::ReturnStatement *>(exp.get())) {
-                containsBreak = true;
-            }
         }
 
-        if (!containsBreak)
+        if (!llvmState.currentBreakBlock.BlockUsed)
             llvmState.Builder->CreateBr(MergeBB);
         ThenBB = llvmState.Builder->GetInsertBlock();
+
 
         if (hasElse) {
             TheFunction->insert(TheFunction->end(), ElseBB);
@@ -723,16 +722,13 @@ namespace llvm_backend {
 
             for (auto &exp: node->elseBlock()) {
                 codegen_base(exp.get(), llvmState);
-                if (auto brk = dynamic_cast<ast::BreakStatement *>(exp.get())) {
-                    containsBreak = true;
-                } else if (auto ret = dynamic_cast<ast::ReturnStatement *>(exp.get())) {
-                    containsBreak = true;
-                }
             }
-            if (!containsBreak)
+            if (!llvmState.currentBreakBlock.BlockUsed)
                 llvmState.Builder->CreateBr(MergeBB);
             // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
             ElseBB = llvmState.Builder->GetInsertBlock();
+        } else {
+            llvmState.currentBreakBlock.BlockUsed = false;
         }
 
 
@@ -949,6 +945,7 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::ReturnStatement *node, LLVMBackendState &llvmState) {
+        llvmState.currentBreakBlock.BlockUsed = true;
         if (auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
             return llvmState.Builder->CreateRet(retValue);
@@ -1141,16 +1138,16 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         llvm::errs() << "TheTargetMachine can't emit a file of this type";
         return;
     }
-
+    if (options.printLLVMIR) {
+        context.TheModule->print(llvm::errs(), nullptr, false, false);
+    }
     pass.run(*context.TheModule);
     dest.flush();
     dest.close();
 
 
     llvm::verifyModule(*context.TheModule, &llvm::errs());
-    if (options.printLLVMIR) {
-        context.TheModule->print(llvm::errs(), nullptr, false, false);
-    }
+
 
     llvm::outs() << "Wrote " << objectFileName.string() << "\n";
 
