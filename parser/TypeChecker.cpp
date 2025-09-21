@@ -4,6 +4,7 @@
 #include <map>
 
 #include "ast/ArrayAccess.h"
+#include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
@@ -12,6 +13,7 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
+#include "ast/LogicalExpression.h"
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -76,11 +78,16 @@ namespace types {
 
     void type_check(ast::ArrayAccess *node, Context &context);
 
+    void type_check(ast::ArrayAssignment *node, Context &context);
+
+    void type_check(ast::LogicalExpression *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
     void type_check(ast::StringConstant *node, Context &context) {
-        node->setExpressionType(context.registry.getTypeByName("string").value());
+        const auto u8Type = context.registry.getTypeByName("u8").value();
+        node->setExpressionType(context.registry.getPointerType(u8Type).value());
     }
 
     void type_check(ast::NumberConstant *node, Context &context) {
@@ -90,6 +97,9 @@ namespace types {
                 break;
             case ast::NumberType::FLOAT:
                 node->setExpressionType(context.registry.getTypeByName("float").value());
+                break;
+            case ast::NumberType::CHAR:
+                node->setExpressionType(context.registry.getTypeByName("u8").value());
                 break;
             default:
                 assert(false && "Unknown number type");
@@ -146,6 +156,12 @@ namespace types {
         if (const auto arrayAccess = dynamic_cast<ast::ArrayAccess *>(node)) {
             return type_check(arrayAccess, context);
         }
+        if (const auto arrayAssign = dynamic_cast<ast::ArrayAssignment *>(node)) {
+            return type_check(arrayAssign, context);
+        }
+        if (const auto logExpr = dynamic_cast<ast::LogicalExpression *>(node)) {
+            return type_check(logExpr, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
@@ -153,6 +169,32 @@ namespace types {
             "Unknown AST node that can not be type checked yet."
         });
     }
+
+    void type_check(ast::LogicalExpression *node, Context &context) {
+        type_check_base(node->lhs(), context);
+        type_check_base(node->rhs(), context);
+        if (node->lhs()->expressionType() && node->rhs()->expressionType()) {
+            if (node->lhs()->expressionType().value()->name() != "bool" ||
+                node->rhs()->expressionType().value()->name() != "bool") {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Logical expressions require boolean operands, but got '" +
+                    node->lhs()->expressionType().value()->name() + "' and '" +
+                    node->rhs()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+            node->setExpressionType(context.registry.getTypeByName("bool").value());
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine types of operands in logical expression."
+            });
+        }
+    }
+
 
     bool type_check_range_for(ast::ForLoop *node, Context &context) {
         type_check_base(node->rangeEnd(), context);
@@ -309,6 +351,83 @@ namespace types {
                 "Array initializer cannot be empty."
             });
             return;
+        }
+    }
+
+    void type_check(ast::ArrayAssignment *node, Context &context) {
+        const auto it = context.currentVariables.find(node->arrayToken().lexical());
+        if (it == context.currentVariables.end()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->arrayToken(),
+                "Variable '" + node->arrayToken().lexical() + "' is not declared in this scope."
+            });
+            return;
+        }
+        if (it->second.has_value()) {
+            if (it->second->type->typeKind() != TypeKind::ARRAY && it->second->type->typeKind() != TypeKind::POINTER) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->arrayToken(),
+                    "Variable '" + node->arrayToken().lexical() + "' is not an array."
+                });
+                return;
+            }
+            type_check_base(node->index(), context);
+            if (!node->index()->expressionType() || node->index()->expressionType().value()->name() != "i32") {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->index()->expressionToken(),
+                    "Array index must be of type 'i32'."
+                });
+                return;
+            }
+            type_check_base(node->value(), context);
+            if (!node->value()->expressionType()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->value()->expressionToken(),
+                    "Could not determine type of value being assigned to array."
+                });
+                return;
+            }
+            if (auto arrayType = std::dynamic_pointer_cast<ArrayType>(it->second->type)) {
+                if (arrayType->baseType()->name() != node->value()->expressionType().value()->name()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->value()->expressionToken(),
+                        "Type mismatch in array assignment: array '" + node->arrayToken().lexical() +
+                        "' expects elements of type '" + arrayType->baseType()->name() +
+                        "', but got value of type '" + node->value()->expressionType().value()->name() + "'."
+                    });
+                    return;
+                }
+            } else if (auto pointerType = std::dynamic_pointer_cast<PointerType>(it->second->type)) {
+                if (pointerType->baseType()->name() != node->value()->expressionType().value()->name()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->value()->expressionToken(),
+                        "Type mismatch in array assignment: pointer '" + node->arrayToken().lexical() +
+                        "' expects elements of type '" + pointerType->baseType()->name() +
+                        "', but got value of type '" + node->value()->expressionType().value()->name() + "'."
+                    });
+                    return;
+                }
+            } else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->arrayToken(),
+                    "Internal error: variable '" + node->arrayToken().lexical() +
+                    "' type information is corrupted."
+                });
+            }
+            node->setArrayType(it->second->type);
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->arrayToken(),
+                "Variable '" + node->arrayToken().lexical() + "' has no type information."
+            });
         }
     }
 

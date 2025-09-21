@@ -16,11 +16,12 @@ public:
     }
 };
 
-// class ProjectEulerTest : public testing::TestWithParam<std::string> {
-// public:
-//     static void SetUpTestSuite() {
-//     }
-// };
+class ProjectEulerTest : public testing::TestWithParam<std::string> {
+public:
+    static void SetUpTestSuite() {
+    }
+};
+
 //
 // class CompilerTestError : public testing::TestWithParam<std::string> {
 // public:
@@ -83,51 +84,52 @@ TEST_P(CompilerTest, TestNoError) {
     ASSERT_EQ(result, expected);
 }
 
-// TEST_P(ProjectEulerTest, TestNoError) {
-//     // Inside a test, access the test parameter with the GetParam() method
-//     // of the TestWithParam<T> class:
-//     std::filesystem::path base_path = "projecteuler";
-//     auto name = GetParam();
-//     std::filesystem::path input_path = base_path / (name + ".zeus");
-//     std::filesystem::path output_path = base_path / (name + ".txt");
-//     ASSERT_TRUE(std::filesystem::exists(input_path));
-//     ASSERT_TRUE(std::filesystem::exists(output_path));
-//     std::stringstream ostream;
-//     std::stringstream erstream;
-//     compiler::CompilerOptions options;
-//     options.rtlDirectories.emplace_back("rtl");
-//
-//     options.buildMode = compiler::BuildMode::Release;
-//
-//     options.runProgram = true;
-//     options.outputDirectory = std::filesystem::current_path();
-//     compiler::parse_and_compile(options, input_path, erstream, ostream);
-//
-//     std::ifstream file;
-//     std::istringstream is;
-//     std::string s;
-//     std::string group;
-//
-//
-//     file.open(output_path, std::ios::in);
-//
-//     if (!file.is_open()) {
-//         std::cerr << input_path.string() << "\n";
-//         std::cerr << std::filesystem::absolute(input_path);
-//         FAIL();
-//     }
-//     std::stringstream buffer;
-//     buffer << file.rdbuf();
-//     auto expected = buffer.str();
-//     std::string result = ostream.str();
-//     result.erase(std::ranges::remove(result, '\r').begin(), result.end());
-//     std::cout << "current path" << std::filesystem::current_path();
-//     std::cout << "expected: " << expected;
-//     std::cout << ostream.str() << "\n";
-//     ASSERT_EQ(erstream.str(), "");
-//     ASSERT_EQ(result, expected);
-//     ASSERT_GT(ostream.str().size(), 0);
-// }
+TEST_P(ProjectEulerTest, TestNoError) {
+    // Inside a test, access the test parameter with the GetParam() method
+    // of the TestWithParam<T> class:
+    std::filesystem::path base_path = "projecteuler";
+    auto name = GetParam();
+    std::filesystem::path input_path = base_path / (name + ".zeus");
+    std::filesystem::path output_path = base_path / (name + ".txt");
+    ASSERT_TRUE(std::filesystem::exists(input_path));
+    ASSERT_TRUE(std::filesystem::exists(output_path));
+    std::stringstream ostream;
+    std::stringstream erstream;
+    compiler::CompilerOptions options;
+    options.stdlibDirectories.emplace_back("stdlib");
+
+    options.buildMode = compiler::BuildMode::Release;
+
+    options.runProgram = true;
+    options.outputDirectory = std::filesystem::current_path();
+    compiler::parse_and_compile(options, input_path, erstream, ostream);
+
+    std::ifstream file;
+    std::istringstream is;
+    std::string s;
+    std::string group;
+
+
+    file.open(output_path, std::ios::in);
+
+    if (!file.is_open()) {
+        std::cerr << input_path.string() << "\n";
+        std::cerr << std::filesystem::absolute(input_path);
+        FAIL();
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto expected = buffer.str();
+    std::string result = ostream.str();
+    result.erase(std::ranges::remove(result, '\r').begin(), result.end());
+    std::cout << "current path" << std::filesystem::current_path();
+    std::cout << "expected: " << expected;
+    std::cout << ostream.str() << "\n";
+    ASSERT_EQ(erstream.str(), "");
+    ASSERT_EQ(result, expected);
+    ASSERT_GT(ostream.str().size(), 0);
+}
+
 //
 // TEST_P(CompilerTestError, CompilerTestWithError) {
 //     // Inside a test, access the test parameter with the GetParam() method
@@ -225,12 +227,12 @@ TEST_P(CompilerTest, TestNoError) {
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
-                             "usemath"));
+                             "usemath","chararray"));
 
 // INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
 //                          testing::Values());
 //
-// INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
-//                          testing::Values());
+INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
+                         testing::Values("problem1"));
 //
 // INSTANTIATE_TEST_SUITE_P(WriteToStdErrTest, WriteToStdErrTest, testing::Values());

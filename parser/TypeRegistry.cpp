@@ -5,6 +5,8 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::VariableType>("string", types::TypeKind::STRING));
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
     registerType(std::make_shared<types::VariableType>("bool", types::TypeKind::BOOL));
+    registerType(std::make_shared<types::IntegerType>("u8", 1, false));
+    registerType(std::make_shared<types::IntegerType>("u16", 2, false));
     registerType(std::make_shared<types::IntegerType>("u32", 4, false));
     registerType(std::make_shared<types::IntegerType>("i64", 8, true));
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));

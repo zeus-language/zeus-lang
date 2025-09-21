@@ -37,6 +37,7 @@
 #include "linker/linker.h"
 #include "llvm_intrinsics.h"
 #include "ast/ArrayAccess.h"
+#include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
@@ -77,11 +78,12 @@ namespace llvm_backend {
         BreakBlock currentBreakBlock;
 
 
-        llvm::Value *findVariable(const std::string &name) {
+        llvm::Value *findVariable(const std::string &name, bool loadValue = true) {
             if (NamedValues.contains(name)) {
                 return NamedValues[name];
             }
             if (NamedAllocations.contains(name)) {
+                if (!loadValue) return NamedAllocations[name];
                 return Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name], name);
             }
             return nullptr;
@@ -103,9 +105,11 @@ namespace llvm_backend {
         InitializeNativeTargetAsmPrinter();
     }
 
-    llvm::Type *resolveLlvmType(std::shared_ptr<types::VariableType> value, LLVMBackendState &context) {
-        if (auto intType = std::dynamic_pointer_cast<types::IntegerType>(value)) {
-            return llvm::Type::getIntNTy(*context.TheContext, intType->size() * 8);
+    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context) {
+        assert(value != nullptr && "Type is null");
+        if (const auto &intType = std::dynamic_pointer_cast<types::IntegerType>(value)) {
+            //return llvm::Type::getIntNTy(*context.TheContext, intType->size() * 8);
+            return llvm::IntegerType::get(*context.TheContext, intType->size() * 8);
         }
 
         switch (value->typeKind()) {
@@ -122,7 +126,7 @@ namespace llvm_backend {
             case types::TypeKind::STRUCT:
                 break;
             case types::TypeKind::ARRAY:
-                if (auto arrayType = std::dynamic_pointer_cast<types::ArrayType>(value)) {
+                if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(value)) {
                     auto baseType = resolveLlvmType(arrayType->baseType(), context);
                     if (baseType == nullptr) return nullptr;
                     return llvm::ArrayType::get(baseType, arrayType->size());
@@ -181,6 +185,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::ArrayAccess *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::ArrayAssignment *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -230,10 +236,59 @@ namespace llvm_backend {
         if (const auto arrayAccess = dynamic_cast<ast::ArrayAccess *>(node)) {
             return llvm_backend::codegen(arrayAccess, llvmState);
         }
+        if (const auto arrayAssign = dynamic_cast<ast::ArrayAssignment *>(node)) {
+            return llvm_backend::codegen(arrayAssign, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    std::shared_ptr<types::VariableType> resolveBaseType(const std::shared_ptr<types::VariableType> &type) {
+        if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(type)) {
+            return arrayType->baseType();
+        }
+        if (const auto &ptrType = std::dynamic_pointer_cast<types::PointerType>(type)) {
+            return ptrType->baseType();
+        }
+        assert(false && "Type is not an array or pointer");
+        return nullptr;
+    }
+
+    llvm::Value *codegen(ast::ArrayAssignment *node, LLVMBackendState &llvmState) {
+        auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical(), false);
+        auto arrayType = resolveLlvmType(node->arrayType(), llvmState);
+        auto baseType = resolveLlvmType(resolveBaseType(node->arrayType()), llvmState);
+        auto indexValue = codegen_base(node->index(), llvmState);
+        if (!indexValue) {
+            assert(false && "Failed to generate index value for array access");
+            return nullptr;
+        }
+        if (!indexValue->getType()->isIntegerTy()) {
+            assert(false && "Array index is not an integer");
+            return nullptr;
+        }
+        std::vector<llvm::Value *> indices;
+        if (node->arrayType()->typeKind() == types::TypeKind::ARRAY) {
+            auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
+            indices.push_back(zero);
+        }
+
+        if (indexValue->getType() != llvm::Type::getInt32Ty(*llvmState.TheContext)) {
+            indexValue = llvmState.Builder->CreateIntCast(indexValue, llvm::Type::getInt32Ty(*llvmState.TheContext),
+                                                          true, "array_index_cast");
+        }
+        indices.push_back(indexValue);
+
+        auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
+        auto valueToStore = codegen_base(node->value(), llvmState);
+        if (!valueToStore) {
+            assert(false && "Failed to generate value for array assignment");
+            return nullptr;
+        }
+        llvmState.Builder->CreateStore(valueToStore, elementPtr);
+        return valueToStore;
     }
 
     llvm::Value *codegen(ast::ArrayInitializer *node, LLVMBackendState &llvmState) {
@@ -464,7 +519,8 @@ namespace llvm_backend {
 
             codegen_base(exp.get(), llvmState);
         }
-
+        llvmState.currentBreakBlock.currentLoop = nullptr;
+        llvmState.currentBreakBlock.afterLoop = nullptr;
         // Step: increment the loop variable.
         const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
@@ -647,6 +703,7 @@ namespace llvm_backend {
 
         llvmState.Builder->SetInsertPoint(ThenBB);
         bool containsBreak = false;
+
         for (auto &exp: node->ifBlock()) {
             codegen_base(exp.get(), llvmState);
             if (auto brk = dynamic_cast<ast::BreakStatement *>(exp.get())) {
@@ -658,15 +715,22 @@ namespace llvm_backend {
 
         if (!containsBreak)
             llvmState.Builder->CreateBr(MergeBB);
-        //context->breakBlock().BlockUsed = false;
-        if (ElseBB) {
+        ThenBB = llvmState.Builder->GetInsertBlock();
+
+        if (hasElse) {
             TheFunction->insert(TheFunction->end(), ElseBB);
             llvmState.Builder->SetInsertPoint(ElseBB);
 
             for (auto &exp: node->elseBlock()) {
                 codegen_base(exp.get(), llvmState);
+                if (auto brk = dynamic_cast<ast::BreakStatement *>(exp.get())) {
+                    containsBreak = true;
+                } else if (auto ret = dynamic_cast<ast::ReturnStatement *>(exp.get())) {
+                    containsBreak = true;
+                }
             }
-            llvmState.Builder->CreateBr(MergeBB);
+            if (!containsBreak)
+                llvmState.Builder->CreateBr(MergeBB);
             // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
             ElseBB = llvmState.Builder->GetInsertBlock();
         }
@@ -713,6 +777,11 @@ namespace llvm_backend {
                     return llvmState.Builder->CreateFDiv(lhs, rhs, "fdivtmp");
                 }
                 break;
+            case ast::BinaryOperator::MOD:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSRem(lhs, rhs, "modtmp");
+                }
+                break;
             default:
                 assert(false && "Unsupported binary operator");
         }
@@ -733,6 +802,9 @@ namespace llvm_backend {
             return value;
         }
         if (NamedAllocations.contains(name)) {
+            if (NamedAllocations[name]->getAllocatedType()->isArrayTy()) {
+                return NamedAllocations[name];
+            }
             return llvmState.Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name],
                                                  name);
         }
@@ -773,6 +845,16 @@ namespace llvm_backend {
         llvmState.NamedAllocations[node->expressionToken().lexical()] = alloca;
 
         if (const auto initialValue = node->initialValue()) {
+            if (auto stringConstant = dynamic_cast<ast::StringConstant *>(initialValue.value())) {
+                auto strValue = codegen(stringConstant, llvmState);
+
+                llvmState.Builder->CreateMemCpy(llvmState.NamedAllocations[node->expressionToken().lexical()],
+                                                llvm::MaybeAlign(),
+                                                strValue,
+                                                llvm::MaybeAlign(),
+                                                stringConstant->expressionToken().lexical().size() + 1);
+                return alloca;
+            }
             if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
                 llvmState.Builder->CreateStore(initValue, alloca);
             } else {
@@ -807,6 +889,10 @@ namespace llvm_backend {
                                               llvm::APInt(32, std::get<int64_t>(node->value()), true));
             case ast::NumberType::FLOAT:
                 return llvm::ConstantFP::get(*llvmState.TheContext, llvm::APFloat(std::get<double>(node->value())));
+            case ast::NumberType::CHAR:
+                return llvm::ConstantInt::get(*llvmState.TheContext,
+                                              llvm::APInt(8, static_cast<uint64_t>(std::get<int64_t>(node->value())),
+                                                          false));
         }
         assert(false && "unknown number type in codegen");
         return nullptr;
@@ -835,7 +921,7 @@ namespace llvm_backend {
                     args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "double_format"));
                 } else if (value->getType()->isFloatTy()) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "float_format"));
-                } else if (value->getType()->isPointerTy()) {
+                } else if (value->getType()->isPointerTy() || value->getType()->isArrayTy()) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
                 } else {
                     assert(false && "Unsupported argument type for println");

@@ -1,0 +1,11 @@
+fn main() : i32 {
+    let mut sum: i32 = 0;
+
+    for let i in 1 ..= 999 {
+        if i % 3 == 0 or i % 5 == 0 {
+            sum = sum + i;
+        }
+    }
+    println(sum);
+    return 0;
+}

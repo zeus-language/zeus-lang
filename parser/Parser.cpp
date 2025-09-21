@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "ast/ArrayAccess.h"
+#include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
@@ -100,6 +101,15 @@ namespace parser {
             return std::nullopt;
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseChar() {
+            if (!canConsume(Token::CHAR)) {
+                return std::nullopt;
+            }
+            Token charToken = current();
+            consume(Token::CHAR);
+            return std::make_unique<ast::NumberConstant>(charToken, ast::NumberType::CHAR);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseString() {
             if (!canConsume(Token::STRING)) {
                 return std::nullopt;
@@ -154,6 +164,9 @@ namespace parser {
             }
             if (auto string = parseString()) {
                 return std::move(string.value());
+            }
+            if (auto character = parseChar()) {
+                return std::move(character.value());
             }
             if (auto memberFuncCall = parseMemberFunctionCall()) {
                 return std::move(memberFuncCall.value());
@@ -309,6 +322,12 @@ namespace parser {
                         std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::DIV,
                                                                 std::move(lhs.value()), std::move(rhs.value())));
                 }
+                if (tryConsume(Token::PERCENT)) {
+                    auto rhs = tryParseToken();
+                    return parseExpression(
+                        std::make_unique<ast::BinaryExpression>(operatorToken, ast::BinaryOperator::MOD,
+                                                                std::move(lhs.value()), std::move(rhs.value())));
+                }
             }
 
             if (canConsume(Token::LEFT_CURLY)) {
@@ -370,7 +389,8 @@ namespace parser {
                                                            std::move(lhs.value()), std::move(rhs.value())));
                 }
 
-                if (canConsume(Token::EQUAL)) {
+                if (canConsume(Token::EQUAL) && canConsume(Token::EQUAL, 1)) {
+                    consume(Token::EQUAL);
                     consume(Token::EQUAL);
                     auto operatorToken = current();
                     auto rhs = parseBaseExpression();
@@ -436,11 +456,34 @@ namespace parser {
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAssignment() {
-            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::EQUAL, 1)) {
+            if (((!canConsume(Token::IDENTIFIER) || !canConsume(Token::EQUAL, 1))
+                 && (!canConsume(Token::IDENTIFIER) || !canConsume(Token::LEFT_SQUAR, 1))
+            )) {
                 return std::nullopt;
             }
             Token nameToken = current();
             consume(Token::IDENTIFIER);
+
+            bool isArrayAccess = false;
+            std::optional<std::unique_ptr<ast::ASTNode> > accessNode = std::nullopt;
+            if (tryConsume(Token::LEFT_SQUAR)) {
+                isArrayAccess = true;
+                if (!canConsume(Token::NUMBER) && !canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected number or identifier inside array access '[]' in variable assignment!"
+                    });
+                    return std::nullopt;
+                }
+                accessNode = tryParseToken();
+                if (!tryConsume(Token::RIGHT_SQUAR)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected ']' at the end of array access in variable assignment!"
+                    });
+                    return std::nullopt;
+                }
+            }
             if (!tryConsume(Token::EQUAL)) {
                 m_messages.push_back(ParserMessasge{
                     .token = nameToken,
@@ -457,6 +500,11 @@ namespace parser {
                 return std::nullopt;
             }
             consume(Token::SEMICOLON);
+            if (isArrayAccess) {
+                return std::make_unique<ast::ArrayAssignment>(std::move(nameToken), std::move(value.value()),
+                                                              std::move(accessNode.value()));
+            }
+
             return std::make_unique<ast::VariableAssignment>(std::move(nameToken), std::move(value.value()));
         }
 
@@ -616,7 +664,8 @@ namespace parser {
             if (!canConsume(Token::RANGE)) {
                 auto block = parseBlock();
 
-                return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken), std::move(rangeStart.value()),
+                return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken),
+                                                      std::move(rangeStart.value()),
                                                       nullptr, isConstant, false, std::move(block));
             }
             consume(Token::RANGE);
@@ -631,7 +680,8 @@ namespace parser {
             }
             auto block = parseBlock();
             return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken), std::move(rangeStart.value()),
-                                                  std::move(rangeEnd.value()), isConstant, inclusive, std::move(block));
+                                                  std::move(rangeEnd.value()), isConstant, inclusive,
+                                                  std::move(block));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseWhileLoop() {
@@ -829,7 +879,8 @@ namespace parser {
             };
         }
 
-    private:
+    private
+    :
         Token next() {
             if (hasNext())
                 ++m_current;
@@ -864,7 +915,9 @@ namespace parser {
             return false;
         }
 
-        [[nodiscard]] bool hasNext() const { return m_current < m_tokens.size() - 1; }
+        [[nodiscard]] bool hasNext() const {
+            return m_current < m_tokens.size() - 1;
+        }
 
         [[nodiscard]] bool canConsume(const Token::Type Token) const {
             return canConsume(Token, 0);;

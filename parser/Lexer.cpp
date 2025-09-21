@@ -7,7 +7,8 @@
 
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
-        "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use"
+        "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use",
+        "or", "and"
     };
 
 
@@ -149,6 +150,17 @@ namespace lexer {
                 col += offset + 1;
                 continue;
             }
+            if (source_code[start] == '\'') {
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = start + 1, .num_bytes = 1, .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(Token::CHAR, source_location);
+                col += 3;
+                start += 2;
+                continue;
+            }
+
             found = find_comment(source_code, start, &endPosition);
             if (found) {
                 // count lines
@@ -239,6 +251,9 @@ namespace lexer {
                         break;
                     case '*':
                         tokens.emplace_back(Token::MUL, source_location);
+                        break;
+                    case '%':
+                        tokens.emplace_back(Token::PERCENT, source_location);
                         break;
                     case '/':
                         tokens.emplace_back(Token::DIV, source_location);

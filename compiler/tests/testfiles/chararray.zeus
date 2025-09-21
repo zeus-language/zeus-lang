@@ -1,0 +1,12 @@
+
+
+fn main() : i32 {
+    let mut s: [u8;14] = "Hello, World!";
+
+    s[0] = 'h'; // Change 'H' to 'h'
+    s[7] = 'w'; // Change 'W' to 'w'
+
+    println(s);
+
+    return 0;
+}

@@ -14,7 +14,8 @@
 namespace ast {
     enum class NumberType {
         INTEGER,
-        FLOAT
+        FLOAT,
+        CHAR
     };
 
     typedef std::variant<int64_t, double> NumberValue;
@@ -28,8 +29,8 @@ namespace ast {
     public:
         explicit NumberConstant(Token constant, NumberType numberType);
 
-        NumberType numberType() const { return m_numberType; }
-        NumberValue value() const { return m_value; }
+        [[nodiscard]] NumberType numberType() const { return m_numberType; }
+        [[nodiscard]] NumberValue value() const { return m_value; }
 
         ~NumberConstant() override = default;
 

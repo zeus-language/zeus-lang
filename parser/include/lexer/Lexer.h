@@ -43,6 +43,7 @@ struct Token {
         MINUS,
         DIV,
         MUL,
+        PERCENT,
         LEFT_CURLY,
         RIGHT_CURLY,
         LEFT_SQUAR,

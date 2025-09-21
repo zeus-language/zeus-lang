@@ -1,0 +1,27 @@
+
+fn fib(n : i32) : i32 {
+    if n <= 1 {
+        return n;
+    }else {
+        return fib(n - 1) + fib(n - 2);
+    }
+    return 0;
+}
+
+fn main() : i32 {
+    let mut sum: i32 = 0;
+
+    for let i in 1 ..= 400 {
+        let f : i32 = fib(i);
+        if f > 4000000 {
+            break;
+        }
+
+        if f % 2 == 0 {
+            sum = sum + f;
+
+        }
+    }
+    println(sum);
+    return 0;
+}
