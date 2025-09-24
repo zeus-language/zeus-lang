@@ -22,6 +22,7 @@
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/TypeCast.h"
 #include "ast/UseModule.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
@@ -158,32 +159,50 @@ namespace parser {
             return std::make_unique<ast::ArrayInitializer>(startToken, std::move(elements));
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > tryParseTypeCast(
+            std::optional<std::unique_ptr<ast::ASTNode> > value) {
+            if (!canConsumeKeyWord("as")) {
+                return std::move(value);
+            }
+            Token asToken = current();
+            consumeKeyWord("as");
+            auto rawType = parseRawType();
+            if (!rawType) {
+                m_messages.push_back(ParserMessasge{
+                    .outputType = OutputType::ERROR,
+                    .token = current(),
+                    .message = "expected type name after 'as' for type cast",
+                });
+                return std::nullopt;
+            }
+
+            return std::make_unique<ast::TypeCast>(asToken, std::move(rawType.value()), std::move(value.value()));
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > tryParseToken() {
+            std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
             if (auto number = parseNumber()) {
-                return std::move(number.value());
+                result = std::move(number.value());
+            } else if (auto string = parseString()) {
+                result = std::move(string.value());
+            } else if (auto character = parseChar()) {
+                result = std::move(character.value());
+            } else if (auto memberFuncCall = parseMemberFunctionCall()) {
+                result = std::move(memberFuncCall.value());
+            } else if (auto functionCall = parseFunctionCall()) {
+                result = std::move(functionCall.value());
+            } else if (auto arrayAccess = parseArrayAccess()) {
+                result = std::move(arrayAccess.value());
+            } else if (auto varAccess = parseVariableAccess()) {
+                result = std::move(varAccess.value());
+            } else if (auto arrayInit = parseArrayInitializer()) {
+                result = std::move(arrayInit.value());
             }
-            if (auto string = parseString()) {
-                return std::move(string.value());
+            if (result) {
+                return tryParseTypeCast(std::move(result));
             }
-            if (auto character = parseChar()) {
-                return std::move(character.value());
-            }
-            if (auto memberFuncCall = parseMemberFunctionCall()) {
-                return std::move(memberFuncCall.value());
-            }
-            if (auto functionCall = parseFunctionCall()) {
-                return std::move(functionCall.value());
-            }
-            if (auto arrayAccess = parseArrayAccess()) {
-                return std::move(arrayAccess.value());
-            }
-            if (auto varAccess = parseVariableAccess()) {
-                return std::move(varAccess.value());
-            }
-            if (auto arrayInit = parseArrayInitializer()) {
-                return std::move(arrayInit.value());
-            }
-            return std::nullopt;
+
+            return result;
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseArrayAccess() {
@@ -579,7 +598,7 @@ namespace parser {
 
             std::optional<std::unique_ptr<ast::ASTNode> > value = std::nullopt;
             if (tryConsume(Token::EQUAL)) {
-                value = tryParseToken();
+                value = parseExpression();
                 consume(Token::Type::SEMICOLON);
             } else {
                 consume(Token::Type::SEMICOLON);

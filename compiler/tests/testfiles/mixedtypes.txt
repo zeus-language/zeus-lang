@@ -1,0 +1,29 @@
+Integer Arithmetic:
+Sum:
+30
+Difference:
+10
+Product:
+200
+Quotient:
+2
+Remainder:
+0
+Floating-point Arithmetic:
+Sum:
+7.700000
+Difference:
+3.300000
+Product:
+12.100000
+Quotient:
+2.500000
+Mixed-type Arithmetic:
+Sum (int + float):
+15.500000
+Difference (int - float):
+17.799999
+Product (int * float):
+22.000000
+Quotient (int / float):
+3.636364

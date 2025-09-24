@@ -49,6 +49,7 @@
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/TypeCast.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
@@ -117,7 +118,9 @@ namespace llvm_backend {
             case types::TypeKind::INT:
                 break;
             case types::TypeKind::FLOAT:
-                return llvm::Type::getFloatTy(*context.TheContext);
+                return context.Builder->getFloatTy();
+            case types::TypeKind::DOUBLE:
+                return context.Builder->getDoubleTy();
             case types::TypeKind::STRING:
                 return llvm::PointerType::getUnqual(*context.TheContext);
             case types::TypeKind::BOOL:
@@ -188,6 +191,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::ArrayAssignment *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::TypeCast *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -240,9 +245,44 @@ namespace llvm_backend {
         if (const auto arrayAssign = dynamic_cast<ast::ArrayAssignment *>(node)) {
             return llvm_backend::codegen(arrayAssign, llvmState);
         }
+        if (const auto typeCast = dynamic_cast<ast::TypeCast *>(node)) {
+            return llvm_backend::codegen(typeCast, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
+        return nullptr; // Placeholder
+    }
+
+    llvm::Value *codegen(ast::TypeCast *node, LLVMBackendState &llvmState) {
+        const auto value = codegen_base(node->value(), llvmState);
+        if (!value) {
+            assert(false && "Unknown type");
+        }
+        const auto targetType = resolveLlvmType(node->expressionType().value(), llvmState);
+        if (!targetType) {
+            assert(false && "Unknown target type");
+        }
+        if (value->getType() == targetType) {
+            return value; // No cast needed
+        }
+        if (targetType->isIntegerTy()) {
+            if (value->getType()->isFloatingPointTy()) {
+                return llvmState.Builder->CreateFPToSI(value, targetType, "float_to_int_cast");
+            }
+            return llvmState.Builder->CreateIntCast(value, targetType, true, "int_cast");
+        }
+        if (targetType->isFloatingPointTy()) {
+            if (value->getType()->isIntegerTy()) {
+                return llvmState.Builder->CreateSIToFP(value, targetType, "int_to_float_cast");
+            }
+            return llvmState.Builder->CreateFPCast(value, targetType, "float_cast");
+        }
+        if (targetType->isArrayTy() && value->getType()->isPointerTy()) {
+            return value;
+        }
+
+        assert(false && "Unsupported type cast");
         return nullptr; // Placeholder
     }
 
@@ -884,7 +924,7 @@ namespace llvm_backend {
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(32, std::get<int64_t>(node->value()), true));
             case ast::NumberType::FLOAT:
-                return llvm::ConstantFP::get(*llvmState.TheContext, llvm::APFloat(std::get<double>(node->value())));
+                return llvm::ConstantFP::get(llvmState.Builder->getFloatTy(), std::get<double>(node->value()));
             case ast::NumberType::CHAR:
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(8, static_cast<uint64_t>(std::get<int64_t>(node->value())),
@@ -913,18 +953,20 @@ namespace llvm_backend {
                     args.push_back(getOrCreateGlobalString(llvmState, "%d\n", "i32_format"));
                 } else if (value->getType()->isIntegerTy(64)) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%ld\n", "i64_format"));
-                } else if (value->getType()->isDoubleTy()) {
+                } else if (value->getType()->isFloatingPointTy()) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "double_format"));
-                } else if (value->getType()->isFloatTy()) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "float_format"));
                 } else if (value->getType()->isPointerTy() || value->getType()->isArrayTy()) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
                 } else {
                     assert(false && "Unsupported argument type for println");
                     return nullptr;
                 }
-
-                args.push_back(value);
+                if (value->getType()->isFloatingPointTy()) {
+                    args.push_back(
+                        llvmState.Builder->CreateFPCast(value, llvmState.Builder->getDoubleTy(), "float_to_double"));
+                } else {
+                    args.push_back(value);
+                }
             }
             return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
         }

@@ -1,0 +1,60 @@
+
+fn main() : i32 {
+    let a: i32 = 10;
+    let b: i32 = 20;
+    let c: float = 5.5;
+    let d: float = 2.2;
+
+    // Integer arithmetic
+    let sum_int: i32 = a + b;
+    let diff_int: i32 = b - a;
+    let prod_int: i32 = a * b;
+    let quot_int: i32 = b / a;
+    let rem_int: i32 = b % a;
+
+    println("Integer Arithmetic:");
+    println("Sum:");
+    println(sum_int);
+    println("Difference:");
+    println(diff_int);
+    println("Product:");
+    println(prod_int);
+    println("Quotient:");
+    println(quot_int);
+    println("Remainder:");
+    println(rem_int);
+
+    // Floating-point arithmetic
+    let sum_float: float = c + d;
+    let diff_float: float = c - d;
+    let prod_float: float = c * d;
+    let quot_float: float = c / d;
+
+    println("Floating-point Arithmetic:");
+    println("Sum:");
+    println(sum_float);
+    println("Difference:");
+    println(diff_float);
+    println("Product:");
+    println(prod_float);
+    println("Quotient:");
+    println(quot_float);
+
+    // Mixed-type arithmetic (casting)
+    let mixed_sum: float =  a as float + c  ;
+    let mixed_diff: float = b as float - d ;
+    let mixed_prod: float = a as float * d ;
+    let mixed_quot: float = b as float / c ;
+
+    println("Mixed-type Arithmetic:");
+    println("Sum (int + float):");
+    println(mixed_sum);
+    println("Difference (int - float):");
+    println(mixed_diff);
+    println("Product (int * float):");
+    println(mixed_prod);
+    println("Quotient (int / float):");
+    println(mixed_quot);
+
+    return 0;
+}

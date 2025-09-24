@@ -5,6 +5,7 @@ namespace types {
     enum class TypeKind {
         INT,
         FLOAT,
+        DOUBLE,
         STRING,
         BOOL,
         VOID,

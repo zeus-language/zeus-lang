@@ -11,6 +11,7 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("i64", 8, true));
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
+    registerType(std::make_shared<types::VariableType>("double", types::TypeKind::DOUBLE));
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(

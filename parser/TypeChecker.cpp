@@ -17,6 +17,7 @@
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/TypeCast.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
@@ -82,12 +83,16 @@ namespace types {
 
     void type_check(ast::LogicalExpression *node, Context &context);
 
+    void type_check(ast::TypeCast *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
     void type_check(ast::StringConstant *node, Context &context) {
         const auto u8Type = context.registry.getTypeByName("u8").value();
-        node->setExpressionType(context.registry.getPointerType(u8Type).value());
+
+        node->setExpressionType(
+            context.registry.getArrayType(u8Type, node->expressionToken().lexical().size() + 1).value());
     }
 
     void type_check(ast::NumberConstant *node, Context &context) {
@@ -162,12 +167,37 @@ namespace types {
         if (const auto logExpr = dynamic_cast<ast::LogicalExpression *>(node)) {
             return type_check(logExpr, context);
         }
+        if (const auto typeCast = dynamic_cast<ast::TypeCast *>(node)) {
+            return type_check(typeCast, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::TypeCast *node, Context &context) {
+        auto type = resolveFromRawType(node->rawType(), context.registry);
+        if (!type) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->rawType()->typeToken,
+                "Unknown type '" + node->rawType()->typeToken.lexical() + "' in type cast."
+            });
+            return;
+        }
+        node->setExpressionType(type.value());
+        type_check_base(node->value(), context);
+        if (!node->value()->expressionType()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->value()->expressionToken(),
+                "Could not determine type of expression in type cast."
+            });
+            return;
+        }
     }
 
     void type_check(ast::LogicalExpression *node, Context &context) {
@@ -334,6 +364,9 @@ namespace types {
                         });
                         return;
                     }
+                    node->setExpressionType(
+                        context.registry.getArrayType(element->expressionType().value(), node->elements().size()).
+                        value());
                 } else {
                     context.messages.push_back({
                         parser::OutputType::ERROR,
@@ -634,6 +667,25 @@ namespace types {
         if (node->initialValue()) {
             type_check_base(node->initialValue().value(), context);
             // check whenever the types match
+            const auto initalType = node->initialValue().value()->expressionType();
+            const auto declaredType = node->expressionType();
+            if (!initalType) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->initialValue().value()->expressionToken(),
+                    "Could not determine type of initial value for variable '" + node->expressionToken().lexical() +
+                    "'."
+                });
+            }
+            if (initalType && declaredType && initalType.value()->name() != declaredType.value()->name()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->initialValue().value()->expressionToken(),
+                    "Type mismatch in variable initialization: variable '" + node->expressionToken().lexical() +
+                    "' is of type '" + (declaredType ? declaredType.value()->name() : "unknown") +
+                    "', but got initial value of type '" + (initalType ? initalType.value()->name() : "unknown") + "'."
+                });
+            }
         }
     }
 

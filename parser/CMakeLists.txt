@@ -14,6 +14,7 @@ add_library(${PROJECT_NAME} STATIC
         ast/FunctionDefinition.cpp
         ast/VariableDeclaration.cpp
         ast/VariableAssignment.cpp
+        include/ast/TypeCast.h
 
 )
 target_sources(${PROJECT_NAME} PRIVATE
