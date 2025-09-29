@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <string>
 
 namespace types {
@@ -74,5 +75,40 @@ namespace types {
         [[nodiscard]] size_t size() const { return m_size; }
 
         [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+    };
+
+    struct StructField {
+        std::shared_ptr<VariableType> type;
+        std::string name;
+    };
+
+    class StructType final : public VariableType {
+    private:
+        std::vector<StructField> m_fields;
+
+    public:
+        StructType(std::string name, const std::vector<StructField> &fields) : VariableType(std::move(name),
+                                                                                   TypeKind::STRUCT), m_fields(fields) {
+        }
+
+        [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
+
+        [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
+            for (const auto &field: m_fields) {
+                if (field.name == fieldName)
+                    return field;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] size_t getFieldIndexByName(const std::string &fieldName) const {
+            for (size_t i = 0; i < m_fields.size(); ++i) {
+                if (m_fields[i].name == fieldName) {
+                    return i;
+                }
+            }
+            assert(false && "invalid index for struct definition");
+            return 0;
+        }
     };
 }

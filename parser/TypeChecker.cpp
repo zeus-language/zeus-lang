@@ -9,6 +9,8 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/FieldAccess.h"
+#include "ast/FieldAssignment.h"
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
@@ -17,6 +19,8 @@
 #include "ast/NumberConstant.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/StructDeclaration.h"
+#include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
@@ -84,6 +88,12 @@ namespace types {
     void type_check(ast::LogicalExpression *node, Context &context);
 
     void type_check(ast::TypeCast *node, Context &context);
+
+    void type_check(ast::StructInitialization *node, Context &context);
+
+    void type_check(ast::FieldAccess *node, Context &context);
+
+    void type_check(ast::FieldAssignment *node, Context &context);
 
     void type_check(ast::BreakStatement *node, Context &context) {
     }
@@ -170,12 +180,130 @@ namespace types {
         if (const auto typeCast = dynamic_cast<ast::TypeCast *>(node)) {
             return type_check(typeCast, context);
         }
+        if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node)) {
+            return;
+        }
+        if (const auto structInit = dynamic_cast<ast::StructInitialization *>(node)) {
+            return type_check(structInit, context);
+        }
+        if (const auto fieldAccess = dynamic_cast<ast::FieldAccess *>(node)) {
+            return type_check(fieldAccess, context);
+        }
+        if (const auto fieldAssign = dynamic_cast<ast::FieldAssignment *>(node)) {
+            return type_check(fieldAssign, context);
+        }
 
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::FieldAssignment *node, Context &context) {
+        type_check_base(node->expression(), context);
+        const auto it = context.currentVariables.find(node->expressionToken().lexical());
+        if (it == context.currentVariables.end()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
+            });
+            return;
+        }
+        if (auto structType = std::dynamic_pointer_cast<types::StructType>(it->second->type)) {
+            const auto field = structType->field(node->fieldName().lexical());
+            if (!field) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->fieldName(),
+                    "The Struct '" + node->expressionToken().lexical() + "' does not contain a field with the name'" +
+                    node->fieldName().lexical() + "'."
+                });
+                return;
+            }
+            if (node->expression()->expressionType() && field->type->name() != node->expression()->expressionType().
+                value()->name()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->fieldName(),
+                    "The Type of the field '" +
+                    node->fieldName().lexical() + "' is not equal to the type that wants to be assigned."
+                });
+            }
+            node->setStructType(structType);
+            node->setExpressionType(field->type);
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->fieldName(),
+                "The Struct '" + node->expressionToken().lexical() + "' is not a valid struct type'" +
+                node->fieldName().lexical() + "'."
+            });
+        }
+    }
+
+    void type_check(ast::FieldAccess *node, Context &context) {
+        const auto it = context.currentVariables.find(node->expressionToken().lexical());
+        if (it == context.currentVariables.end()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
+            });
+            return;
+        }
+        if (auto structType = std::dynamic_pointer_cast<types::StructType>(it->second->type)) {
+            auto field = structType->field(node->fieldName().lexical());
+            if (!field) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->fieldName(),
+                    "The Struct '" + node->expressionToken().lexical() + "' does not contain a field with the name'" +
+                    node->fieldName().lexical() + "'."
+                });
+                return;
+            }
+            node->setStructType(structType);
+            node->setExpressionType(field->type);
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->fieldName(),
+                "The Struct '" + node->expressionToken().lexical() + "' is not a valid struct type'" +
+                node->fieldName().lexical() + "'."
+            });
+        }
+    }
+
+    void type_check_field(const ast::StructInitField &field, Context &context) {
+        type_check_base(field.value.get(), context);
+    }
+
+    void type_check(ast::StructInitialization *node, Context &context) {
+        const auto type = context.registry.getTypeByName(node->expressionToken().lexical());
+        if (type) {
+            if (auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
+                for (auto &field: node->fields()) {
+                    type_check_field(field, context);
+                }
+                node->setExpressionType(type.value());
+            } else {
+                context.messages.push_back({
+                    .outputType = parser::OutputType::ERROR,
+                    .token = node->expressionToken(),
+                    .message = "The type " + node->expressionToken().lexical() +
+                               " is not a valid structure type."
+                });
+            }
+        } else {
+            context.messages.push_back({
+                .outputType = parser::OutputType::ERROR,
+                .token = node->expressionToken(),
+                .message = "Could not determine type " + node->expressionToken().lexical() +
+                           " for the structure initialization."
+            });
+        }
     }
 
     void type_check(ast::TypeCast *node, Context &context) {
@@ -398,7 +526,8 @@ namespace types {
             return;
         }
         if (it->second.has_value()) {
-            if (it->second->type->typeKind() != TypeKind::ARRAY && it->second->type->typeKind() != TypeKind::POINTER) {
+            if (it->second->type->typeKind() != TypeKind::ARRAY && it->second->type->typeKind() !=
+                TypeKind::POINTER) {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->arrayToken(),
@@ -683,7 +812,8 @@ namespace types {
                     node->initialValue().value()->expressionToken(),
                     "Type mismatch in variable initialization: variable '" + node->expressionToken().lexical() +
                     "' is of type '" + (declaredType ? declaredType.value()->name() : "unknown") +
-                    "', but got initial value of type '" + (initalType ? initalType.value()->name() : "unknown") + "'."
+                    "', but got initial value of type '" + (initalType ? initalType.value()->name() : "unknown") +
+                    "'."
                 });
             }
         }
@@ -738,12 +868,34 @@ namespace types {
             type_check_base(stmt.get(), context);
         }
         context.currentVariables.clear();
+
+        if (node->returnType()) {
+            node->setExpressionType(
+                resolveFromRawType(node->returnType().value(), context.registry).value());
+        } else {
+            node->setExpressionType(context.registry.getTypeByName("void").value());
+        }
         // Further type checking logic would go here...
     }
 
     void type_check(const std::vector<std::unique_ptr<ast::ASTNode> > &nodes, TypeCheckResult &result) {
         Context context;
-        // collect function definitions first
+        // resolve global type declarations first
+        for (const auto &node: nodes) {
+            if (auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
+                std::vector<types::StructField> structFields;
+                for (auto &field: structDecl->fields()) {
+                    structFields.push_back({
+                        .type = resolveFromRawType(field.type.get(), context.registry).value(),
+                        .name = field.name.lexical()
+                    });
+                }
+                auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
+                                                                structFields);
+                context.registry.registerType(type);
+            }
+        }
+        // collect function definitions second
         for (const auto &node: nodes) {
             if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
                 context.functions.push_back(funcDef);
