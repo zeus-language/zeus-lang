@@ -163,9 +163,13 @@ namespace parser {
             return std::make_unique<ast::ArrayInitializer>(startToken, std::move(elements));
         }
 
+        bool canParseTypeCast() const {
+            return canConsumeKeyWord("as");
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > tryParseTypeCast(
             std::optional<std::unique_ptr<ast::ASTNode> > value) {
-            if (!canConsumeKeyWord("as")) {
+            if (!canParseTypeCast()) {
                 return std::move(value);
             }
             Token asToken = current();
@@ -242,8 +246,6 @@ namespace parser {
                 result = std::move(string.value());
             } else if (auto character = parseChar()) {
                 result = std::move(character.value());
-            } else if (auto memberFuncCall = parseMemberAccess()) {
-                result = std::move(memberFuncCall.value());
             } else if (auto functionCall = parseFunctionCall()) {
                 result = std::move(functionCall.value());
             } else if (auto arrayAccess = parseArrayAccess()) {
@@ -256,7 +258,12 @@ namespace parser {
                 result = std::move(arrayInit.value());
             }
             if (result) {
-                return tryParseTypeCast(std::move(result));
+                if (canParseMemberAccess()) {
+                    result = std::move(parseMemberAccess(std::move(result)).value());
+                }
+                if (canParseTypeCast()) {
+                    result = std::move(tryParseTypeCast(std::move(result)).value());
+                }
             }
 
             return result;
@@ -291,29 +298,28 @@ namespace parser {
                                                                              std::move(indexExpr.value())));
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseMemberAccess() {
-            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::DOT, 1)) {
+        bool canParseMemberAccess() {
+            return canConsume(Token::DOT) && canConsume(Token::IDENTIFIER, 1);
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseMemberAccess(
+            std::optional<std::unique_ptr<ast::ASTNode> > origLhs) {
+            if (!canParseMemberAccess()) {
                 return std::nullopt;
             }
-            Token nameToken = current();
-            consume(Token::IDENTIFIER);
+
             consume(Token::DOT);
-            if (!canConsume(Token::IDENTIFIER)) {
-                m_messages.push_back(ParserMessasge{
-                    .outputType = OutputType::ERROR,
-                    .token = current(),
-                    .message = "expected member function name after '.'",
-                });
-                return std::nullopt;
-            }
             Token funcNameToken = current();
             consume(Token::IDENTIFIER);
             if (!canConsume(Token::LEFT_CURLY)) {
-                return std::make_unique<ast::FieldAccess>(std::move(nameToken), std::move(funcNameToken));
+                auto result = std::make_unique<ast::FieldAccess>(std::move(funcNameToken), std::move(origLhs.value()));
+                if (canConsume(Token::DOT))
+                    return parseMemberAccess(std::move(result));
+                return std::move(result);
             }
             consume(Token::LEFT_CURLY);
             std::vector<std::unique_ptr<ast::ASTNode> > args;
-            args.push_back(std::make_unique<ast::VariableAccess>(std::move(nameToken)));
+            args.push_back(std::move(origLhs.value()));
             while (!canConsume(Token::RIGHT_CURLY) && !canConsume(Token::END_OF_FILE)) {
                 if (auto arg = parseExpression(true)) {
                     args.push_back(std::move(arg.value()));
@@ -616,18 +622,17 @@ namespace parser {
             if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::DOT, 1) || !canConsume(Token::IDENTIFIER, 2)) {
                 return std::nullopt;
             }
-            Token nameToken = current();
-            consume(Token::IDENTIFIER);
 
-            consume(Token::DOT);
-            Token fieldToken = current();
-            consume(Token::IDENTIFIER);
+            auto varAccess = parseMemberAccess(parseVariableAccess());
+            if (!varAccess) {
+                return std::nullopt;
+            }
 
             std::optional<std::unique_ptr<ast::ASTNode> > accessNode = std::nullopt;
 
             if (!tryConsume(Token::EQUAL)) {
                 m_messages.push_back(ParserMessasge{
-                    .token = nameToken,
+                    .token = varAccess.value()->expressionToken(),
                     .message = "expected '=' after variable name in assignment!"
                 });
                 return std::nullopt;
@@ -643,7 +648,8 @@ namespace parser {
             consume(Token::SEMICOLON);
 
 
-            return std::make_unique<ast::FieldAssignment>(std::move(nameToken), std::move(fieldToken),
+            return std::make_unique<ast::FieldAssignment>(std::move(varAccess.value()->expressionToken()),
+                                                          std::move(varAccess.value()),
                                                           std::move(value.value()));
         }
 

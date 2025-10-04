@@ -198,7 +198,7 @@ namespace types {
         if (const auto fieldAssign = dynamic_cast<ast::FieldAssignment *>(node)) {
             return type_check(fieldAssign, context);
         }
-
+        assert(node != nullptr && "Node is null");
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
@@ -208,77 +208,101 @@ namespace types {
 
     void type_check(ast::FieldAssignment *node, Context &context) {
         type_check_base(node->expression(), context);
-        const auto it = context.currentVariables.find(node->expressionToken().lexical());
-        if (it == context.currentVariables.end()) {
-            context.messages.push_back({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
-            });
-            return;
-        }
-        if (auto structType = std::dynamic_pointer_cast<types::StructType>(it->second->type)) {
-            const auto field = structType->field(node->fieldName().lexical());
-            if (!field) {
+        type_check_base(node->accessNode(), context);
+        if (node->accessNode()->expressionType() && node->expression()->expressionType()) {
+            if (node->accessNode()->expressionType().value() != node->expression()->expressionType().value()) {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
-                    node->fieldName(),
-                    "The Struct '" + node->expressionToken().lexical() + "' does not contain a field with the name'" +
-                    node->fieldName().lexical() + "'."
+                    node->expressionToken(),
+                    "Type mismatch in field assignment: field '" + node->accessNode()->expressionToken().lexical() +
+                    "' is of type '" + node->accessNode()->expressionType().value()->name() +
+                    "', but assigned expression is of type '" + node->expression()->expressionType().value()->name() +
+                    "'."
                 });
                 return;
             }
-            if (node->expression()->expressionType() && field->type->name() != node->expression()->expressionType().
-                value()->name()) {
-                context.messages.push_back({
-                    parser::OutputType::ERROR,
-                    node->fieldName(),
-                    "The Type of the field '" +
-                    node->fieldName().lexical() + "' is not equal to the type that wants to be assigned."
-                });
+            if (const auto accessNode = dynamic_cast<ast::FieldAccess *>(node->accessNode())) {
+                node->setStructType(accessNode->structType().value());
             }
-            node->setStructType(structType);
-            node->setExpressionType(field->type);
+
+            node->setExpressionType(node->expression()->expressionType().value());
         } else {
             context.messages.push_back({
                 parser::OutputType::ERROR,
-                node->fieldName(),
-                "The Struct '" + node->expressionToken().lexical() + "' is not a valid struct type'" +
-                node->fieldName().lexical() + "'."
+                node->expressionToken(),
+                "Could not determine types in field assignment."
             });
         }
     }
 
     void type_check(ast::FieldAccess *node, Context &context) {
-        const auto it = context.currentVariables.find(node->expressionToken().lexical());
-        if (it == context.currentVariables.end()) {
-            context.messages.push_back({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
-            });
-            return;
-        }
-        if (auto structType = std::dynamic_pointer_cast<types::StructType>(it->second->type)) {
-            auto field = structType->field(node->fieldName().lexical());
-            if (!field) {
-                context.messages.push_back({
-                    parser::OutputType::ERROR,
-                    node->fieldName(),
-                    "The Struct '" + node->expressionToken().lexical() + "' does not contain a field with the name'" +
-                    node->fieldName().lexical() + "'."
-                });
-                return;
+        type_check_base(node->accessNode(), context);
+        if (node->accessNode()) {
+            if (auto varAccess = dynamic_cast<ast::VariableAccess *>(node->accessNode())) {
+                if (!varAccess->expressionType()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not determine type of variable '" + varAccess->expressionToken().lexical() +
+                        "' in field access."
+                    });
+                    return;
+                }
+                if (auto structType = std::dynamic_pointer_cast<
+                    types::StructType>(varAccess->expressionType().value())) {
+                    auto fieldIt = std::find_if(structType->fields().begin(), structType->fields().end(),
+                                                [&](const types::StructField &field) {
+                                                    return field.name == node->fieldName().lexical();
+                                                });
+                    if (fieldIt == structType->fields().end()) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Field '" + node->fieldName().lexical() + "' does not exist in struct type '" +
+                            structType->name() + "'."
+                        });
+                        return;
+                    }
+                    node->setExpressionType(fieldIt->type);
+                    node->setStructType(varAccess->expressionType().value());
+                } else {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Type '" + varAccess->expressionType().value()->name() +
+                        "' is not a struct type, cannot access field '" + node->fieldName().lexical() + "'."
+                    });
+                    return;
+                }
+            } else if (auto fieldAccess = dynamic_cast<ast::FieldAccess *>(node->accessNode())) {
+                if (!fieldAccess->expressionType()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not determine type of field '" + fieldAccess->fieldName().lexical() +
+                        "' in nested field access."
+                    });
+                    return;
+                }
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(
+                    fieldAccess->expressionType().value())) {
+                    auto fieldIt = std::find_if(structType->fields().begin(), structType->fields().end(),
+                                                [&](const types::StructField &field) {
+                                                    return field.name == node->fieldName().lexical();
+                                                });
+                    if (fieldIt == structType->fields().end()) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Field '" + node->fieldName().lexical() + "' does not exist in struct type '" +
+                            structType->name() + "'."
+                        });
+                        return;
+                    }
+                    node->setExpressionType(fieldIt->type);
+                    node->setStructType(fieldAccess->expressionType().value());
+                }
             }
-            node->setStructType(structType);
-            node->setExpressionType(field->type);
-        } else {
-            context.messages.push_back({
-                parser::OutputType::ERROR,
-                node->fieldName(),
-                "The Struct '" + node->expressionToken().lexical() + "' is not a valid struct type'" +
-                node->fieldName().lexical() + "'."
-            });
         }
     }
 

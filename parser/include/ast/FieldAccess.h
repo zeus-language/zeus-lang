@@ -9,17 +9,21 @@
 namespace ast {
     class FieldAccess final : public ASTNode {
     private:
-        Token m_fieldName;
+        std::unique_ptr<ASTNode> m_accessNode;
 
         std::optional<std::shared_ptr<types::VariableType> > m_structType = std::nullopt;
 
     public:
-        explicit FieldAccess(Token name, Token fieldName) : ASTNode(std::move(name)),
-                                                            m_fieldName(std::move(fieldName)) {
+        explicit FieldAccess(Token name, std::unique_ptr<ASTNode> accessNode) : ASTNode(std::move(name)),
+            m_accessNode(std::move(accessNode)) {
         }
 
         [[nodiscard]] Token fieldName() const {
-            return m_fieldName;
+            return expressionToken();
+        }
+
+        [[nodiscard]] ASTNode *accessNode() const {
+            return m_accessNode.get();
         }
 
         ~FieldAccess() override = default;

@@ -13,14 +13,14 @@
 namespace ast {
     class FieldAssignment final : public ASTNode {
     private:
-        Token m_fieldName;
+        std::unique_ptr<ASTNode> m_accessNode;
         std::unique_ptr<ASTNode> m_expression;
         std::optional<std::shared_ptr<types::VariableType> > m_structType = std::nullopt;
 
     public:
-        explicit FieldAssignment(Token name, Token fieldName,
+        explicit FieldAssignment(Token name, std::unique_ptr<ASTNode> accessNode,
                                  std::unique_ptr<ASTNode> expression) : ASTNode(std::move(name)),
-                                                                        m_fieldName(std::move(fieldName)),
+                                                                        m_accessNode(std::move(accessNode)),
                                                                         m_expression(std::move(expression)) {
         }
 
@@ -29,8 +29,8 @@ namespace ast {
             return m_expression.get();
         }
 
-        [[nodiscard]] Token fieldName() const {
-            return m_fieldName;
+        [[nodiscard]] ASTNode *accessNode() const {
+            return m_accessNode.get();
         }
 
         ~FieldAssignment() override = default;
