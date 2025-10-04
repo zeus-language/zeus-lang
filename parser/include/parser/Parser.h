@@ -6,6 +6,7 @@
 #define ZEUS_LANG_PARSER_H
 #include <algorithm>
 #include <vector>
+#include <ranges>
 #include <iostream>
 #include "../lexer/Lexer.h"
 #include "ast/ASTNode.h"

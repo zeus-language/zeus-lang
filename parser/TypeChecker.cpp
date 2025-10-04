@@ -870,8 +870,15 @@ namespace types {
         context.currentVariables.clear();
 
         if (node->returnType()) {
-            node->setExpressionType(
-                resolveFromRawType(node->returnType().value(), context.registry).value());
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.registry))
+                node->setExpressionType(returnType.value());
+            else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + node->returnType().value()->typeToken.lexical() + "' for the function retu."
+                });
+            }
         } else {
             node->setExpressionType(context.registry.getTypeByName("void").value());
         }

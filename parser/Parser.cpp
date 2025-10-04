@@ -437,6 +437,13 @@ namespace parser {
                                                                   std::move(lhs.value()), std::move(rhs.value()));
                     }
                     auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected a right hand side after an '>'!"
+                        });
+                        return std::nullopt;
+                    }
                     return parseExpression(false,
                                            std::make_unique<ast::Comparisson>(
                                                operatorToken, ast::CMPOperator::GREATER, std::move(lhs.value()),
@@ -459,6 +466,13 @@ namespace parser {
                                                    std::move(lhs.value()), std::move(rhs.value())));
                     }
                     auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected a right hand side after an '<'!"
+                        });
+                        return std::nullopt;
+                    }
                     return parseExpression(false,
                                            std::make_unique<ast::Comparisson>(
                                                operatorToken, ast::CMPOperator::LESS, std::move(lhs.value()),
@@ -891,6 +905,13 @@ namespace parser {
             }
             consumeKeyWord("fn");
             Token nameToken = current();
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected a function name but found a '" + nameToken.lexical() + "'"
+                });
+                return std::nullopt;
+            }
             consume(Token::Type::IDENTIFIER);
 
             consume(Token::Type::LEFT_CURLY);
@@ -899,6 +920,12 @@ namespace parser {
                 if (auto arg = tryParseFunctionArgument()) {
                     functionArgs.push_back(std::move(arg.value()));
                     tryConsume(Token::COMMA);
+                } else {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "a function argument but found '" + current().lexical() + "'"
+                    });
+                    break;
                 }
                 if (canConsume(Token::Type::RIGHT_CURLY))
                     break;
