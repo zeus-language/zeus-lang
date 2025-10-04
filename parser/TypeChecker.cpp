@@ -10,6 +10,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
 #include "ast/ForLoop.h"
@@ -40,7 +41,7 @@ namespace types {
         TypeRegistry registry;
         std::map<std::string, std::optional<Variable> > currentVariables;
         std::vector<parser::ParserMessasge> messages;
-        std::vector<ast::FunctionDefinition *> functions;
+        std::vector<ast::FunctionDefinitionBase *> functions;
     };
 
 
@@ -59,6 +60,8 @@ namespace types {
     }
 
     void type_check(ast::FunctionDefinition *node, Context &context);
+
+    void type_check(ast::ExternFunctionDefinition *node, Context &context);
 
     void type_check(ast::FunctionCallNode *node, Context &context);
 
@@ -130,6 +133,9 @@ namespace types {
 
     void type_check_base(ast::ASTNode *node, Context &context) {
         if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node)) {
+            return type_check(funcDef, context);
+        }
+        if (const auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node)) {
             return type_check(funcDef, context);
         }
         if (const auto varAssign = dynamic_cast<ast::VariableAssignment *>(node)) {
@@ -752,7 +758,7 @@ namespace types {
                 bool argsMatch = true;
                 for (size_t i = 0; i < funcDef->args().size(); ++i) {
                     if (!node->args()[i]->expressionType() ||
-                        funcDef->args()[i].type == nullptr ||
+                        !funcDef->args()[i].type ||
                         node->args()[i]->expressionType().value()->name() !=
                         funcDef->args()[i].type.value()->name()) {
                         context.messages.push_back({
@@ -915,6 +921,39 @@ namespace types {
         // Further type checking logic would go here...
     }
 
+    void type_check(ast::ExternFunctionDefinition *node, Context &context) {
+        // Example type checking logic for a function definition
+
+
+        for (auto &arg: node->args()) {
+            arg.type = resolveFromRawType(arg.rawType.get(), context.registry);
+            if (!arg.type) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name + "'."
+                });
+            }
+        }
+
+        context.currentVariables.clear();
+
+        if (node->returnType()) {
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.registry))
+                node->setExpressionType(returnType.value());
+            else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + node->returnType().value()->typeToken.lexical() + "' for the function retu."
+                });
+            }
+        } else {
+            node->setExpressionType(context.registry.getTypeByName("void").value());
+        }
+        // Further type checking logic would go here...
+    }
+
     void type_check(const std::vector<std::unique_ptr<ast::ASTNode> > &nodes, TypeCheckResult &result) {
         Context context;
         // resolve global type declarations first
@@ -934,7 +973,7 @@ namespace types {
         }
         // collect function definitions second
         for (const auto &node: nodes) {
-            if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
+            if (const auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(node.get())) {
                 context.functions.push_back(funcDef);
             }
         }

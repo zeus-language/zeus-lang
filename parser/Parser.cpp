@@ -14,6 +14,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
 #include "ast/ForLoop.h"
@@ -905,6 +906,55 @@ namespace parser {
             );
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseExternFunctionDefinition() {
+            if (canConsumeKeyWord("extern")) {
+                consumeKeyWord("extern");
+                if (!canConsumeKeyWord("fn")) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected 'fn' after 'extern'!"
+                    });
+                    return std::nullopt;
+                }
+                consumeKeyWord("fn");
+                Token nameToken = current();
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected a function name but found a '" + nameToken.lexical() + "'"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::Type::IDENTIFIER);
+
+                consume(Token::Type::LEFT_CURLY);
+                std::vector<ast::FunctionArgument> functionArgs;
+                while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                    if (auto arg = tryParseFunctionArgument()) {
+                        functionArgs.push_back(std::move(arg.value()));
+                        tryConsume(Token::COMMA);
+                    } else {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "a function argument but found '" + current().lexical() + "'"
+                        });
+                        break;
+                    }
+                    if (canConsume(Token::Type::RIGHT_CURLY))
+                        break;
+                }
+                consume(Token::Type::RIGHT_CURLY);
+                consume(Token::COLON);
+                auto returnType = parseRawType();
+                consume(Token::SEMICOLON);
+
+                return std::make_unique<ast::ExternFunctionDefinition>(std::move(nameToken),
+                                                                       std::move(functionArgs),
+                                                                       std::move(returnType));
+            }
+            return std::nullopt;
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseFunctionDefinition() {
             if (!canConsumeKeyWord("fn")) {
                 return std::nullopt;
@@ -1065,6 +1115,8 @@ namespace parser {
             while (!canConsume(Token::END_OF_FILE) && hasNext()) {
                 if (auto functionDef = parseFunctionDefinition()) {
                     nodes.push_back(std::move(functionDef.value()));
+                } else if (auto externFnDefintion = parseExternFunctionDefinition()) {
+                    nodes.push_back(std::move(externFnDefintion.value()));
                 } else if (auto useModule = parseUseModule()) {
                     nodes.push_back(std::move(useModule.value()));
                 } else if (auto structDecl = parseStructDeclaration()) {

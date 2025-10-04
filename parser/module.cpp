@@ -3,6 +3,7 @@
 #include <fstream>
 #include <optional>
 
+#include "ast/ExternFunctionDefinition.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/UseModule.h"
 #include "parser/Parser.h"
@@ -58,7 +59,7 @@ namespace modules {
                         useModuleFile(stdlibDirectories, moduleResult, subUseModule);
                         moduleResult.nodes.erase(std::ranges::remove(moduleResult.nodes, token).begin(),
                                                  moduleResult.nodes.end());
-                    } else if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(token.get())) {
+                    } else if (auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(token.get())) {
                         funcDef->setModulePath(useModule->modulePath());
                         // if (funcDef->isPrivate()) {
                         //     result.messages.push_back(parser::ParserMessasge{

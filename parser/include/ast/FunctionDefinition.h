@@ -20,25 +20,12 @@ namespace ast {
         }
     };
 
-    class FunctionDefinition final : public ASTNode {
+    class FunctionDefinitionBase : public ASTNode {
         std::vector<FunctionArgument> m_args;
         std::optional<std::unique_ptr<RawType> > m_returnType;
-        std::vector<std::unique_ptr<ASTNode> > m_statements;
         std::vector<Token> m_namespacePrefix;
 
     public:
-        explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
-                                    std::optional<std::unique_ptr<RawType> > returnType,
-                                    std::vector<std::unique_ptr<ASTNode> > statements);
-
-        ~FunctionDefinition() override = default;
-
-        [[nodiscard]] std::string functionName() const;
-
-        std::vector<FunctionArgument> &args();
-
-        std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
-
         [[nodiscard]] std::optional<RawType *> returnType() const {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
         }
@@ -51,7 +38,33 @@ namespace ast {
             return m_namespacePrefix;
         }
 
+        [[nodiscard]] std::string functionName() const;
+
+        std::vector<FunctionArgument> &args();
+
+        explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,
+                                        std::optional<std::unique_ptr<RawType> > returnType) : ASTNode(std::move(
+                functionName)),
+            m_args(std::move(args)),
+            m_returnType(std::move(returnType)) {
+        }
+
         [[nodiscard]] std::string functionSignature() const;
+    };
+
+    class FunctionDefinition final : public FunctionDefinitionBase {
+        std::vector<std::unique_ptr<ASTNode> > m_statements;
+
+    public:
+        explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+                                    std::optional<std::unique_ptr<RawType> > returnType,
+                                    std::vector<std::unique_ptr<ASTNode> > statements);
+
+        ~FunctionDefinition() override = default;
+
+
+        std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
+
 
         FunctionDefinition(FunctionDefinition &&) = default;
 

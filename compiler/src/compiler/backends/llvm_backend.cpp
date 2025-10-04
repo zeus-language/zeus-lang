@@ -42,6 +42,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
 #include "ast/ForLoop.h"
@@ -417,6 +418,9 @@ namespace llvm_backend {
         if (targetType->isArrayTy() && value->getType()->isPointerTy()) {
             return value;
         }
+        if (targetType->isPointerTy() && value->getType()->isIntegerTy()) {
+            return llvmState.Builder->CreateIntToPtr(value, targetType, "int_to_ptr_cast");
+        }
 
         assert(false && "Unsupported type cast");
         return nullptr; // Placeholder
@@ -434,8 +438,12 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(const ast::ArrayAssignment *node, LLVMBackendState &llvmState) {
-        const auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical(), false);
-        const auto arrayType = resolveLlvmType(node->arrayType(), llvmState);
+        auto baseType = node->arrayType();
+
+        const auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical(),
+                                                     baseType->typeKind() == types::TypeKind::POINTER);
+
+        const auto arrayType = resolveLlvmType(baseType, llvmState);
         auto indexValue = codegen_base(node->index(), llvmState);
         if (!indexValue) {
             assert(false && "Failed to generate index value for array access");
@@ -446,7 +454,7 @@ namespace llvm_backend {
             return nullptr;
         }
         std::vector<llvm::Value *> indices;
-        if (node->arrayType()->typeKind() == types::TypeKind::ARRAY) {
+        if (baseType->typeKind() == types::TypeKind::ARRAY) {
             indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0));
         }
 
@@ -455,12 +463,21 @@ namespace llvm_backend {
                                                           true, "array_index_cast");
         }
         indices.push_back(indexValue);
-
-        const auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
         const auto valueToStore = codegen_base(node->value(), llvmState);
         if (!valueToStore) {
             assert(false && "Failed to generate value for array assignment");
             return nullptr;
+        }
+        llvm::Value *elementPtr = nullptr;
+        if (baseType->typeKind() == types::TypeKind::ARRAY) {
+            elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
+        } else {
+            auto ptrType = std::dynamic_pointer_cast<types::PointerType>(baseType);
+            if (!ptrType) {
+                assert(false && "Array assignment base type is not a pointer");
+            }
+            auto type = resolveLlvmType(ptrType->baseType(), llvmState);
+            elementPtr = llvmState.Builder->CreateGEP(type, arrayPtr, indices, "elem_ptr");
         }
         llvmState.Builder->CreateStore(valueToStore, elementPtr);
         return valueToStore;
@@ -510,7 +527,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ArrayAccess *node, LLVMBackendState &llvmState) {
         const auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical());
-        const auto arrayType = resolveLlvmType(node->arrayType().value(), llvmState);
+        auto baseType = node->arrayType().value();
+        const auto arrayType = resolveLlvmType(baseType, llvmState);
         auto indexValue = codegen_base(node->index(), llvmState);
         if (!indexValue) {
             assert(false && "Failed to generate index value for array access");
@@ -1132,8 +1150,9 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
         }
-        const auto call = llvmState.Builder->CreateCall(functionCall, args, "funcCall");
-
+        const auto call = llvmState.Builder->CreateCall(functionCall, args);
+        if (node->functionName() == "malloc" || node->functionName() == "calloc")
+            call->addRetAttr(llvm::Attribute::NoAlias);
         for (size_t i = 0; i < node->args().size(); ++i) {
             const auto argType = node->args()[i]->expressionType();
 
@@ -1145,7 +1164,9 @@ namespace llvm_backend {
                                    llvm::Attribute::getWithByValType(*llvmState.TheContext, llvmArgType));
             }
         }
-        return call;
+        if (!functionCall->getReturnType()->isVoidTy())
+            return call;
+        return nullptr;
     }
 
     llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
@@ -1158,6 +1179,47 @@ namespace llvm_backend {
         }
     }
 
+    void codegen(ast::ExternFunctionDefinition *node, LLVMBackendState &llvmState) {
+        const auto resultType = resolveLlvmType(node->expressionType().value(), llvmState);
+        std::vector<llvm::Type *> params;
+        for (const auto &param: node->args()) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+                params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+            } else {
+                params.push_back(resolveLlvmType(param.type.value(), llvmState));
+            }
+        }
+        llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
+        auto linkage = llvm::Function::ExternalLinkage;
+
+
+        auto functionDefinition = llvm::Function::Create(FT, linkage, node->functionName(),
+                                                         llvmState.TheModule.get());
+
+
+        std::vector<std::string> argNames;
+        for (auto &arg: functionDefinition->args()) {
+            auto &param = node->args()[arg.getArgNo()];
+            arg.setName(param.name);
+        }
+        //attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+
+        if (functionDefinition->getName() == "malloc" || functionDefinition->getName() == "calloc") {
+            functionDefinition->addRetAttr(llvm::Attribute::NoAlias);
+            functionDefinition->addFnAttr(llvm::Attribute::NoFree);
+            functionDefinition->addFnAttr(llvm::Attribute::NoUnwind);
+            functionDefinition->addFnAttr(llvm::Attribute::WillReturn);
+            functionDefinition->addFnAttr(llvm::Attribute::Speculatable);
+            functionDefinition->addFnAttr(llvm::Attribute::Memory);
+            functionDefinition->addFnAttr(llvm::Attribute::NoSync);
+            functionDefinition->addFnAttr(llvm::Attribute::NoCallback);
+        }
+
+
+        if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {
+            llvmState.TheFPM->run(*functionDefinition, *llvmState.TheFAM);
+        }
+    }
 
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         // Placeholder for actual LLVM IR generation logic
@@ -1325,6 +1387,9 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
 
     for (auto &node: nodes) {
         if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
+            llvm_backend::codegen(funcDef, context);
+        }
+        if (auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node.get())) {
             llvm_backend::codegen(funcDef, context);
         }
     }

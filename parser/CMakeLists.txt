@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} STATIC
         ast/VariableAssignment.cpp
         include/parser/module.h
         module.cpp
+        include/ast/ExternFunctionDefinition.h
 
 )
 target_sources(${PROJECT_NAME} PRIVATE

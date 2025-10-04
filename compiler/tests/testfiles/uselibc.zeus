@@ -1,0 +1,25 @@
+use core::libc;
+
+fn main() : i32{
+    let mut data :*u8 = core::libc::malloc(13 as u64);
+    if(data == 0 as *u8){
+        return 1;
+    }
+    data[0] = 'H' as u8;
+    data[1] = 'e' as u8;
+    data[2] = 'l' as u8;
+    data[3] = 'l' as u8;
+    data[4] = 'o' as u8;
+    data[5] = ',' as u8;
+    data[6] = ' ' as u8;
+    data[7] = 'Z' as u8;
+    data[8] = 'e' as u8;
+    data[9] = 'u' as u8;
+    data[10] = 's' as u8;
+    data[11] = '!' as u8;
+    data[12] = 0 as u8;
+    println("Hello, Zeus with libc!");
+    println(data);
+    core::libc::free(data);
+    return 0;
+}

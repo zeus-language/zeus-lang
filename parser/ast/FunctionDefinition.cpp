@@ -8,19 +8,19 @@ namespace ast {
     FunctionDefinition::FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
                                            std::optional<std::unique_ptr<RawType> > returnType,
                                            std::vector<std::unique_ptr<ASTNode> > statements)
-        : ASTNode(std::move(functionName)), m_args(std::move(args)), m_returnType(std::move(returnType)),
+        : FunctionDefinitionBase(std::move(functionName), std::move(args), std::move(returnType)),
           m_statements(std::move(statements)) {
     }
 
-    std::string FunctionDefinition::functionName() const {
+    std::string FunctionDefinitionBase::functionName() const {
         return expressionToken().lexical();
     }
 
-    std::vector<FunctionArgument> &FunctionDefinition::args() {
+    std::vector<FunctionArgument> &FunctionDefinitionBase::args() {
         return m_args;
     }
 
-    std::string FunctionDefinition::functionSignature() const {
+    std::string FunctionDefinitionBase::functionSignature() const {
         std::string signature;
         for (auto &ns: m_namespacePrefix) {
             signature += ns.lexical() + "::";
