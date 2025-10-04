@@ -120,6 +120,14 @@ void parseAndSendDiagnostics(std::vector<std::filesystem::path> rtlDirectories, 
     sentDiagnostics(errorsMap);
 }
 
+nlohmann::json buildError(const char *message, const int errorCode) {
+    nlohmann::json error;
+    error["code"] = errorCode;
+    error["message"] = message;
+    error["data"] = "An internal error occurred while processing the request.";
+    return error;
+}
+
 LanguageServer::LanguageServer(lsp::LspOptions options) : m_options(std::move(options)) {
 }
 
@@ -142,10 +150,12 @@ void LanguageServer::handleRequest() {
         std::string id;
 
         nlohmann::json response;
+        response["jsonrpc"] = "2.0";
+
         auto jsonId = json.find("id");
         if (jsonId == json.end()) {
         } else if (jsonId->is_number_integer()) {
-            response["id"] = std::to_string(json.value("id", 0));
+            response["id"] = json.value("id", 0);
             hasId = true;
         } else if (json.find("id")->is_string()) {
             response["id"] = json.value("id", "");
@@ -205,6 +215,85 @@ void LanguageServer::handleRequest() {
                                          });
             } catch (nlohmann::json::exception &e) {
                 std::cerr << "error at pos '" << pos << "':" << e.what() << "\n";
+            }
+        } else if (method == "textDocument/diagnostic") {
+            auto params = json.at("params").get<nlohmann::json>();
+            auto uri = params["textDocument"]["uri"].get<std::string>(); //.("uri");
+            std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
+            std::stringstream text;
+            if (m_openDocuments.contains(uri)) {
+                text << m_openDocuments.at(uri).text;
+                auto tokens = lexer::lex_file(uri, text.str());
+                std::filesystem::path filePath = uri;
+                std::unordered_map<std::string, bool> definitions;
+                auto result = parser::parse_tokens(tokens);
+                const auto nodes = modules::include_modules(m_options.stdlibDirectories, result);
+
+                types::TypeCheckResult type_check_result;
+                types::type_check(nodes, type_check_result);
+
+
+                if (result.messages.empty() && type_check_result.messages.empty()) {
+                    errorsMap[filePath.string()] = {};
+                } else {
+                    for (auto &error: result.messages) {
+                        errorsMap[error.token.source_location.filename].push_back(error);
+                    }
+                    for (const auto &msg: type_check_result.messages) {
+                        errorsMap[msg.token.source_location.filename].push_back(msg);
+                    }
+                }
+                nlohmann::json diagnosticValues;
+                nlohmann::json relatedDocuments;
+
+                for (auto &[fileName, messsages]: errorsMap) {
+                    nlohmann::json logMessages;
+                    for (const auto &[outputType, token, message]: messsages) {
+                        nlohmann::json logMessage;
+                        nlohmann::json range;
+                        range["start"] = buildPosition(token.source_location.row, token.source_location.col);
+                        range["end"] = buildPosition(token.source_location.row,
+                                                     token.source_location.col + token.source_location.num_bytes);
+                        logMessage["range"] = std::move(range);
+                        logMessage["severity"] = mapOutputTypeToSeverity(outputType);
+                        logMessage["message"] = message;
+                        nlohmann::json relatedInformations;
+                        nlohmann::json source;
+                        nlohmann::json location;
+                        location["uri"] = token.source_location.filename;
+                        nlohmann::json range2;
+                        range2["start"] = buildPosition(token.source_location.row, token.source_location.col);
+                        range2["end"] = buildPosition(token.source_location.row,
+                                                      token.source_location.col + token.source_location.num_bytes);
+                        location["range"] = std::move(range2);
+                        source["location"] = std::move(location);
+                        source["message"] = message;
+                        source["source"] = "wirthx";
+                        relatedInformations.push_back(std::move(source));
+
+                        logMessage["relatedInformation"] = std::move(relatedInformations);
+                        logMessages.push_back(std::move(logMessage));
+                    }
+                    if (fileName == uri) {
+                        for (auto msg: logMessages)
+                            diagnosticValues.push_back(std::move(msg));
+                        logMessages.clear();
+                    } else {
+                        nlohmann::json diagnosticsReport;
+                        diagnosticsReport["kind"] = "full";
+                        diagnosticsReport["items"] = logMessages;
+
+                        relatedDocuments[fileName] = diagnosticsReport;
+                    }
+                }
+                nlohmann::json diagnosticsReport;
+                diagnosticsReport["kind"] = "full";
+                diagnosticsReport["items"] = diagnosticValues;
+                diagnosticsReport["relatedDocuments"] = std::move(relatedDocuments);
+                response["result"] = std::move(diagnosticsReport);
+            } else {
+                std::cerr << "Document not found for uri: " << uri << "\n";
+                response["error"] = buildError("Document not found", -32603);
             }
         } else if (method == "textDocument/didClose") {
             auto params = json["params"];

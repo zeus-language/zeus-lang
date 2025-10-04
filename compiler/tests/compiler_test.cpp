@@ -227,7 +227,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
-                             "usemath","chararray","mixedtypes","structtest","nestedstructs"));
+                             "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc"));
 
 // INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
 //                          testing::Values());
