@@ -1045,8 +1045,9 @@ namespace llvm_backend {
     llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState) {
         switch (node->numberType()) {
             case ast::NumberType::INTEGER:
+
                 return llvm::ConstantInt::get(*llvmState.TheContext,
-                                              llvm::APInt(32, std::get<int64_t>(node->value()), true));
+                                              llvm::APInt(node->numBits(), std::get<int64_t>(node->value()), true));
             case ast::NumberType::FLOAT:
                 return llvm::ConstantFP::get(llvmState.Builder->getFloatTy(), std::get<double>(node->value()));
             case ast::NumberType::CHAR:

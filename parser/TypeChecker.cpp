@@ -1,6 +1,7 @@
 #include "types/TypeChecker.h"
 
 #include <cassert>
+#include <cmath>
 #include <map>
 
 #include "ast/ArrayAccess.h"
@@ -107,9 +108,14 @@ namespace types {
 
     void type_check(ast::NumberConstant *node, Context &context) {
         switch (node->numberType()) {
-            case ast::NumberType::INTEGER:
-                node->setExpressionType(context.registry.getTypeByName("i32").value());
-                break;
+            case ast::NumberType::INTEGER: {
+                if (node->numBits() == 32) {
+                    node->setExpressionType(context.registry.getTypeByName("i32").value());
+                } else {
+                    node->setExpressionType(context.registry.getTypeByName("i64").value());
+                }
+            }
+            break;
             case ast::NumberType::FLOAT:
                 node->setExpressionType(context.registry.getTypeByName("float").value());
                 break;

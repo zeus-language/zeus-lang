@@ -34,6 +34,8 @@ namespace ast {
 
         ~NumberConstant() override = default;
 
+        size_t numBits() const;
+
         NumberConstant(NumberConstant &&) = default;
 
         NumberConstant(const NumberConstant &) = delete;

@@ -5,6 +5,7 @@
 #include "ast/NumberConstant.h"
 
 #include <cassert>
+#include <cmath>
 
 namespace ast {
     NumberValue parseNumber(const std::string &lexical, const NumberType type) {
@@ -43,5 +44,11 @@ namespace ast {
     NumberConstant::NumberConstant(Token constant, const NumberType numberType)
         : ASTNode(std::move(constant)), m_value(parseNumber(expressionToken().lexical(), numberType)),
           m_numberType(numberType) {
+    }
+
+    size_t NumberConstant::numBits() const {
+        auto base = 1 + static_cast<int>(std::log2(std::get<int64_t>(m_value)));
+        base = (base > 32) ? 64 : 32;
+        return base;
     }
 } // ast

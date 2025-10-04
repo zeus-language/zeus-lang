@@ -233,6 +233,6 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
 //                          testing::Values());
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
-                         testing::Values("problem1","problem2"));
+                         testing::Values("problem1","problem2", "problem3"));
 //
 // INSTANTIATE_TEST_SUITE_P(WriteToStdErrTest, WriteToStdErrTest, testing::Values());
