@@ -1,0 +1,3 @@
+FILENAME:3:12: error: Type mismatch in return statement of function 'test': expected 'i32', but got 'array[u8; 7]'.
+    return "string";
+            ^-------

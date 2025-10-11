@@ -34,10 +34,10 @@ fn main(): i32 {
     let vec4: Vec2 = Vec2 { x: 11.0, y: 12.0 };
     vec3.v2  = vec4;
 
-        println("(copy) Vec3:");
-        println(vec3.v2.x);
-        println(vec3.v2.y);
-        println(vec3.z);
+    println("(copy) Vec3:");
+    println(vec3.v2.x);
+    println(vec3.v2.y);
+    println(vec3.z);
 
     return 0;
 }

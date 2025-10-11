@@ -1,0 +1,8 @@
+
+fn test() : i32 {
+    return "string";
+}
+fn main() : i32 {
+    println(test());
+    return 0;
+}

@@ -902,6 +902,46 @@ namespace types {
         }
         for (auto &stmt: node->statements()) {
             type_check_base(stmt.get(), context);
+            if (auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
+                if (node->returnType()) {
+                    if (returnStatement->returnValue()) {
+                        if (!returnStatement->returnValue().value()->expressionType()) {
+                            context.messages.push_back({
+                                parser::OutputType::ERROR,
+                                returnStatement->returnValue().value()->expressionToken(),
+                                "Could not determine type of return value in function '" + node->functionName() + "'."
+                            });
+                        } else if (resolveFromRawType(node->returnType().value(), context.registry).value()->
+                                   name() != returnStatement->returnValue().value()->expressionType().value()->name()) {
+                            context.messages.push_back({
+                                parser::OutputType::ERROR,
+                                returnStatement->returnValue().value()->expressionToken(),
+                                "Type mismatch in return statement of function '" + node->functionName() +
+                                "': expected '" +
+                                resolveFromRawType(node->returnType().value(), context.registry).value()->name() +
+                                "', but got '" +
+                                returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                            });
+                        }
+                    } else {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            returnStatement->expressionToken(),
+                            "Return statement in function '" + node->functionName() +
+                            "' must return a value of type '" +
+                            resolveFromRawType(node->returnType().value(), context.registry).value()->name() + "'."
+                        });
+                    }
+                } else {
+                    if (returnStatement->returnValue()) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            returnStatement->returnValue().value()->expressionToken(),
+                            "Return statement in void function '" + node->functionName() + "' must not return a value."
+                        });
+                    }
+                }
+            }
         }
         context.currentVariables.clear();
 

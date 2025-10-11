@@ -41,22 +41,17 @@ namespace compiler {
                            std::ostream &outputStream) {
         const auto content = read_file(inputPath);
         const auto tokens = lexer::lex_file(inputPath.string(), content.value());
-        // for (const auto &token: tokens) {
-        //   std::cout << "Token Type: " << std::string(
-        //         magic_enum::enum_name(token.type)) << " Lexical: " << token.lexical() << " at Line: " << token.source_location
-        //       .row
-        //       << ", Column: " << token.source_location.col << std::endl;
-        // }
+
         auto result = parser::parse_tokens(tokens);
 
         const auto nodes = modules::include_modules(options.stdlibDirectories, result);
         for (const auto &message: result.messages) {
-            message.msg(std::cout, true);
+            message.msg(errorStream, options.colorOutput);
         }
         types::TypeCheckResult typeCheckResult;
         types::type_check(nodes, typeCheckResult);
         for (const auto &message: typeCheckResult.messages) {
-            message.msg(std::cout, true);
+            message.msg(errorStream, options.colorOutput);
         }
 
 

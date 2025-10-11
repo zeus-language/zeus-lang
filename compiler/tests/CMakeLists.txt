@@ -72,5 +72,9 @@ add_custom_command(TARGET zeus_test POST_BUILD
 
 add_custom_command(TARGET zeus_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/compiler/tests/errortests/ $<TARGET_FILE_DIR:zeus_test>/errortests/)
+
+add_custom_command(TARGET zeus_test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/stdlib/ $<TARGET_FILE_DIR:zeus_test>/stdlib/)
 

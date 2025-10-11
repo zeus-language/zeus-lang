@@ -1,0 +1,16 @@
+use std::str;
+
+
+fn print(fmt: string, args... : any) : void {
+    // A simple implementation of print that handles basic formatting
+    let mut formatted : string = fmt;
+    for arg in args {
+        formatted = formatted.replace("{}", to_str(arg));
+    }
+    // Assuming there's a low-level function to output to console
+    puts(formatted.as_c_str());
+}
+
+fn println(fmt: string, args... : any) : void {
+    print(fmt + "\n", args...);
+}

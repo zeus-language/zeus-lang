@@ -22,18 +22,18 @@ public:
     }
 };
 
-//
-// class CompilerTestError : public testing::TestWithParam<std::string> {
-// public:
-//     static void SetUpTestSuite() {
-//     }
-// };
 
-// class WriteToStdErrTest : public testing::TestWithParam<std::string> {
-// public:
-//     static void SetUpTestSuite() {
-//     }
-// };
+class CompilerTestError : public testing::TestWithParam<std::string> {
+public:
+    static void SetUpTestSuite() {
+    }
+};
+
+class WriteToStdErrTest : public testing::TestWithParam<std::string> {
+public:
+    static void SetUpTestSuite() {
+    }
+};
 
 TEST_P(CompilerTest, TestNoError) {
     // Inside a test, access the test parameter with the GetParam() method
@@ -131,45 +131,47 @@ TEST_P(ProjectEulerTest, TestNoError) {
 }
 
 //
-// TEST_P(CompilerTestError, CompilerTestWithError) {
-//     // Inside a test, access the test parameter with the GetParam() method
-//     // of the TestWithParam<T> class:
-//     std::filesystem::path base_path = "errortests";
-//     auto name = GetParam();
-//     std::filesystem::path input_path = base_path / (name + ".zeus");
-//     std::filesystem::path output_path = base_path / (name + ".txt");
-//     ASSERT_TRUE(std::filesystem::exists(input_path));
-//     ASSERT_TRUE(std::filesystem::exists(output_path));
-//     std::stringstream ostream;
-//     std::stringstream erstream;
-//     compiler::CompilerOptions options;
-//     options.rtlDirectories.emplace_back("rtl");
-//     options.colorOutput = false;
-//     compiler::parse_and_compile(options, input_path, erstream, ostream);
-//
-//     std::ifstream file;
-//     std::istringstream is;
-//     std::string s;
-//     std::string group;
-//
-//     file.open(output_path, std::ios::in);
-//
-//     if (!file.is_open()) {
-//         std::cerr << input_path.string() << "\n";
-//         std::cerr << std::filesystem::absolute(input_path);
-//         FAIL();
-//     }
-//     std::stringstream buffer;
-//     buffer << file.rdbuf();
-//     auto expected = buffer.str();
-//     std::string placeholder = "FILENAME";
-//     while (expected.find(placeholder) != std::string::npos)
-//         expected = expected.replace(expected.find(placeholder), placeholder.size(), input_path.string());
-//     std::cout << "expected: " << expected;
-//     std::cout << ostream.str() << "\n";
-//     ASSERT_EQ(erstream.str(), expected);
-//     ASSERT_EQ(ostream.str(), "");
-// }
+TEST_P(CompilerTestError, CompilerTestWithError) {
+    // Inside a test, access the test parameter with the GetParam() method
+    // of the TestWithParam<T> class:
+    std::filesystem::path base_path = "errortests";
+    auto name = GetParam();
+    std::filesystem::path input_path = base_path / (name + ".zeus");
+    std::filesystem::path output_path = base_path / (name + ".txt");
+
+    ASSERT_TRUE(std::filesystem::exists(input_path));
+    ASSERT_TRUE(std::filesystem::exists(output_path));
+    std::stringstream ostream;
+    std::stringstream erstream;
+    compiler::CompilerOptions options;
+    options.stdlibDirectories.emplace_back("stdlib");
+    options.colorOutput = false;
+    compiler::parse_and_compile(options, input_path, erstream, ostream);
+
+    std::ifstream file;
+    std::istringstream is;
+    std::string s;
+    std::string group;
+
+    file.open(output_path, std::ios::in);
+
+    if (!file.is_open()) {
+        std::cerr << input_path.string() << "\n";
+        std::cerr << std::filesystem::absolute(input_path);
+        FAIL();
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto expected = buffer.str();
+    std::string placeholder = "FILENAME";
+    while (expected.find(placeholder) != std::string::npos)
+        expected = expected.replace(expected.find(placeholder), placeholder.size(), input_path.string());
+    std::cout << "expected: " << expected;
+    std::cout << ostream.str() << "\n";
+    ASSERT_EQ(erstream.str(), expected);
+    ASSERT_EQ(ostream.str(), "");
+}
+
 //
 // TEST_P(WriteToStdErrTest, WriteToStdErrTest) {
 //     // Inside a test, access the test parameter with the GetParam() method
@@ -190,7 +192,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
 //     std::stringstream ostream;
 //     std::stringstream erstream;
 //     compiler::CompilerOptions options;
-//     options.rtlDirectories.emplace_back("rtl");
+//     options.stdlibDirectories.emplace_back("rtl");
 //
 //     options.runProgram = true;
 //     options.buildMode = compiler::BuildMode::Release;
@@ -229,8 +231,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc"));
 
-// INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-//                          testing::Values());
+INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
+                         testing::Values("returntype"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));
