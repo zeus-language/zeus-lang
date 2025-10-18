@@ -13,13 +13,21 @@
 #include "types/VariableType.h"
 
 namespace ast {
+    enum class TypeModifier {
+        REFERENCE,
+        POINTER,
+        NONE
+    };
+
     struct RawType {
         Token typeToken;
-        bool isPointer = false;
+        std::vector<Token> namespaceElements;
+        TypeModifier typeModifier = TypeModifier::NONE;
 
-        RawType(Token type_token, bool is_pointer)
-            : typeToken(std::move(type_token)),
-              isPointer(is_pointer) {
+
+        RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier)
+            : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
+              typeModifier(typeModifier) {
         }
 
         virtual ~RawType() = default;
@@ -29,8 +37,9 @@ namespace ast {
         std::unique_ptr<RawType> baseType;
         size_t size;
 
-        ArrayRawType(const Token &type_token, bool is_pointer, std::unique_ptr<RawType> base_type, size_t size)
-            : RawType(type_token, is_pointer),
+        ArrayRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
+                     std::unique_ptr<RawType> base_type, size_t size)
+            : RawType(type_token, namespaceElements, typeModifier),
               baseType(std::move(base_type)),
               size(size) {
         }

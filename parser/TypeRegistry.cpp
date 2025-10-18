@@ -2,7 +2,6 @@
 
 types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("i32", 4, true));
-    registerType(std::make_shared<types::VariableType>("string", types::TypeKind::STRING));
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
     registerType(std::make_shared<types::VariableType>("bool", types::TypeKind::BOOL));
     registerType(std::make_shared<types::IntegerType>("u8", 1, false));
@@ -17,7 +16,13 @@ types::TypeRegistry::TypeRegistry() {
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
     const std::shared_ptr<VariableType> &base_type) {
     return std::make_optional(
-        std::make_shared<types::PointerType>("ptr<" + base_type->name() + ">", base_type));
+        std::make_shared<types::PointerType>("*" + base_type->name(), base_type));
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getReferenceType(
+    const std::shared_ptr<VariableType> &base_type) {
+    return std::make_optional(
+        std::make_shared<types::ReferenceType>("&" + base_type->name(), base_type));
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArrayType(

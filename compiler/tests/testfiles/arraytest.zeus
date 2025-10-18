@@ -1,5 +1,5 @@
 
-fn len(arr : [i32; 5]) : i32 {
+fn len(arr : &[i32; 5]) : i32 {
     return 5;
 }
 

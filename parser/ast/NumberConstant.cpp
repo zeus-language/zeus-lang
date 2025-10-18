@@ -14,6 +14,8 @@ namespace ast {
                 return static_cast<int64_t>(std::stoull(lexical));
             case NumberType::FLOAT:
                 return std::stod(lexical);
+            case NumberType::BOOLEAN:
+                return static_cast<bool>(lexical == "true");
             case NumberType::CHAR:
                 if (lexical.front() == '\\') {
                     switch (lexical[1]) {

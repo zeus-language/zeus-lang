@@ -24,6 +24,8 @@ namespace ast {
         StringConstant &operator=(StringConstant &&) = delete;
 
         StringConstant &operator=(const StringConstant &) = delete;
+
+        [[nodiscard]] std::string value() const;
     };
 } // ast
 

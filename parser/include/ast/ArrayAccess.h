@@ -9,17 +9,25 @@
 namespace ast {
     class ArrayAccess final : public ASTNode {
     private:
+        std::unique_ptr<ASTNode> m_accessExpression;
         std::unique_ptr<ASTNode> m_indexExpression;
 
         std::optional<std::shared_ptr<types::VariableType> > m_arrayType = std::nullopt;
 
     public:
-        explicit ArrayAccess(Token name, std::unique_ptr<ASTNode> indexExpression) : ASTNode(std::move(name)),
-            m_indexExpression(std::move(indexExpression)) {
+        explicit ArrayAccess(Token name, std::unique_ptr<ASTNode> accessExpression,
+                             std::unique_ptr<ASTNode> indexExpression) : ASTNode(std::move(name)),
+                                                                         m_accessExpression(
+                                                                             std::move(accessExpression)),
+                                                                         m_indexExpression(std::move(indexExpression)) {
         }
 
         [[nodiscard]] ASTNode *index() const {
             return m_indexExpression.get();
+        }
+
+        [[nodiscard]] ASTNode *accessExpression() const {
+            return m_accessExpression.get();
         }
 
         ~ArrayAccess() override = default;

@@ -54,27 +54,36 @@ namespace modules {
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
                 }
-                for (auto &token: moduleResult.nodes) {
-                    if (auto subUseModule = dynamic_cast<ast::UseModule *>(token.get())) {
-                        useModuleFile(stdlibDirectories, moduleResult, subUseModule);
-                        moduleResult.nodes.erase(std::ranges::remove(moduleResult.nodes, token).begin(),
-                                                 moduleResult.nodes.end());
-                    } else if (auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(token.get())) {
-                        funcDef->setModulePath(useModule->modulePath());
-                        // if (funcDef->isPrivate()) {
-                        //     result.messages.push_back(parser::ParserMessasge{
-                        //         .outputType = parser::OutputType::ERROR,
-                        //         .token = funcDef->expressionToken(),
-                        //         .message = "Cannot use private function '" + funcDef->functionName() +
-                        //                    "' from module '" + fullPath.string() + "'!"
-                        //     });
-                        // }
+                if (!result.hasError()) {
+                    std::vector<ast::ASTNode *> nodesToDelete;
+                    for (size_t i = 0; i < moduleResult.nodes.size(); ++i) {
+                        ast::ASTNode *token = moduleResult.nodes[i].get();
+                        if (const auto subUseModule = dynamic_cast<ast::UseModule *>(token)) {
+                            useModuleFile(stdlibDirectories, moduleResult, subUseModule);
+                            nodesToDelete.push_back(token);
+                        } else if (auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(token)) {
+                            funcDef->setModulePath(useModule->modulePath());
+                            // if (funcDef->isPrivate()) {
+                            //     result.messages.push_back(parser::ParserMessasge{
+                            //         .outputType = parser::OutputType::ERROR,
+                            //         .token = funcDef->expressionToken(),
+                            //         .message = "Cannot use private function '" + funcDef->functionName() +
+                            //                    "' from module '" + fullPath.string() + "'!"
+                            //     });
+                            // }
+                        }
+                    }
+                    for (const auto &node: nodesToDelete) {
+                        moduleResult.nodes.erase(std::ranges::remove_if(moduleResult.nodes,
+                                                                        [&](const std::unique_ptr<ast::ASTNode> &n) {
+                                                                            return n.get() == node;
+                                                                        }).begin(), moduleResult.nodes.end());
                     }
                 }
 
-                result.nodes.insert(result.nodes.end(),
-                                    std::make_move_iterator(moduleResult.nodes.begin()),
-                                    std::make_move_iterator(moduleResult.nodes.end()));
+                for (auto &node: moduleResult.nodes) {
+                    result.nodes.push_back(std::move(node));
+                }
 
 
                 break;
@@ -104,7 +113,7 @@ namespace modules {
                 }
 
                 for (auto &node: moduleResult.nodes) {
-                    nodes.push_back(std::move(node));
+                    nodes.insert(nodes.begin(), std::move(node));
                 }
             } else {
                 nodes.push_back(std::move(token));

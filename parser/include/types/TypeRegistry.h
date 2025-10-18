@@ -22,6 +22,9 @@ namespace types {
         static std::optional<std::shared_ptr<VariableType> > getPointerType(
             const std::shared_ptr<VariableType> &base_type);
 
+        static std::optional<std::shared_ptr<VariableType> > getReferenceType(
+            const std::shared_ptr<VariableType> &base_type);
+
         TypeRegistry(const TypeRegistry &) = delete;
 
         TypeRegistry &operator=(const TypeRegistry &) = delete;

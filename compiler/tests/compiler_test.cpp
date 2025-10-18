@@ -229,7 +229,8 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
-                             "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc"));
+                             "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
+                             "strings"));
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                          testing::Values("returntype"));

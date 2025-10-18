@@ -12,14 +12,16 @@
 namespace ast {
     class ArrayAssignment final : public ASTNode {
     private:
+        std::unique_ptr<ASTNode> m_accessNode;
         std::unique_ptr<ASTNode> m_value;
         std::unique_ptr<ASTNode> m_index;
         std::shared_ptr<types::VariableType> m_arrayType = nullptr;
 
     public:
-        explicit ArrayAssignment(Token name, std::unique_ptr<ASTNode> expression,
+        explicit ArrayAssignment(Token name, std::unique_ptr<ASTNode> accessNode, std::unique_ptr<ASTNode> expression,
                                  std::unique_ptr<ASTNode> index)
-            : ASTNode(std::move(name)), m_value(std::move(expression)), m_index(std::move(index)) {
+            : ASTNode(std::move(name)), m_accessNode(std::move(accessNode)), m_value(std::move(expression)),
+              m_index(std::move(index)) {
         }
 
         [[nodiscard]] ASTNode *index() const {
@@ -28,6 +30,10 @@ namespace ast {
 
         [[nodiscard]] ASTNode *value() const {
             return m_value.get();
+        }
+
+        [[nodiscard]] ASTNode *accessNode() const {
+            return m_accessNode.get();
         }
 
         ~ArrayAssignment() override = default;

@@ -1,0 +1,66 @@
+
+struct array<T>{
+    data : *T;
+    length : i32;
+    capacity : i32;
+
+    fn length() : i32 {
+        return length;
+    }
+
+    fn push(value : T) : void {
+        if length >= capacity {
+            // Resize logic (simple doubling strategy)
+            let new_capacity : i32 = if capacity == 0 { 1 } else { capacity * 2 };
+            let new_data : *T = allocate(new_capacity);
+            for i in 0 .. length {
+                new_data[i] = data[i];
+            }
+            deallocate(data);
+            data = new_data;
+            capacity = new_capacity;
+        }
+        data[length] = value;
+        length = length + 1;
+    }
+
+    fn [](index : i32) : T {
+        if index < 0 || index >= length {
+            panic("Index out of bounds");
+        }
+        return data[index];
+    }
+
+    fn set(index : i32, value : T) : void {
+        if index < 0 || index >= length {
+            panic("Index out of bounds");
+        }
+        data[index] = value;
+    }
+
+    fn pop() : T {
+        if length == 0 {
+            panic("Pop from empty array");
+        }
+        length = length - 1;
+        return data[length];
+    }
+
+    fn new() : array {
+        return array<T> { data: null, length: 0, capacity: 0 };
+    }
+
+    fn clear() : void {
+        length = 0;
+    }
+
+    fn free() : void {
+        deallocate(data);
+        data = null;
+        length = 0;
+        capacity = 0;
+    }
+
+
+
+}

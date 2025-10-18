@@ -1,0 +1,30 @@
+i: 0
+Match found: H
+No match: H vs a
+No match: H vs l
+No match: H vs l
+No match: H vs o
+i: 1
+No match: e vs H
+No match: e vs a
+No match: e vs l
+No match: e vs l
+No match: e vs o
+i: 2
+No match: l vs H
+No match: l vs a
+Match found: l
+Match found: l
+No match: l vs o
+i: 3
+No match: l vs H
+No match: l vs a
+Match found: l
+Match found: l
+No match: l vs o
+i: 4
+No match: o vs H
+No match: o vs a
+No match: o vs l
+No match: o vs l
+Match found: o

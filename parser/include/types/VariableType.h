@@ -30,6 +30,10 @@ namespace types {
         [[nodiscard]] std::string name() const { return m_typename; }
 
         [[nodiscard]] TypeKind typeKind() const { return m_typeKind; }
+
+        bool operator==(const VariableType &other) const {
+            return this->name() == other.name();
+        }
     };
 
     class IntegerType final : public VariableType {
@@ -54,6 +58,19 @@ namespace types {
 
     public:
         PointerType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
+                std::move(name), TypeKind::POINTER),
+            m_baseType(std::move(baseType)) {
+        }
+
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+    };
+
+    class ReferenceType final : public VariableType {
+    private:
+        std::shared_ptr<VariableType> m_baseType;
+
+    public:
+        ReferenceType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::POINTER),
             m_baseType(std::move(baseType)) {
         }

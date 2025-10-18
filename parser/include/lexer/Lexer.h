@@ -44,6 +44,7 @@ struct Token {
         DIV,
         MUL,
         PERCENT,
+        AND,
         LEFT_CURLY,
         RIGHT_CURLY,
         LEFT_SQUAR,

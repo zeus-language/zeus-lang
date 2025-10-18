@@ -1,0 +1,194 @@
+use core::libc;
+
+
+
+struct string {
+    data : *u8, // Pointer to the string data
+    length : i32, // Length of the string
+    capacity : i32, // Capacity of the string
+}
+
+fn from_c_str(cstr: *u8) : string {
+    let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
+    str_obj.length  = strlen(cstr) as i32;
+    str_obj.capacity = str_obj.length + 1;
+
+    str_obj.data = core::libc::malloc(str_obj.capacity as u64);
+    strcpy(str_obj.data, cstr);
+
+
+    return str_obj;
+}
+fn as_c_str(self : &string) : *u8 {
+    return self.data;
+}
+fn length(self : &string) : u32 {
+    return self.length as u32;
+}
+fn capacity(self : &string) : u32 {
+    return self.capacity as u32;
+}
+
+fn destroy(self : &string) : void {
+    if self.data != 0 as *u8 {
+        core::libc::free(self.data);
+    }
+    // Optionally, you can set fields to zero to avoid dangling pointers
+    self.data = 0 as *u8;
+    self.length = 0;
+    self.capacity = 0;
+}
+
+
+fn replace(self : &string, old : *u8, new : &string) : string {
+    let old_length : i32 = strlen(old) as i32;
+
+    for i in 0 .. (self.length - old_length + 1) {
+        let mut match_found : bool = true;
+        for j in 0 .. old_length {
+            let index : i32= i + j;
+
+            if index >= self.length {
+                match_found = false;
+                break;
+            }
+
+            if  self.data[index] != old[j] {
+                match_found = false;
+                break;
+            }
+        }
+        if match_found {
+
+            // Create prefix and suffix strings
+            let mut prefix : string;
+            prefix.length = i;
+            prefix.capacity = i + 1;
+                        prefix.length = i;
+
+            prefix.data = core::libc::malloc(prefix.capacity as u64);
+            core::libc::memcpy(prefix.data, self.data, prefix.length as u64);
+            prefix.data[i] = 0 as u8; // Null-terminate
+            prefix.length = i;
+
+            let mut suffix : string;
+            suffix.length = self.length - (i + old_length);
+
+
+            suffix.capacity = suffix.length + 1;
+
+            if suffix.length > 0 {
+                suffix.data = core::libc::malloc(suffix.capacity as u64);
+                // copy data to suffix
+
+                if suffix.data == 0 as *u8 {
+                    // Handle memory allocation failure
+                    suffix.data = 0 as *u8;
+                    suffix.length = 0;
+                    suffix.capacity = 0;
+                    return suffix; // or handle error appropriately
+                }
+                let suffix_start : *u8 = self.data + i as *u8+ old_length as *u8;
+                // Only copy if there's something to copy
+                core::libc::memcpy(suffix.data, suffix_start, suffix.length as u64);
+            }
+            suffix.data[suffix.length] = 0 as u8; // Null-terminate
+//           // suffix.data = self.data + (i + old_length) as *u8;
+//
+
+            //printf("prefix length: %d\n" as *u8, prefix.length);
+            //printf("new length: %d\n" as *u8, new.length);
+            let mut result : string = concat(&prefix, new);
+
+            let mut final_result : string = concat(&result, &suffix);
+
+
+            // Free temporary strings
+            core::libc::free(prefix.data);
+            //core::libc::free(suffix.data);
+            core::libc::free(result.data);
+
+            return final_result;
+
+        }
+    }
+    // If no match found, return a copy of the original string
+    return copy(self);
+}
+
+
+
+fn concat(a : &string, b : &string) : string {
+    if(a.length == 0) {
+        return copy(b);
+    }
+    if(b.length == 0) {
+        return copy(a);
+    }
+    let  new_length : i32 = a.length + b.length;
+    let mut new_data : *u8 = core::libc::malloc(new_length as u64 + 1  as u64);
+    if new_data == 0 as *u8 {
+        printf("Memory allocation failed in concat\n" as *u8);
+        // Handle memory allocation failure
+        let mut empty_str : string;
+        empty_str.data = 0 as *u8;
+        empty_str.length = 0;
+        empty_str.capacity = 0;
+        return empty_str;
+    }
+    let target : *u8 = new_data + a.length as *u8;
+    core::libc::memcpy(new_data, a.data, a.length as u64);
+    core::libc::memcpy(target, b.data, b.length as u64);
+    new_data[new_length] = 0 as u8; // Null-terminate
+    let mut new_str : string;
+    new_str.data = new_data;
+    new_str.length = new_length;
+    new_str.capacity = new_length + 1;
+    return new_str;
+}
+
+fn copy(self : &string) : string {
+    let mut copy_str : string;
+    copy_str.data = core::libc::malloc(self.capacity as u64);
+    if copy_str.data == 0 as *u8 {
+        // Handle memory allocation failure
+        copy_str.data = 0 as *u8;
+        copy_str.length = 0;
+        copy_str.capacity = 0;
+        return copy_str;
+    }
+    strcpy(copy_str.data, self.data);
+    copy_str.length = self.length;
+    copy_str.capacity = self.capacity;
+    return copy_str;
+}
+//// Converts a float to string with 2 decimal places
+//fn float_to_str(value : float) : string {
+//    let mut int_part : i32 = value as i32;
+//    let mut frac_part : i32 = ((value - int_part as float) * 100.0) as i32;
+//    if frac_part < 0 {
+//        frac_part = -frac_part;
+//    }
+//    return int_to_str(int_part) + "." + (if frac_part < 10 { "0" } else { "" }) + int_to_str(frac_part);
+//}
+//fn int_to_str(value : i32) : string {
+//    if value == 0 {
+//        return "0";
+//    }
+//    let mut is_negative : bool = false;
+//    let mut num : i32 = value;
+//    if num < 0 {
+//        is_negative = true;
+//        num = -num;
+//    }
+//    let mut digits : string = "";
+//    while num > 0 {
+//        let digit : i32 = num % 10;
+//        digits = char(digit + '0' as i32) + digits;
+//        num = num / 10;
+//    }
+//    if is_negative {
+//        digits = "-" + digits;
+//    }
+//    return digits;
+//}

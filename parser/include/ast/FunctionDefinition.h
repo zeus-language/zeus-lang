@@ -40,6 +40,14 @@ namespace ast {
 
         [[nodiscard]] std::string functionName() const;
 
+
+        [[nodiscard]] FunctionArgument *getParam(const unsigned index) {
+            if (index >= m_args.size()) {
+                return nullptr;
+            }
+            return &m_args[index];
+        }
+
         std::vector<FunctionArgument> &args();
 
         explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,

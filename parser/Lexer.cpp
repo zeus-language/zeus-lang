@@ -306,6 +306,9 @@ namespace lexer {
                     case '}':
                         tokens.emplace_back(Token::CLOSE_BRACE, source_location);
                         break;
+                    case '&':
+                        tokens.emplace_back(Token::AND, source_location);
+                        break;
                     default:
                         break;
                 }

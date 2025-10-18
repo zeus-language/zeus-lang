@@ -20,6 +20,7 @@ namespace ast {
         return m_args;
     }
 
+
     std::string FunctionDefinitionBase::functionSignature() const {
         std::string signature;
         for (auto &ns: m_namespacePrefix) {
