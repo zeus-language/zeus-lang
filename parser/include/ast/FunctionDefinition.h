@@ -38,6 +38,15 @@ namespace ast {
             return m_namespacePrefix;
         }
 
+        [[nodiscard]] std::string modulePathName() const {
+            std::string name;
+            for (auto &ns: m_namespacePrefix) {
+                name += ns.lexical() + "::";
+            }
+            return name;
+        }
+
+
         [[nodiscard]] std::string functionName() const;
 
 

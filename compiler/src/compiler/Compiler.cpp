@@ -36,6 +36,31 @@ namespace compiler {
         return buffer;
     }
 
+    std::vector<std::unique_ptr<ast::ASTNode> > moveNodesFromResult(const std::shared_ptr<parser::Module> &module,
+                                                                    std::vector<std::string> &visitedModules) {
+        std::vector<std::unique_ptr<ast::ASTNode> > nodes;
+        for (auto &sub: module->modules) {
+            if (visitedModules.end() != std::ranges::find(visitedModules,
+                                                          sub->modulePathName())) {
+                continue;
+            }
+            visitedModules.push_back(sub->modulePathName());
+            for (auto subNodes = moveNodesFromResult(sub, visitedModules); auto &node: subNodes) {
+                nodes.push_back(std::move(node));
+            }
+        }
+
+        for (auto &node: module->nodes) {
+            nodes.push_back(std::move(node));
+        }
+
+        for (auto &node: module->functions) {
+            nodes.push_back(std::move(node));
+        }
+
+        return nodes;
+    }
+
     void parse_and_compile(const compiler::CompilerOptions &options, const std::filesystem::path &inputPath,
                            std::ostream &errorStream,
                            std::ostream &outputStream) {
@@ -44,16 +69,17 @@ namespace compiler {
 
         auto result = parser::parse_tokens(tokens);
 
-        const auto nodes = modules::include_modules(options.stdlibDirectories, result);
+        modules::include_modules(options.stdlibDirectories, result);
         for (const auto &message: result.messages) {
             message.msg(errorStream, options.colorOutput);
         }
         types::TypeCheckResult typeCheckResult;
-        types::type_check(nodes, typeCheckResult);
+        types::type_check(result.module, typeCheckResult);
         for (const auto &message: typeCheckResult.messages) {
             message.msg(errorStream, options.colorOutput);
         }
-
+        std::vector<std::string> visitedModules;
+        auto nodes = moveNodesFromResult(result.module, visitedModules);
 
         if (!result.hasError() && !typeCheckResult.hasError()) {
             compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,

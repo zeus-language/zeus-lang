@@ -1,5 +1,7 @@
 #include "llvm_backend.h"
 
+#include <iostream>
+
 
 #include "../CompilerOptions.h"
 #include "ast/ASTNode.h"
@@ -1237,8 +1239,11 @@ namespace llvm_backend {
             return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
         }
         const auto functionCall = llvmState.TheModule->getFunction(node->functionName());
-        assert(functionCall && "Function not declared before call");
+
         if (!functionCall) {
+            std::cerr << "Function " << node->functionName() << " not found in module.\n";
+            assert(false && "Function not declared before call");
+
             return nullptr; // Error handling
         }
         std::vector<llvm::Value *> args;
@@ -1329,7 +1334,7 @@ namespace llvm_backend {
         }
     }
 
-    void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
+    void codegen_functionstub(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         const auto returnTypeKind = node->expressionType().value()->typeKind();
         const auto resultType = (returnTypeKind == types::TypeKind::STRUCT)
                                     ? llvm::PointerType::getUnqual(*llvmState.TheContext)
@@ -1351,6 +1356,36 @@ namespace llvm_backend {
 
         auto functionDefinition = llvm::Function::Create(FT, linkage, node->functionName(),
                                                          llvmState.TheModule.get());
+        functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
+        functionDefinition->addFnAttr(llvm::Attribute::NoFree);
+
+
+        llvm::AttrBuilder b(*llvmState.TheContext);
+        b.addAttribute("frame-pointer", "all");
+        functionDefinition->addFnAttrs(b);
+    }
+
+    void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
+        const auto returnTypeKind = node->expressionType().value()->typeKind();
+        const auto resultType = (returnTypeKind == types::TypeKind::STRUCT)
+                                    ? llvm::PointerType::getUnqual(*llvmState.TheContext)
+                                    : resolveLlvmType(node->expressionType().value(), llvmState);
+        std::vector<llvm::Type *> params;
+        for (const auto &param: node->args()) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+                params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+            } else {
+                params.push_back(resolveLlvmType(param.type.value(), llvmState));
+            }
+        }
+        llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
+        auto linkage = llvm::Function::ExternalLinkage;
+        if (node->functionName() != "main") {
+            linkage = llvm::Function::PrivateLinkage;
+        }
+
+
+        auto functionDefinition = llvmState.TheModule->getFunction(node->functionName());
 
         llvm::BasicBlock *functionBaseBlock = llvm::BasicBlock::Create(*llvmState.TheContext,
                                                                        functionDefinition->getName(),
@@ -1500,12 +1535,16 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     context.TheModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     createPrintfCall(*context.TheContext, *context.TheModule);
-
     for (auto &node: nodes) {
         if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
-            llvm_backend::codegen(funcDef, context);
+            llvm_backend::codegen_functionstub(funcDef, context);
         }
         if (auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node.get())) {
+            llvm_backend::codegen(funcDef, context);
+        }
+    }
+    for (auto &node: nodes) {
+        if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
             llvm_backend::codegen(funcDef, context);
         }
     }

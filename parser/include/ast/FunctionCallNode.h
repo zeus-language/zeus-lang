@@ -22,6 +22,15 @@ namespace ast {
         ~FunctionCallNode() override = default;
 
         std::string functionName() const { return expressionToken().lexical(); }
+
+        [[nodiscard]] std::string modulePathName() const {
+            std::string name;
+            for (auto &ns: m_namespacePrefix) {
+                name += ns.lexical() + "::";
+            }
+            return name;
+        }
+
         std::vector<std::unique_ptr<ASTNode> > &args() { return m_args; }
 
         [[nodiscard]] std::string functionSignature() const;

@@ -11,6 +11,10 @@
 #include "../lexer/Lexer.h"
 #include "ast/ASTNode.h"
 
+namespace ast {
+    class FunctionDefinitionBase;
+}
+
 namespace parser {
     enum class OutputType {
         ERROR,
@@ -52,8 +56,37 @@ namespace parser {
         void msg(std::ostream &ostream, bool printColor) const;
     };
 
-    struct ParseResult {
+    struct Module;
+
+    struct Module {
+        std::vector<std::shared_ptr<Module> > modules;
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
+        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > functions;
+
+        std::vector<std::unique_ptr<ast::ASTNode> > useModuleNodes;
+        std::vector<Token> modulePath;
+
+        [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
+            for (const auto &mod: modules) {
+                if (!mod->modulePath.empty() && mod->modulePath.back().lexical() == moduleName) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        [[nodiscard]] std::string modulePathName() const {
+            std::string modName;
+            for (auto &ns: modulePath) {
+                modName += ns.lexical() + "::";
+            }
+            return modName;
+        }
+    };
+
+
+    struct ParseResult {
+        std::shared_ptr<Module> module;
         std::vector<ParserMessasge> messages;
 
         [[nodiscard]] bool hasError() const {

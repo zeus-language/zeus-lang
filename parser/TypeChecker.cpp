@@ -42,7 +42,31 @@ namespace types {
         TypeRegistry registry;
         std::map<std::string, std::optional<Variable> > currentVariables;
         std::vector<parser::ParserMessasge> messages;
-        std::vector<ast::FunctionDefinitionBase *> functions;
+        //std::vector<ast::FunctionDefinitionBase *> functions;
+        std::shared_ptr<parser::Module> module;
+
+        [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
+            const std::string &name) const {
+            std::vector<ast::FunctionDefinitionBase *> result;
+            for (const auto &f: module->functions) {
+                if (f->functionName() == name and (
+                        f->modulePathName() == path or f->modulePathName() == module->modulePathName())) {
+                    result.push_back(f.get());
+                }
+            }
+            if (!path.empty()) {
+                for (const auto &m: module->modules) {
+                    if (m->modulePathName() == path) {
+                        for (const auto &node: m->functions) {
+                            if (node->functionName() == name) {
+                                result.push_back(node.get());
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
     };
 
 
@@ -713,7 +737,8 @@ namespace types {
                 return;
             }
             // For simplicity, we assume the result type is the same as the operand types
-            node->setExpressionType(node->lhs()->expressionType().value());
+            if (node->lhs()->expressionType())
+                node->setExpressionType(node->lhs()->expressionType().value());
         } else {
             context.messages.push_back({
                 parser::OutputType::ERROR,
@@ -754,7 +779,12 @@ namespace types {
             node->setExpressionType(context.registry.getTypeByName("void").value());
             return;
         }
-        for (const auto funcDef: context.functions) {
+        auto functions = context.findFunctionsByName(node->modulePathName(), node->functionName());
+
+        for (const auto funcDef: functions) {
+            auto oldVariables = context.currentVariables;
+            type_check_base(funcDef, context);
+            context.currentVariables = oldVariables;
             if (funcDef->functionName() == node->functionName()) {
                 if (funcDef->args().size() != node->args().size()) {
                     context.messages.push_back({
@@ -890,6 +920,8 @@ namespace types {
     }
 
     void type_check(ast::FunctionDefinition *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
         // Example type checking logic for a function definition
         if (node->functionName() == "main" && !node->args().empty()) {
             context.messages.push_back({
@@ -1006,10 +1038,15 @@ namespace types {
         // Further type checking logic would go here...
     }
 
-    void type_check(const std::vector<std::unique_ptr<ast::ASTNode> > &nodes, TypeCheckResult &result) {
-        Context context;
+    void type_check(const std::shared_ptr<parser::Module> &module, Context &context, TypeCheckResult &result) {
+        context.module = module;
+        for (auto &childModule: module->modules) {
+            type_check(childModule, context, result);
+        }
+
+        context.module = module;
         // resolve global type declarations first
-        for (const auto &node: nodes) {
+        for (const auto &node: module->nodes) {
             if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 std::vector<types::StructField> structFields;
                 for (const auto &[name, type]: structDecl->fields()) {
@@ -1023,16 +1060,21 @@ namespace types {
                 context.registry.registerType(type);
             }
         }
-        // collect function definitions second
-        for (const auto &node: nodes) {
-            if (const auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(node.get())) {
-                context.functions.push_back(funcDef);
-            }
-        }
-
-        for (auto &node: nodes) {
+        for (auto &node: module->nodes) {
             type_check_base(node.get(), context);
         }
+        // collect function definitions second
+        // for (const auto &node: module->functions) {
+        //     context.functions.push_back(node.get());
+        // }
+        for (const auto &node: module->functions) {
+            type_check_base(node.get(), context);
+        }
+    }
+
+    void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result) {
+        Context context;
+        type_check(module, context, result);
         result.messages = std::move(context.messages);
     }
 }

@@ -13,5 +13,5 @@ namespace types {
         }
     };
 
-    void type_check(const std::vector<std::unique_ptr<ast::ASTNode> > &nodes, TypeCheckResult &result);
+    void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result);
 }

@@ -101,10 +101,10 @@ void parseAndSendDiagnostics(std::vector<std::filesystem::path> rtlDirectories, 
     std::filesystem::path filePath = uri;
 
     auto result = parser::parse_tokens(tokens);
-    const auto nodes = modules::include_modules(rtlDirectories, result);
+    modules::include_modules(rtlDirectories, result);
 
     types::TypeCheckResult type_check_result;
-    types::type_check(nodes, type_check_result);
+    types::type_check(result.module, type_check_result);
 
 
     if (result.messages.empty() && type_check_result.messages.empty()) {
@@ -227,10 +227,10 @@ void LanguageServer::handleRequest() {
                 std::filesystem::path filePath = uri;
                 std::unordered_map<std::string, bool> definitions;
                 auto result = parser::parse_tokens(tokens);
-                const auto nodes = modules::include_modules(m_options.stdlibDirectories, result);
+                modules::include_modules(m_options.stdlibDirectories, result);
 
                 types::TypeCheckResult type_check_result;
-                types::type_check(nodes, type_check_result);
+                types::type_check(result.module, type_check_result);
 
 
                 if (result.messages.empty() && type_check_result.messages.empty()) {

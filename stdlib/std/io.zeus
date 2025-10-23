@@ -1,19 +1,19 @@
 use std::str;
+use core::libc;
+fn print(fmt: *u8, arg1 : &std::str::string) : void {
+    // A simple implementation of print that handles basic formatting
+    let formatted : string = std::str::from_c_str(fmt);
+
+    let replaced : string = std::str::replace(&formatted,"{}" as *u8,arg1);
+
+    printf("%s",std::str::as_c_str(&replaced));
+    core::libc::free(formatted.data);
+    core::libc::free(replaced.data);
+}
 
 
 fn println2(fmt: *u8, arg1 : &std::str::string) : void {
     print(fmt,arg1);
     printf("\n");
-}
-
-fn print(fmt: *u8, arg1 : &std::str::string) : void {
-    // A simple implementation of print that handles basic formatting
-    let formatted : string = str::from_c_str(fmt);
-
-    let replaced : string = replace(&formatted,"{}" as *u8,arg1);
-
-    printf("%s",replaced.as_c_str());
-    free(formatted.data);
-    free(replaced.data);
 }
 

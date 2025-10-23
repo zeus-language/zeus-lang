@@ -10,11 +10,11 @@ struct string {
 
 fn from_c_str(cstr: *u8) : string {
     let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
-    str_obj.length  = strlen(cstr) as i32;
+    str_obj.length  = core::libc::strlen(cstr) as i32;
     str_obj.capacity = str_obj.length + 1;
 
     str_obj.data = core::libc::malloc(str_obj.capacity as u64);
-    strcpy(str_obj.data, cstr);
+    core::libc::strcpy(str_obj.data, cstr);
 
 
     return str_obj;
@@ -41,7 +41,7 @@ fn destroy(self : &string) : void {
 
 
 fn replace(self : &string, old : *u8, new : &string) : string {
-    let old_length : i32 = strlen(old) as i32;
+    let old_length : i32 = core::libc::strlen(old) as i32;
 
     for i in 0 .. (self.length - old_length + 1) {
         let mut match_found : bool = true;
@@ -157,7 +157,7 @@ fn copy(self : &string) : string {
         copy_str.capacity = 0;
         return copy_str;
     }
-    strcpy(copy_str.data, self.data);
+    core::libc::strcpy(copy_str.data, self.data);
     copy_str.length = self.length;
     copy_str.capacity = self.capacity;
     return copy_str;

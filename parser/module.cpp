@@ -28,6 +28,7 @@ namespace modules {
     void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories, parser::ParseResult &result,
                        ast::UseModule *useModule) {
         std::string modulePath;
+        assert(result.module && "Resulting module must not be null");
         for (const auto &ns: useModule->modulePath()) {
             modulePath += ns.lexical() + "/";
         }
@@ -38,7 +39,8 @@ namespace modules {
         bool moduleLoadedSuccessfully = false;
         for (const auto &basePath: stdlibDirectories) {
             auto fullPath = basePath / modulePath;
-            if (std::filesystem::exists(fullPath)) {
+            if (std::filesystem::exists(fullPath) and (
+                    !result.module->containsSubModule(modulePath))) {
                 auto moduleContent = read_file(fullPath);
                 if (!moduleContent) {
                     result.messages.push_back(parser::ParserMessasge{
@@ -51,38 +53,31 @@ namespace modules {
                 moduleLoadedSuccessfully = true;
                 auto moduleTokens = lexer::lex_file(fullPath.string(), moduleContent.value());
                 auto moduleResult = parser::parse_tokens(moduleTokens);
+                moduleResult.module->modulePath = useModule->modulePath();
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
                 }
+
                 if (!result.hasError()) {
+                    result.module->modules.push_back(moduleResult.module);
+
                     std::vector<ast::ASTNode *> nodesToDelete;
-                    for (size_t i = 0; i < moduleResult.nodes.size(); ++i) {
-                        ast::ASTNode *token = moduleResult.nodes[i].get();
-                        if (const auto subUseModule = dynamic_cast<ast::UseModule *>(token)) {
+                    for (auto &node: moduleResult.module->useModuleNodes) {
+                        if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
                             useModuleFile(stdlibDirectories, moduleResult, subUseModule);
-                            nodesToDelete.push_back(token);
-                        } else if (auto funcDef = dynamic_cast<ast::FunctionDefinitionBase *>(token)) {
-                            funcDef->setModulePath(useModule->modulePath());
-                            // if (funcDef->isPrivate()) {
-                            //     result.messages.push_back(parser::ParserMessasge{
-                            //         .outputType = parser::OutputType::ERROR,
-                            //         .token = funcDef->expressionToken(),
-                            //         .message = "Cannot use private function '" + funcDef->functionName() +
-                            //                    "' from module '" + fullPath.string() + "'!"
-                            //     });
-                            // }
                         }
                     }
-                    for (const auto &node: nodesToDelete) {
-                        moduleResult.nodes.erase(std::ranges::remove_if(moduleResult.nodes,
-                                                                        [&](const std::unique_ptr<ast::ASTNode> &n) {
-                                                                            return n.get() == node;
-                                                                        }).begin(), moduleResult.nodes.end());
+                    for (auto &function: moduleResult.module->functions) {
+                        function->setModulePath(useModule->modulePath());
+                        // if (funcDef->isPrivate()) {
+                        //     result.messages.push_back(parser::ParserMessasge{
+                        //         .outputType = parser::OutputType::ERROR,
+                        //         .token = funcDef->expressionToken(),
+                        //         .message = "Cannot use private function '" + funcDef->functionName() +
+                        //                    "' from module '" + fullPath.string() + "'!"
+                        //     });
+                        // }
                     }
-                }
-
-                for (auto &node: moduleResult.nodes) {
-                    result.nodes.push_back(std::move(node));
                 }
 
 
@@ -99,26 +94,15 @@ namespace modules {
         }
     }
 
-    std::vector<std::unique_ptr<ast::ASTNode> > include_modules(
+    void include_modules(
         const std::vector<std::filesystem::path> &stdlibDirectories,
         parser::ParseResult &result) {
-        std::vector<std::unique_ptr<ast::ASTNode> > nodes;
-        for (auto &token: result.nodes) {
-            if (auto useModule = dynamic_cast<ast::UseModule *>(token.get())) {
+        for (auto &token: result.module->useModuleNodes) {
+            if (const auto useModule = dynamic_cast<ast::UseModule *>(token.get())) {
                 parser::ParseResult moduleResult;
-                useModuleFile(stdlibDirectories, moduleResult, useModule);
 
-                for (auto &message: moduleResult.messages) {
-                    result.messages.push_back(message);
-                }
-
-                for (auto &node: moduleResult.nodes) {
-                    nodes.insert(nodes.begin(), std::move(node));
-                }
-            } else {
-                nodes.push_back(std::move(token));
+                useModuleFile(stdlibDirectories, result, useModule);
             }
         }
-        return nodes;
     }
 }

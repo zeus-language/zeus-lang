@@ -969,7 +969,7 @@ namespace parser {
             );
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseExternFunctionDefinition() {
+        std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseExternFunctionDefinition() {
             if (canConsumeKeyWord("extern")) {
                 consumeKeyWord("extern");
                 if (!canConsumeKeyWord("fn")) {
@@ -1018,7 +1018,7 @@ namespace parser {
             return std::nullopt;
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseFunctionDefinition() {
+        std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseFunctionDefinition() {
             if (!canConsumeKeyWord("fn")) {
                 return std::nullopt;
             }
@@ -1174,16 +1174,16 @@ namespace parser {
         }
 
         ParseResult parse() {
-            std::vector<std::unique_ptr<ast::ASTNode> > nodes;
+            auto module = std::make_shared<parser::Module>();
             while (!canConsume(Token::END_OF_FILE) && hasNext()) {
                 if (auto functionDef = parseFunctionDefinition()) {
-                    nodes.push_back(std::move(functionDef.value()));
+                    module->functions.push_back(std::move(functionDef.value()));
                 } else if (auto externFnDefintion = parseExternFunctionDefinition()) {
-                    nodes.push_back(std::move(externFnDefintion.value()));
+                    module->functions.push_back(std::move(externFnDefintion.value()));
                 } else if (auto useModule = parseUseModule()) {
-                    nodes.push_back(std::move(useModule.value()));
+                    module->useModuleNodes.push_back(std::move(useModule.value()));
                 } else if (auto structDecl = parseStructDeclaration()) {
-                    nodes.push_back(std::move(structDecl.value()));
+                    module->nodes.push_back(std::move(structDecl.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -1195,13 +1195,12 @@ namespace parser {
             }
 
             return ParseResult{
-                .nodes = std::move(nodes),
+                .module = std::move(module),
                 .messages = m_messages
             };
         }
 
-    private
-    :
+    private:
         Token next() {
             if (hasNext())
                 ++m_current;
