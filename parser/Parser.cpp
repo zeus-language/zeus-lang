@@ -1272,6 +1272,30 @@ namespace parser {
         }
     };
 
+    std::optional<std::pair<Module *, ast::FunctionDefinitionBase *> > Module::findFunctionsByName(
+        const std::string &path,
+        const std::string &name) const {
+        std::cerr << "Searching for function '" << name << "' in path '" << path << "'\n";
+        for (const auto &f: functions) {
+            if (f->functionName() == name and (
+                    f->modulePathName() == path or f->modulePathName() == modulePathName())) {
+                return std::make_pair(const_cast<Module *>(this), f.get());
+            }
+        }
+        if (!path.empty()) {
+            for (const auto &m: modules) {
+                if (m->modulePathName() == path) {
+                    for (const auto &node: m->functions) {
+                        if (node->functionName() == name) {
+                            return std::make_pair(const_cast<Module *>(m.get()), node.get());
+                        }
+                    }
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
     std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > Module::getNodeByToken(
         const Token &token) const {
         for (auto &node: nodes) {

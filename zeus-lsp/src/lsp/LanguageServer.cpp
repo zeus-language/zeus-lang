@@ -211,6 +211,8 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
+    modules::include_modules(this->m_options.stdlibDirectories, parseResult);
+
     auto resultPair = parseResult.module->getNodeByToken(foundToken.value());
     if (resultPair) {
         std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
@@ -222,7 +224,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                     if (auto varDefinition = function->getVariableDefinition(varName)) {
                         std::cerr << "Found variable definition for " << varName << "\n";
                         lsp::Location location;
-                        location.uri = lsp::Uri::parse(
+                        location.uri = lsp::FileUri::fromPath(
                             varDefinition.value()->expressionToken().source_location.filename);
                         location.range.start.line = static_cast<int>(
                                                         varDefinition.value()->expressionToken().source_location.row) -
@@ -243,7 +245,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                         if (param.name.lexical() == varName) {
                             std::cerr << "Found argument definition for " << varName << "\n";
                             lsp::Location location;
-                            location.uri = lsp::Uri::parse(param.name.source_location.filename);
+                            location.uri = lsp::FileUri::fromPath(param.name.source_location.filename);
                             location.range.start.line = static_cast<int>(
                                                             param.name.source_location.row) - 1;
                             location.range.start.character = static_cast<int>(
@@ -261,11 +263,14 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         } else if (auto funcCall = dynamic_cast<const ast::FunctionCallNode *>(node)) {
             auto funcName = funcCall->functionName();
             std::cerr << "Found function " << funcName << "\n";
-            for (const auto &func: parseResult.module->functions) {
+            auto funcResult = parseResult.module->findFunctionsByName(funcCall->modulePathName(), funcName);
+            if (!funcResult)
+                return result;
+            if (const auto &[module, func] = funcResult.value(); func) {
                 if (func->functionName() == funcName) {
                     std::cerr << "Found function definition for " << funcName << "\n";
                     lsp::Location location;
-                    location.uri = lsp::Uri::parse(func->expressionToken().source_location.filename);
+                    location.uri = lsp::FileUri::fromPath(func->expressionToken().source_location.filename);
                     location.range.start.line = static_cast<int>(
                                                     func->expressionToken().source_location.row) - 1;
                     location.range.start.character = static_cast<int>(

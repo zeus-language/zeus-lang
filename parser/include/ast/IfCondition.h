@@ -32,5 +32,25 @@ namespace ast {
         IfCondition &operator=(IfCondition &&) = delete;
 
         IfCondition &operator=(const IfCondition &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_condition->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            for (auto &stmt: m_ifBlock) {
+                result = stmt->getNodeByToken(token);
+                if (result.has_value()) {
+                    return result;
+                }
+            }
+            for (auto &stmt: m_elseBlock) {
+                result = stmt->getNodeByToken(token);
+                if (result.has_value()) {
+                    return result;
+                }
+            }
+            return std::nullopt;
+        }
     };
 }

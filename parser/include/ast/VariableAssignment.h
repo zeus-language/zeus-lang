@@ -31,6 +31,15 @@ namespace ast {
         VariableAssignment &operator=(VariableAssignment &&) = delete;
 
         VariableAssignment &operator=(const VariableAssignment &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_expression->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            auto ownToken = expressionToken();
+            return ownToken == token ? std::make_optional(const_cast<VariableAssignment *>(this)) : std::nullopt;
+        }
     };
 } // ast
 

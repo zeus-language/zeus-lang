@@ -83,6 +83,10 @@ namespace parser {
             return modName;
         }
 
+        [[nodiscard]] std::optional<std::pair<Module *, ast::FunctionDefinitionBase *> > findFunctionsByName(
+            const std::string &path,
+            const std::string &name) const;
+
         std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > getNodeByToken(const Token &token) const;
     };
 

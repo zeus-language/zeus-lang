@@ -39,5 +39,23 @@ namespace ast {
         [[nodiscard]] bool inclusive() const { return m_inclusive; }
         [[nodiscard]] bool isConstant() const { return m_isConstant; }
         [[nodiscard]] const std::vector<std::unique_ptr<ASTNode> > &block() const { return m_block; }
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_rangeStart->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            result = m_rangeEnd->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            for (auto &stmt: m_block) {
+                result = stmt->getNodeByToken(token);
+                if (result.has_value()) {
+                    return result;
+                }
+            }
+            return std::nullopt;
+        }
     };
 }
