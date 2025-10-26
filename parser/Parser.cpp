@@ -964,7 +964,7 @@ namespace parser {
                 });
                 return std::nullopt;
             }
-            return ast::FunctionArgument(std::move(nameToken.lexical()),
+            return ast::FunctionArgument(std::move(nameToken),
                                          std::move(rawType.value())
             );
         }
@@ -1271,6 +1271,28 @@ namespace parser {
             return canConsume(Token::Type::KEYWORD) && m_tokens[m_current].lexical() == keyword;
         }
     };
+
+    std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > Module::getNodeByToken(
+        const Token &token) const {
+        for (auto &node: nodes) {
+            if (node->expressionToken() == token) {
+                return std::make_pair(nullptr, node.get());
+            }
+        }
+        for (auto &func: functions) {
+            if (func->expressionToken() == token) {
+                return std::make_pair(nullptr, func.get());
+            }
+            if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(func.get())) {
+                for (auto &node: funcDef->statements()) {
+                    if (const auto result = node->getNodeByToken(token)) {
+                        return std::make_pair(func.get(), result.value());
+                    }
+                }
+            }
+        }
+        return std::nullopt;
+    }
 
     ParseResult parse_tokens(const std::vector<Token> &tokens) {
         Parser parser(tokens);

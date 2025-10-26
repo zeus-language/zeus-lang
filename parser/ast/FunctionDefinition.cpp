@@ -12,6 +12,17 @@ namespace ast {
           m_statements(std::move(statements)) {
     }
 
+    std::optional<ASTNode *> FunctionDefinition::getVariableDefinition(const std::string &varName) const {
+        for (auto &stmt: m_statements) {
+            if (auto varDef = dynamic_cast<VariableDeclaration *>(stmt.get())) {
+                if (varDef->expressionToken().lexical() == varName) {
+                    return varDef;
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
     std::string FunctionDefinitionBase::functionName() const {
         return expressionToken().lexical();
     }

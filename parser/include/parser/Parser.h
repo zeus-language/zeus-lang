@@ -82,6 +82,8 @@ namespace parser {
             }
             return modName;
         }
+
+        std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > getNodeByToken(const Token &token) const;
     };
 
 

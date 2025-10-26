@@ -74,6 +74,10 @@ struct Token {
     [[nodiscard]] std::string lexical() const {
         return source_location.text();
     }
+
+    bool operator==(const Token &other) const {
+        return source_location == other.source_location;
+    }
 };
 
 namespace lexer {

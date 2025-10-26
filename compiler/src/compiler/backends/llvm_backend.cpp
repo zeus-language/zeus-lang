@@ -1313,7 +1313,7 @@ namespace llvm_backend {
         std::vector<std::string> argNames;
         for (auto &arg: functionDefinition->args()) {
             auto &param = node->args()[arg.getArgNo()];
-            arg.setName(param.name);
+            arg.setName(param.name.lexical());
         }
         //attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
@@ -1395,7 +1395,7 @@ namespace llvm_backend {
         std::vector<std::string> argNames;
         for (auto &arg: functionDefinition->args()) {
             auto &param = node->args()[arg.getArgNo()];
-            arg.setName(param.name);
+            arg.setName(param.name.lexical());
             // Create an alloca for this variable.
             const auto varType = resolveLlvmType(param.type.value(), llvmState);
             llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType,

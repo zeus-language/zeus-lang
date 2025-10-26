@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "CompilerOptions.h"
+#include "lsp/messages.h"
 
 struct LspDocument {
     std::string uri;
@@ -25,6 +26,9 @@ public:
     explicit LanguageServer(lsp::LspOptions options);
 
     void handleRequest();
+
+    lsp::requests::TextDocument_Definition::Result findDefinition(
+        const lsp::requests::TextDocument_Definition::Params &params);
 };
 
 

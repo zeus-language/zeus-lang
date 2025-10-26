@@ -10,12 +10,12 @@
 
 namespace ast {
     struct FunctionArgument {
-        std::string name;
+        Token name;
         std::unique_ptr<RawType> rawType;
 
         std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
 
-        FunctionArgument(std::string name, std::unique_ptr<RawType> type)
+        FunctionArgument(Token name, std::unique_ptr<RawType> type)
             : name(std::move(name)), rawType(std::move(type)) {
         }
     };
@@ -81,6 +81,8 @@ namespace ast {
 
 
         std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
+
+        std::optional<ASTNode *> getVariableDefinition(const std::string &varName) const;
 
 
         FunctionDefinition(FunctionDefinition &&) = default;

@@ -951,10 +951,12 @@ namespace types {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name + "'."
+                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name.lexical() + "'."
                 });
             }
-            context.currentVariables.emplace(arg.name, Variable{arg.name, arg.type.value_or(nullptr), false});
+            context.currentVariables.emplace(arg.name.lexical(), Variable{
+                                                 arg.name.lexical(), arg.type.value_or(nullptr), false
+                                             });
         }
         for (auto &stmt: node->statements()) {
             type_check_base(stmt.get(), context);
@@ -1015,7 +1017,7 @@ namespace types {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name + "'."
+                    "Unknown type '" + arg.rawType->typeToken.lexical() + "' for argument '" + arg.name.lexical() + "'."
                 });
             }
         }
