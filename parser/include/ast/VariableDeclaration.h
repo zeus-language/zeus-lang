@@ -74,6 +74,13 @@ namespace ast {
         VariableDeclaration &operator=(VariableDeclaration &&) = delete;
 
         VariableDeclaration &operator=(const VariableDeclaration &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            if (m_initialValue.has_value()) {
+                return m_initialValue.value()->getNodeByToken(token);
+            }
+            return std::nullopt;
+        }
     };
 } // ast
 

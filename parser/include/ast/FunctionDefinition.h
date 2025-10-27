@@ -82,7 +82,7 @@ namespace ast {
 
         std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
 
-        std::optional<ASTNode *> getVariableDefinition(const std::string &varName) const;
+        std::optional<ASTNode *> getVariableDefinition(const Token &token) const;
 
 
         FunctionDefinition(FunctionDefinition &&) = default;

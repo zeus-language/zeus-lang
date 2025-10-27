@@ -47,6 +47,19 @@ namespace ast {
         void setArrayType(std::shared_ptr<types::VariableType> type) {
             m_arrayType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
+
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_accessExpression->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            result = m_indexExpression->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            auto ownToken = expressionToken();
+            return ownToken == token ? std::make_optional(const_cast<ArrayAccess *>(this)) : std::nullopt;
+        }
     };
 } // ast
 

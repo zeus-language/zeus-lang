@@ -47,6 +47,18 @@ namespace ast {
         LogicalExpression &operator=(LogicalExpression &&) = delete;
 
         LogicalExpression &operator=(const LogicalExpression &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_lhs ? m_lhs->getNodeByToken(token) : std::nullopt;
+            if (result) {
+                return result;
+            }
+            result = m_rhs->getNodeByToken(token);
+            if (result) {
+                return result;
+            }
+            return std::nullopt;
+        }
     };
 } // ast
 

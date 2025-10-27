@@ -24,16 +24,24 @@
 
 using namespace std::string_view_literals;
 
-static int mapOutputTypeToSeverity(const parser::OutputType output) {
+static lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType output) {
     switch (output) {
         case parser::OutputType::ERROR:
-            return static_cast<int>(lsp::DiagnosticSeverity::Error);
+            return lsp::DiagnosticSeverity::Error;
         case parser::OutputType::HINT:
-            return static_cast<int>(lsp::DiagnosticSeverity::Hint);
+            return lsp::DiagnosticSeverity::Hint;
         case parser::OutputType::WARN:
-            return static_cast<int>(lsp::DiagnosticSeverity::Warning);
+            return lsp::DiagnosticSeverity::Warning;
     }
-    return static_cast<int>(lsp::DiagnosticSeverity::Information);
+    return lsp::DiagnosticSeverity::Information;
+}
+
+lsp::Uri toUri(const std::string &filePath) {
+    if (filePath.starts_with("file:")) {
+        return lsp::Uri::parse(filePath);
+    } else {
+        return lsp::FileUri::fromPath(filePath);
+    }
 }
 
 static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
@@ -49,26 +57,36 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
         const auto &token = msg.token;
         lsp::Diagnostic diag;
         // adjust to 0-based indexing
+
         diag.range.start.line = static_cast<int>(token.source_location.row) - 1;
         diag.range.start.character = static_cast<int>(token.source_location.col) - 1;
         diag.range.end.line = static_cast<int>(token.source_location.row) - 1;
         diag.range.end.character = static_cast<int>(token.source_location.col + token.source_location.num_bytes) - 1;
-        diag.severity = static_cast<lsp::DiagnosticSeverity>(mapOutputTypeToSeverity(msg.outputType));
+        diag.severity = mapOutputTypeToSeverity(msg.outputType);
         diag.message = msg.message;
         diag.source = std::string("zeus");
+        diag.relatedInformation = std::vector<lsp::DiagnosticRelatedInformation>{
+            lsp::DiagnosticRelatedInformation{
+                .location = lsp::Location{
+                    .uri = toUri(token.source_location.filename),
+                    .range = diag.range
+                },
+                .message = msg.message
+            }
+        };
         diagnostics.push_back(std::move(diag));
     }
 
     return diagnostics;
 }
 
+
 static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
     const std::vector<std::filesystem::path> &rtlDirectories,
-    const std::string &uri,
+    const lsp::Uri &uri,
     const std::string &text) {
     std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
-
-    auto tokens = lexer::lex_file(uri, text);
+    auto tokens = lexer::lex_file(std::string(uri.path()), text);
     auto result = parser::parse_tokens(tokens);
     modules::include_modules(rtlDirectories, result);
 
@@ -76,7 +94,7 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
     types::type_check(result.module, type_check_result);
 
     if (result.messages.empty() && type_check_result.messages.empty()) {
-        errorsMap[uri] = {};
+        errorsMap[std::string(uri.path())] = {};
     } else {
         for (auto &error: result.messages) {
             errorsMap[error.token.source_location.filename].push_back(error);
@@ -103,7 +121,8 @@ void LanguageServer::handleRequest() {
         // Register callbacks
         messageHandler.add<lsp::requests::Initialize>([&](lsp::requests::Initialize::Params &&params) {
                     lsp::InitializeResult result;
-                    result.capabilities.positionEncoding = lsp::PositionEncodingKind::UTF16;
+                    result.capabilities.positionEncoding = lsp::PositionEncodingKind::UTF8;
+
                     result.capabilities.textDocumentSync = lsp::TextDocumentSyncOptions{
                         .openClose = true,
                         .change = lsp::TextDocumentSyncKind::Full,
@@ -112,6 +131,10 @@ void LanguageServer::handleRequest() {
                     result.capabilities.hoverProvider = false;
                     result.capabilities.definitionProvider = true;
                     result.capabilities.declarationProvider = true;
+                    result.capabilities.diagnosticProvider = lsp::DiagnosticOptions{
+                        .interFileDependencies = true,
+                        .workspaceDiagnostics = false
+                    };
 
                     result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = "0.1"};
 
@@ -134,17 +157,26 @@ void LanguageServer::handleRequest() {
                         m_openDocuments[uriString] = LspDocument{.uri = uriString, .text = text};
 
                         // compute diagnostics asynchronously using a detached thread and send PublishDiagnostics
-                        std::thread(
-                            [this, uri = std::move(uri), text = std::move(text), &messageHandler, rtl = this->m_options.
-                                stdlibDirectories]() mutable {
-                                auto messages = collectDiagnostics(rtl, uri.toString(), text);
-                                auto diagnostics = buildDiagnosticsFromMessages(messages, uri.toString());
-                                lsp::notifications::TextDocument_PublishDiagnostics::Params params2{
-                                    .uri = uri, .diagnostics = diagnostics
-                                };
-                                messageHandler.sendNotification<lsp::notifications::TextDocument_PublishDiagnostics>(
-                                    std::move(params2));
-                            }).detach();
+                        std::ignore = std::async(std::launch::async,
+                                                 [ uri = std::move(uri), text = std::move(text), &messageHandler, rtl =
+                                                     this->m_options.
+                                                     stdlibDirectories]() {
+                                                     const auto messages =
+                                                             collectDiagnostics(rtl, uri, text);
+
+                                                     for (const auto &[file,_]: messages) {
+                                                         const auto diagnostics = buildDiagnosticsFromMessages(
+                                                             messages, file);
+                                                         lsp::notifications::TextDocument_PublishDiagnostics::Params
+                                                                 params2
+                                                                 {
+                                                                     .uri = toUri(file), .diagnostics = diagnostics
+                                                                 };
+                                                         messageHandler.sendNotification<
+                                                             lsp::notifications::TextDocument_PublishDiagnostics>(
+                                                             std::move(params2));
+                                                     }
+                                                 });
                     })
                 .add<lsp::notifications::TextDocument_DidChange>(
                     [&](lsp::notifications::TextDocument_DidChange::Params &&params) {
@@ -152,23 +184,31 @@ void LanguageServer::handleRequest() {
                         // content changes: for Full sync the first change contains whole text
                         std::string text;
                         if (!params.contentChanges.empty()) {
-                            text = std::get<lsp::TextDocumentContentChangeEvent_Range_Text>(
+                            text = std::get<lsp::TextDocumentContentChangeEvent_Text>(
                                 params.contentChanges.front()).text;
                         }
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
 
                         // async diagnostics
-                        std::thread(
-                            [this, uri = uri, text = std::move(text), &messageHandler, rtl = this->
-                                m_options.stdlibDirectories]() mutable {
-                                auto messages = collectDiagnostics(rtl, uri.toString(), text);
-                                auto diagnostics = buildDiagnosticsFromMessages(messages, uri.toString());
-                                lsp::notifications::TextDocument_PublishDiagnostics::Params params2{
-                                    .uri = uri, .diagnostics = diagnostics
-                                };
-                                messageHandler.sendNotification<lsp::notifications::TextDocument_PublishDiagnostics>(
-                                    std::move(params2));
-                            }).detach();
+                        std::ignore = std::async(std::launch::async,
+                                                 [ uri = uri, text = std::move(text), &messageHandler, rtl = this->
+                                                     m_options.stdlibDirectories]() {
+                                                     const auto messages =
+                                                             collectDiagnostics(rtl, uri, text);
+                                                     for (const auto &file: messages | std::views::keys) {
+                                                         const auto diagnostics = buildDiagnosticsFromMessages(
+                                                             messages, file);
+                                                         lsp::notifications::TextDocument_PublishDiagnostics::Params
+                                                                 params2
+                                                                 {
+                                                                     .uri = toUri(file), .diagnostics = diagnostics
+                                                                 };
+                                                         messageHandler.sendNotification<
+                                                             lsp::notifications::TextDocument_PublishDiagnostics>(
+                                                             std::move(params2));
+                                                     }
+                                                 }
+                        );
                     })
                 .add<lsp::notifications::TextDocument_DidClose>(
                     [&](lsp::notifications::TextDocument_DidClose::Params &&params) {
@@ -177,12 +217,65 @@ void LanguageServer::handleRequest() {
                 .add<lsp::requests::TextDocument_Definition>(
                     [&](lsp::requests::TextDocument_Definition::Params &&params) {
                         return findDefinition(params);
+                    })
+                .add<lsp::requests::TextDocument_Diagnostic>(
+                    [&](lsp::requests::TextDocument_Diagnostic::Params &&params) {
+                        auto diagnosticsReport = lsp::requests::TextDocument_Diagnostic::Result();
+                        const auto &uri = params.textDocument.uri;
+                        std::cerr << "Diagnostics requested for uri: " << uri.toString() << "\n";
+                        // content changes: for Full sync the first change contains whole text
+                        const std::string text = m_openDocuments.at(uri.toString()).text;
+
+
+                        const auto messages = collectDiagnostics(this->m_options.stdlibDirectories, uri,
+                                                                 text);
+                        const auto diagnostics = buildDiagnosticsFromMessages(
+                            messages, std::string(uri.path()));
+                        auto fullDiagnosticsReport = lsp::RelatedFullDocumentDiagnosticReport{};
+                        fullDiagnosticsReport.items = diagnostics;
+                        std::cerr << "Found " << diagnostics.size() << " diagnostics\n";
+                        diagnosticsReport = fullDiagnosticsReport;
+                        return diagnosticsReport;
+                    }).add<lsp::requests::Workspace_Diagnostic>(
+                    [&](lsp::requests::Workspace_Diagnostic::Params &&params) {
+                        auto diagnosticsReport = lsp::requests::Workspace_Diagnostic::Result();
+                        std::map<lsp::Uri, lsp::WorkspaceFullDocumentDiagnosticReport> relatedDocuments;
+                        for (const auto &doc: params.previousResultIds) {
+                            const auto &uri = doc.uri;
+                            std::cerr << "Workspace diagnostics requested for uri: " << uri.toString() << "\n";
+                            // content changes: for Full sync the first change contains whole text
+                            std::string text;
+                            text = m_openDocuments.at(uri.toString()).text;
+                            const auto messages = collectDiagnostics(this->m_options.stdlibDirectories, uri,
+                                                                     text);
+                            const auto diagnostics = buildDiagnosticsFromMessages(
+                                messages, std::string(uri.path()));
+                            auto report = lsp::WorkspaceFullDocumentDiagnosticReport{
+                                .uri = uri
+                            };
+                            report.items = diagnostics;
+                            diagnosticsReport.items.push_back(report);
+                        }
+
+                        return diagnosticsReport;
                     });
 
         // Main loop
         while (running) {
-            messageHandler.processIncomingMessages();
+            try {
+                messageHandler.processIncomingMessages();
+            } catch (const lsp::Error &e) {
+                std::cerr << "LSP Exception: " << e.what() << "\n";
+                std::cerr << "LSP Exception code: " << e.code() << "\n";
+                if (e.data())
+                    std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
+            }
         }
+    } catch (const lsp::Error &e) {
+        std::cerr << "LSP Exception: " << e.what() << "\n";
+        std::cerr << "LSP Exception code: " << e.code() << "\n";
+        if (e.data())
+            std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
     } catch (const std::exception &e) {
         std::cerr << "LSP ERROR: " << e.what() << std::endl;
     }
@@ -218,13 +311,13 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
         auto [parent, node] = resultPair.value();
         if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
-            auto varName = varAccess->expressionToken().lexical();
+            auto varName = varAccess->expressionToken();
             if (parent) {
                 if (auto function = dynamic_cast<ast::FunctionDefinition *>(parent)) {
                     if (auto varDefinition = function->getVariableDefinition(varName)) {
-                        std::cerr << "Found variable definition for " << varName << "\n";
+                        std::cerr << "Found variable definition for " << varName.lexical() << "\n";
                         lsp::Location location;
-                        location.uri = lsp::FileUri::fromPath(
+                        location.uri = toUri(
                             varDefinition.value()->expressionToken().source_location.filename);
                         location.range.start.line = static_cast<int>(
                                                         varDefinition.value()->expressionToken().source_location.row) -
@@ -242,10 +335,10 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                         result.emplace(std::move(location));
                     }
                     for (const auto &param: function->args()) {
-                        if (param.name.lexical() == varName) {
-                            std::cerr << "Found argument definition for " << varName << "\n";
+                        if (param.name.lexical() == varName.lexical()) {
+                            std::cerr << "Found argument definition for " << varName.lexical() << "\n";
                             lsp::Location location;
-                            location.uri = lsp::FileUri::fromPath(param.name.source_location.filename);
+                            location.uri = toUri(param.name.source_location.filename);
                             location.range.start.line = static_cast<int>(
                                                             param.name.source_location.row) - 1;
                             location.range.start.character = static_cast<int>(
@@ -270,7 +363,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 if (func->functionName() == funcName) {
                     std::cerr << "Found function definition for " << funcName << "\n";
                     lsp::Location location;
-                    location.uri = lsp::FileUri::fromPath(func->expressionToken().source_location.filename);
+                    location.uri = toUri(func->expressionToken().source_location.filename);
                     location.range.start.line = static_cast<int>(
                                                     func->expressionToken().source_location.row) - 1;
                     location.range.start.character = static_cast<int>(

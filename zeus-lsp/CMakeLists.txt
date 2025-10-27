@@ -6,7 +6,7 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
         NAME lsp-framework
         GITHUB_REPOSITORY leon-bckl/lsp-framework
-        GIT_TAG 1.2.0
+        GIT_TAG a97fa5127559c4bdf748c8610b58840d1830d9f6
 )
 # Quellen rekursiv sammeln (nur cpp/c)
 file(GLOB_RECURSE SRC CONFIGURE_DEPENDS "src/*.cpp" "src/*.c" "src/**/*.cpp" "src/**/*.c")

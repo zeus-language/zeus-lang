@@ -23,5 +23,9 @@ namespace ast {
 
         [[nodiscard]] RawType *rawType() const { return m_type.get(); }
         [[nodiscard]] ASTNode *value() const { return m_value.get(); }
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            return m_value->getNodeByToken(token);
+        }
     };
 }

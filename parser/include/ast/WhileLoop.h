@@ -26,5 +26,19 @@ namespace ast {
         WhileLoop &operator=(WhileLoop &&) = delete;
 
         WhileLoop &operator=(const WhileLoop &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_condition->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            for (auto &stmt: m_block) {
+                result = stmt->getNodeByToken(token);
+                if (result.has_value()) {
+                    return result;
+                }
+            }
+            return std::nullopt;
+        }
     };
 }

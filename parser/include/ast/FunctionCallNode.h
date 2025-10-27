@@ -43,6 +43,16 @@ namespace ast {
         FunctionCallNode &operator=(FunctionCallNode &&) = delete;
 
         FunctionCallNode &operator=(const FunctionCallNode &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            for (auto &arg: m_args) {
+                if (auto result = arg->getNodeByToken(token); result.has_value()) {
+                    return result;
+                }
+            }
+            const auto ownToken = expressionToken();
+            return ownToken == token ? std::make_optional(const_cast<FunctionCallNode *>(this)) : std::nullopt;
+        }
     };
 } // ast
 

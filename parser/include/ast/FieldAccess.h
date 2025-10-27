@@ -43,6 +43,15 @@ namespace ast {
         void setStructType(std::shared_ptr<types::VariableType> type) {
             m_structType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_accessNode->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            auto ownToken = expressionToken();
+            return ownToken == token ? std::make_optional(const_cast<FieldAccess *>(this)) : std::nullopt;
+        }
     };
 } // ast
 
