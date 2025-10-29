@@ -22,13 +22,16 @@ class LanguageServer {
     lsp::LspOptions m_options;
     std::map<std::string, LspDocument> m_openDocuments;
 
+    lsp::requests::TextDocument_Definition::Result findDefinition(
+        const lsp::requests::TextDocument_Definition::Params &params);
+
+    lsp::requests::TextDocument_Completion::Result findCompletions(
+        const lsp::requests::TextDocument_Completion::Params &params);
+
 public:
     explicit LanguageServer(lsp::LspOptions options);
 
     void handleRequest();
-
-    lsp::requests::TextDocument_Definition::Result findDefinition(
-        const lsp::requests::TextDocument_Definition::Params &params);
 };
 
 

@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 
+#include "ast/FieldAccess.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/VariableAccess.h"
@@ -135,6 +136,11 @@ void LanguageServer::handleRequest() {
                         .interFileDependencies = true,
                         .workspaceDiagnostics = false
                     };
+                    result.capabilities.completionProvider = lsp::CompletionOptions{
+                        .triggerCharacters = std::vector<std::string>{"."},
+                        .resolveProvider = false,
+
+                    };
 
                     result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = "0.1"};
 
@@ -254,10 +260,14 @@ void LanguageServer::handleRequest() {
                                 .uri = uri
                             };
                             report.items = diagnostics;
-                            diagnosticsReport.items.push_back(report);
+                            diagnosticsReport.items.emplace_back(report);
                         }
 
                         return diagnosticsReport;
+                    })
+                .add<lsp::requests::TextDocument_Completion>(
+                    [&](lsp::requests::TextDocument_Completion::Params &&item) {
+                        return findCompletions(item);
                     });
 
         // Main loop
@@ -284,6 +294,90 @@ void LanguageServer::handleRequest() {
 bool tokenInRange(const Token &token, size_t line, size_t character) {
     return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
            character + 1 <= token.source_location.col + token.source_location.num_bytes;
+}
+
+lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
+    const lsp::requests::TextDocument_Completion::Params &params) {
+    auto result = lsp::requests::TextDocument_Completion::Result();
+    // auto completionItem = lsp::CompletionItem{
+    //     .label = "HelloWorld",
+    //     .kind = lsp::CompletionItemKind::Function,
+    //     .detail = "Example completion item",
+    //     .documentation = lsp::MarkupContent{
+    //         .kind = lsp::MarkupKind::Markdown,
+    //         .value = "This is an example completion item provided by Zeus LSP."
+    //     }
+    // };
+    //
+    auto uri = params.textDocument.uri.toString();
+    auto document = m_openDocuments.at(uri);
+
+    auto completionList = lsp::CompletionList{
+        .isIncomplete = true,
+        .items = std::vector<lsp::CompletionItem>{}
+    };
+    result = completionList;
+    auto size = (params.context.value().triggerCharacter) ? params.context.value().triggerCharacter.value().size() : 0;
+    auto tokens = lexer::lex_file(uri, document.text);
+    std::optional<Token> foundToken = std::nullopt;
+    for (auto &token: tokens) {
+        if (tokenInRange(token, params.position.line, params.position.character - size)) {
+            foundToken = token;
+            break;
+        }
+    }
+    if (!foundToken.has_value()) {
+        std::cerr << "No token found at position\n";
+        return result;
+    }
+    auto parseResult = parser::parse_tokens(tokens);
+    modules::include_modules(this->m_options.stdlibDirectories, parseResult);
+    types::TypeCheckResult typeCheckResult;
+    types::type_check(parseResult.module, typeCheckResult);
+
+    auto resultPair = parseResult.module->getNodeByToken(foundToken.value());
+    if (resultPair) {
+        auto [parent, node] = resultPair.value();
+        if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
+            auto varName = varAccess->expressionToken();
+            if (varAccess->expressionType()) {
+                auto varType = varAccess->expressionType().value();
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(varType)) {
+                    for (const auto &field: structType->fields()) {
+                        lsp::CompletionItem item;
+                        item.label = field.name;
+                        item.kind = lsp::CompletionItemKind::Field;
+                        item.detail = "Field of struct " + structType->name();
+                        completionList.items.push_back(std::move(item));
+                    }
+                }
+            } else {
+                std::cerr << "Variable " << varName.lexical() << " has no type information\n";
+            }
+        } else if (auto fieldAccess = dynamic_cast<const ast::FieldAccess *>(node)) {
+            if (fieldAccess->expressionType()) {
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(
+                    fieldAccess->expressionType().value())) {
+                    for (const auto &field: structType->fields()) {
+                        lsp::CompletionItem item;
+                        item.label = field.name;
+                        item.kind = lsp::CompletionItemKind::Field;
+                        item.detail = "Field of struct " + structType->name();
+                        completionList.items.push_back(std::move(item));
+                    }
+                }
+            } else {
+                std::cerr << "Field access has no struct type information\n";
+            }
+        }
+    } else {
+        std::cerr << "No node found for token " << foundToken.value().lexical() << "\n";
+    }
+    std::cerr << "Found token: " << foundToken.value().lexical() << "\n";
+    std::cerr << "Providing " << completionList.items.size() << " completion items\n";
+    result = completionList;
+
+    return result;
 }
 
 lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
