@@ -407,7 +407,7 @@ namespace parser {
 
 
             if (lhs) {
-                Token operatorToken = current();
+                auto operatorToken = current();
 
                 if (tryConsume(Token::PLUS)) {
                     auto rhs = tryParseToken(allowInit);
@@ -1207,7 +1207,7 @@ namespace parser {
             return current();
         }
 
-        Token current() {
+        Token &current() {
             return m_tokens[m_current];
         }
 

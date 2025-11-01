@@ -43,4 +43,8 @@ namespace ast {
         }
         return result;
     }
+
+    bool StringConstant::constant() const {
+        return true;
+    }
 } // ast

@@ -23,7 +23,7 @@ fn main() : i32 {
     println(v3.x);
     println(v3.y);
     println("----Multiply Manually----");
-    let mul : Vec2;
+    let mut mul : Vec2;
     mul.x = v1.x * v2.x;
     mul.y = v1.y * v2.y;
     println(mul.x);

@@ -1,0 +1,12 @@
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn main() : i32 {
+    let x : Point = Point { x: 10, y: 15 };
+    x.x = 20; // Error: cannot modify a field of an immutable variable
+
+    return 0;
+}

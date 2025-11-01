@@ -298,6 +298,16 @@ namespace types {
                 node->expressionToken(),
                 "Could not determine types in field assignment."
             });
+            return;
+        }
+
+        if (node->accessNode()->constant()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "cannot modify a field of an immutable variable."
+            });
+            return;
         }
     }
 
@@ -712,6 +722,7 @@ namespace types {
         }
         if (it->second.has_value()) {
             node->setExpressionType(it->second->type);
+            node->setConstant(it->second->constant);
         } else {
             context.messages.push_back({
                 parser::OutputType::ERROR,

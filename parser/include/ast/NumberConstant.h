@@ -33,6 +33,11 @@ namespace ast {
         [[nodiscard]] NumberType numberType() const { return m_numberType; }
         [[nodiscard]] NumberValue value() const { return m_value; }
 
+        [[nodiscard]] bool constant() const override {
+            return true;
+        }
+
+
         ~NumberConstant() override = default;
 
         size_t numBits() const;

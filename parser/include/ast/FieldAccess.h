@@ -44,7 +44,11 @@ namespace ast {
             m_structType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] bool constant() const override {
+            return m_accessNode->constant();
+        }
+
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_accessNode->getNodeByToken(token);
             if (result.has_value()) {
                 return result;

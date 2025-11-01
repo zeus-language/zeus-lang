@@ -64,7 +64,7 @@ namespace ast {
 
         [[nodiscard]] RawType *type() const;
 
-        [[nodiscard]] bool constant() const;
+        [[nodiscard]] bool constant() const override;
 
 
         VariableDeclaration(VariableDeclaration &&) = default;

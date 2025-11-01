@@ -27,7 +27,7 @@ namespace types {
 
         virtual ~VariableType() = default;
 
-        [[nodiscard]] std::string name() const { return m_typename; }
+        [[nodiscard]] const std::string &name() const { return m_typename; }
 
         [[nodiscard]] TypeKind typeKind() const { return m_typeKind; }
 

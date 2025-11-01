@@ -24,6 +24,10 @@ namespace ast {
             return m_accessNode.get();
         }
 
+        [[nodiscard]] bool constant() const override {
+            return m_accessNode->constant();
+        }
+
         ~ReferenceAccess() override = default;
 
         ReferenceAccess(ReferenceAccess &&) = default;

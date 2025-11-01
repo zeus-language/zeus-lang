@@ -40,6 +40,11 @@ namespace ast {
 
         BinaryExpression &operator=(const BinaryExpression &) = delete;
 
+        [[nodiscard]] bool constant() const override {
+            return m_lhs->constant() && m_rhs->constant();
+        }
+
+
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_lhs->getNodeByToken(token);
             if (result.has_value()) {

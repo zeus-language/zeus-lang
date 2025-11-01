@@ -39,6 +39,10 @@ namespace ast {
             m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
 
+        [[nodiscard]] virtual bool constant() const {
+            return false;
+        }
+
 
         [[nodiscard]] Token expressionToken() const { return m_token; }
 

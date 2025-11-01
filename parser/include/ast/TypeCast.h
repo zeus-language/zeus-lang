@@ -27,5 +27,9 @@ namespace ast {
         std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             return m_value->getNodeByToken(token);
         }
+
+        [[nodiscard]] bool constant() const override {
+            return m_value->constant();
+        }
     };
 }

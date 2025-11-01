@@ -26,6 +26,8 @@ namespace ast {
         StringConstant &operator=(const StringConstant &) = delete;
 
         [[nodiscard]] std::string value() const;
+
+        [[nodiscard]] bool constant() const override;
     };
 } // ast
 
