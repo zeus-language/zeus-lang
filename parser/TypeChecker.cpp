@@ -48,23 +48,35 @@ namespace types {
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
             const std::string &name) const {
             std::vector<ast::FunctionDefinitionBase *> result;
+            std::optional<std::string> aliasName = module->aliasName.has_value()
+                                                       ? std::make_optional(module->aliasName.value() + "::")
+                                                       : std::nullopt;
+
             for (const auto &f: module->functions) {
                 if (f->functionName() == name and (
-                        f->modulePathName() == path or f->modulePathName() == module->modulePathName())) {
+                        f->modulePathName() == path or f->modulePathName() == module->modulePathName()
+                        or (aliasName and path == aliasName.value())
+                        or (path.empty() and !aliasName)
+                    )) {
                     result.push_back(f.get());
                 }
             }
-            if (!path.empty()) {
-                for (const auto &m: module->modules) {
-                    if (m->modulePathName() == path) {
-                        for (const auto &node: m->functions) {
-                            if (node->functionName() == name) {
-                                result.push_back(node.get());
-                            }
+
+            for (const auto &m: module->modules) {
+                std::optional<std::string> aliasName2 = m->aliasName.has_value()
+                                                            ? std::make_optional(m->aliasName.value() + "::")
+                                                            : std::nullopt;
+                if (m->modulePathName() == path or (aliasName2 and path == aliasName2.value())
+                    or (path.empty() and !aliasName2)
+                ) {
+                    for (const auto &node: m->functions) {
+                        if (node->functionName() == name) {
+                            result.push_back(node.get());
                         }
                     }
                 }
             }
+
             return result;
         }
     };

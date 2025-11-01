@@ -54,6 +54,7 @@ namespace modules {
                 auto moduleTokens = lexer::lex_file(fullPath.string(), moduleContent.value());
                 auto moduleResult = parser::parse_tokens(moduleTokens);
                 moduleResult.module->modulePath = useModule->modulePath();
+                moduleResult.module->aliasName = useModule->aliasName();
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
                 }

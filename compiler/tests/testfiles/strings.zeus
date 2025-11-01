@@ -1,19 +1,19 @@
 
 use std::io;
-use core::libc;
+use core::libc as libc;
 use std::str;
 
 fn main() : i32 {
-    let mut hello : std::str::string = std::str::from_c_str("Hello, World!" as *u8);
-    std::io::println2("String: {}" as *u8, &hello);
-    printf("length: %d\n" as *u8, std::str::length(&hello));
-    printf("capacity: %d\n" as *u8, std::str::capacity(&hello));
+    let mut hello : std::str::string = from_c_str("Hello, World!" as *u8);
+    println2("String: {}" as *u8, &hello);
+    printf("length: %d\n" as *u8, length(&hello));
+    printf("capacity: %d\n" as *u8, capacity(&hello));
     //std::io::println2("Length: {}" as *u8, hello.length());
     //std::io::println2("Capacity: {}" as *u8, hello.capacity());
 
 //    let mut new_hello : std::str::string = str::from_c_str("Universe" as *u8);
 //    let replaced : std::str::string = hello.replace(str::from_c_str("World" as *u8), new_hello);
 //    std::io::println2("Replaced String: {}" as *u8, replaced);
-    core::libc::free(hello.data);
+    libc::free(hello.data);
     return 0;
 }

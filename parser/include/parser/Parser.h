@@ -65,6 +65,7 @@ namespace parser {
 
         std::vector<std::unique_ptr<ast::ASTNode> > useModuleNodes;
         std::vector<Token> modulePath;
+        std::optional<std::string> aliasName;
 
         [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
             for (const auto &mod: modules) {

@@ -1125,8 +1125,20 @@ namespace parser {
                     break;
                 }
             }
+            std::optional<Token> aliasName = std::nullopt;
+            if (tryConsumeKeyWord("as")) {
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected alias name after 'as' in use module statement!"
+                    });
+                    return std::nullopt;
+                }
+                aliasName = current();
+                consume(Token::IDENTIFIER);
+            }
             consume(Token::SEMICOLON);
-            return std::make_unique<ast::UseModule>(modulePath);
+            return std::make_unique<ast::UseModule>(modulePath, aliasName);
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseStructDeclaration() {
@@ -1275,24 +1287,34 @@ namespace parser {
     std::optional<std::pair<Module *, ast::FunctionDefinitionBase *> > Module::findFunctionsByName(
         const std::string &path,
         const std::string &name) const {
-        std::cerr << "Searching for function '" << name << "' in path '" << path << "'\n";
+        std::optional<std::string> resolvedAlias = this->aliasName.has_value()
+                                                       ? std::make_optional(this->aliasName.value() + "::")
+                                                       : std::nullopt;
         for (const auto &f: functions) {
             if (f->functionName() == name and (
-                    f->modulePathName() == path or f->modulePathName() == modulePathName())) {
+                    f->modulePathName() == path or f->modulePathName() == modulePathName()
+                    or (resolvedAlias and path == resolvedAlias.value())
+                    or (path.empty() and !resolvedAlias)
+                )) {
                 return std::make_pair(const_cast<Module *>(this), f.get());
             }
         }
-        if (!path.empty()) {
-            for (const auto &m: modules) {
-                if (m->modulePathName() == path) {
-                    for (const auto &node: m->functions) {
-                        if (node->functionName() == name) {
-                            return std::make_pair(const_cast<Module *>(m.get()), node.get());
-                        }
+
+        for (const auto &m: modules) {
+            std::optional<std::string> aliasName2 = m->aliasName.has_value()
+                                                        ? std::make_optional(m->aliasName.value() + "::")
+                                                        : std::nullopt;
+            if (m->modulePathName() == path or (aliasName2 and path == aliasName2.value())
+                or (path.empty() and !aliasName2)
+            ) {
+                for (const auto &node: m->functions) {
+                    if (node->functionName() == name) {
+                        return std::make_pair(const_cast<Module *>(m.get()), node.get());
                     }
                 }
             }
         }
+
         return std::nullopt;
     }
 
