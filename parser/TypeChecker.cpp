@@ -18,7 +18,9 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
+#include "ast/MatchExpression.h"
 #include "ast/NumberConstant.h"
+#include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -150,6 +152,10 @@ namespace types {
 
     void type_check(ast::ReferenceAccess *node, Context &context);
 
+    void type_check(ast::MatchExpression *node, Context &context);
+
+    void type_check(ast::RangeExpression *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -261,12 +267,68 @@ namespace types {
         if (const auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node)) {
             return type_check(refAccess, context);
         }
+
+        if (const auto matchExpr = dynamic_cast<ast::MatchExpression *>(node)) {
+            return type_check(matchExpr, context);
+        }
+        if (const auto rangeExpr = dynamic_cast<ast::RangeExpression *>(node)) {
+            return type_check(rangeExpr, context);
+        }
         assert(node != nullptr && "Node is null");
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::RangeExpression *node, Context &context) {
+        type_check_base(node->start(), context);
+        type_check_base(node->end(), context);
+        if (node->start()->expressionType() && node->end()->expressionType()) {
+            if (node->start()->expressionType().value()->name() !=
+                node->end()->expressionType().value()->name()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type mismatch in range expression: start is of type '" +
+                    node->start()->expressionType().value()->name() +
+                    "', but end is of type '" + node->end()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+
+            node->setExpressionType(node->start()->expressionType().value());
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine types in range expression."
+            });
+            return;
+        }
+    }
+
+    void type_check(ast::MatchExpression *node, Context &context) {
+        type_check_base(node->accessNode(), context);
+        for (auto &[matchKeys, expression]: node->matchCases()) {
+            for (auto &key: matchKeys) {
+                type_check_base(key.get(), context);
+                if (key->expressionType() != node->accessNode()->expressionType() and
+                    key->expressionToken().lexical() != "_"
+                ) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        key->expressionToken(),
+                        "The case element has a diffent type than the match expression!"
+                    });
+                }
+            }
+            type_check_base(expression.get(), context);
+            if (node->accessNode()->expressionType()) {
+                node->setExpressionType(node->accessNode()->expressionType().value());
+            }
+        }
     }
 
     void type_check(ast::ReferenceAccess *node, Context &context) {
@@ -489,62 +551,30 @@ namespace types {
     }
 
 
-    bool type_check_range_for(ast::ForLoop *node, Context &context) {
-        type_check_base(node->rangeEnd(), context);
-        if (node->rangeStart()->expressionType() && node->rangeEnd()->expressionType()) {
-            if (node->rangeStart()->expressionType().value()->name() != node->rangeEnd()->expressionType().value()->
-                name()) {
-                context.messages.push_back({
-                    parser::OutputType::ERROR,
-                    node->expressionToken(),
-                    "Type mismatch in 'for' loop range: start is of type '" +
-                    node->rangeStart()->expressionType().value()->name() + "', end is of type '" +
-                    node->rangeEnd()->expressionType().value()->name() + "'."
-                });
-                return true;
-            }
-            if (node->rangeStart()->expressionType().value()->typeKind() != types::TypeKind::INT) {
-                context.messages.push_back({
-                    parser::OutputType::ERROR,
-                    node->expressionToken(),
-                    "'for' loop range must be of integer type, but got '" +
-                    node->rangeStart()->expressionType().value()->name() + "'."
-                });
-                return true;
-            }
-            node->setExpressionType(node->rangeStart()->expressionType().value());
-        } else {
+    bool type_check_iterator_loop(ast::ForLoop *node, Context &context) {
+        const auto varType = node->range()->expressionType();
+        if (!varType) {
             context.messages.push_back({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
-                "Could not determine types of 'for' loop range."
+                "Could not determine type of the for loop range expression."
             });
-            return true;
-        }
-        return false;
-    }
-
-    bool type_check_iterator_loop(ast::ForLoop *node, Context &context) {
-        const auto varType = node->rangeStart()->expressionType();
-        if (!varType) {
             return true;
         }
         if (const auto arrayType = dynamic_cast<ArrayType *>(varType.value().get())) {
             node->setExpressionType(arrayType->baseType());
+        } else {
+            node->setExpressionType(varType.value());
         }
 
         return false;
     }
 
     void type_check(ast::ForLoop *node, Context &context) {
-        type_check_base(node->rangeStart(), context);
-        if (node->rangeEnd()) {
-            if (type_check_range_for(node, context)) return;
-        } else {
-            if (type_check_iterator_loop(node, context)) return;
-        }
+        type_check_base(node->range(), context);
+        if (type_check_iterator_loop(node, context)) return;
         // Create a new scope for the loop variable
-        const auto varType = node->rangeStart()->expressionType().value();
+        const auto varType = node->range()->expressionType().value();
 
         context.currentVariables.emplace(node->iteratorToken().lexical(),
                                          Variable{
@@ -723,6 +753,8 @@ namespace types {
     }
 
     void type_check(ast::VariableAccess *node, Context &context) {
+        if (node->expressionToken().lexical() == "_")
+            return;
         const auto it = context.currentVariables.find(node->expressionToken().lexical());
         if (it == context.currentVariables.end()) {
             context.messages.push_back({

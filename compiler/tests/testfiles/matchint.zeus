@@ -1,0 +1,23 @@
+
+fn print_match(value : i32) : void {
+    match value {
+        1 => println("One"),
+        // Match several values
+        2 | 3 | 5 | 7 | 11 => println("This is a prime"),
+        // Match an inclusive range
+        13..=19 => println("A teen"),
+        20..=29 => println("In the twenties"),
+        // Handle the rest of cases
+        _ => println("Ain't special"),
+    };
+}
+
+fn main() : i32 {
+    print_match(128);
+    print_match(1);
+    print_match(3);
+    print_match(19);
+    print_match(15);
+    print_match(25);
+    return 0;
+}

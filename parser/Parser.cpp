@@ -22,7 +22,9 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
+#include "ast/MatchExpression.h"
 #include "ast/NumberConstant.h"
+#include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -269,8 +271,42 @@ namespace parser {
                                                           std::move(refNode.value()));
         }
 
+        bool canParseRange() const {
+            return canConsume(Token::RANGE);
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseRange(std::optional<std::unique_ptr<ast::ASTNode> > lhs) {
+            if (!canParseRange() && !lhs) {
+                return std::nullopt;
+            }
+            auto startToken = lhs.value()->expressionToken();
+            auto startExpr = std::move(lhs);
+            if (!startExpr) {
+                m_messages.push_back(ParserMessasge{
+                    .outputType = OutputType::ERROR,
+                    .token = current(),
+                    .message = "expected expression before '..' for range",
+                });
+                return std::nullopt;
+            }
+            consume(Token::RANGE);
+            auto inclusive = tryConsume(Token::EQUAL);
+            auto endExpr = parseExpression(false);
+            if (!endExpr) {
+                m_messages.push_back(ParserMessasge{
+                    .outputType = OutputType::ERROR,
+                    .token = current(),
+                    .message = "expected expression after '..' for range",
+                });
+                return std::nullopt;
+            }
+            return std::make_unique<ast::RangeExpression>(startToken, std::move(startExpr.value()),
+                                                          std::move(endExpr.value()), inclusive);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > tryParseToken(bool allowInit = false) {
             std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
+
             if (auto number = parseNumber()) {
                 result = std::move(number.value());
             } else if (auto string = parseString()) {
@@ -300,6 +336,9 @@ namespace parser {
 
                 if (canParseArrayAccess()) {
                     result = std::move(parseArrayAccess(std::move(result)).value());
+                }
+                if (canParseRange()) {
+                    result = std::move(parseRange(std::move(result)).value());
                 }
             }
 
@@ -476,7 +515,7 @@ namespace parser {
                 return parseExpression(allowInit, std::move(result));
             }
 
-            if (includeCompare) {
+            if (includeCompare && lhs) {
                 if (canConsume(Token::GREATER)) {
                     consume(Token::GREATER);
                     auto operatorToken = current();
@@ -862,35 +901,18 @@ namespace parser {
                 return std::nullopt;
             }
             consumeKeyWord("in");
-            auto rangeStart = parseExpression(false);
-            if (!rangeStart) {
+            auto range = parseExpression(false);
+            if (!range) {
                 m_messages.push_back(ParserMessasge{
                     .token = current(),
                     .message = "expected start expression after 'in' in 'for' loop!"
                 });
                 return std::nullopt;
             }
-            if (!canConsume(Token::RANGE)) {
-                auto block = parseBlock();
 
-                return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken),
-                                                      std::move(rangeStart.value()),
-                                                      nullptr, isConstant, false, std::move(block));
-            }
-            consume(Token::RANGE);
-            auto inclusive = tryConsume(Token::EQUAL);
-            auto rangeEnd = parseExpression(false);
-            if (!rangeEnd) {
-                m_messages.push_back(ParserMessasge{
-                    .token = current(),
-                    .message = "expected end expression after '..' in 'for' loop!"
-                });
-                return std::nullopt;
-            }
             auto block = parseBlock();
-            return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken), std::move(rangeStart.value()),
-                                                  std::move(rangeEnd.value()), isConstant, inclusive,
-                                                  std::move(block));
+            return std::make_unique<ast::ForLoop>(forToken, std::move(iteratorToken), std::move(range.value()),
+                                                  isConstant, std::move(block));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseWhileLoop() {
@@ -909,6 +931,64 @@ namespace parser {
             }
             auto block = parseBlock();
             return std::make_unique<ast::WhileLoop>(whileToken, std::move(condition.value()), std::move(block));
+        }
+
+        std::optional<ast::MatchCase> parseMatch() {
+            auto token = tryParseToken();
+
+
+            if (!token) {
+                return std::nullopt;
+            }
+            std::vector<std::unique_ptr<ast::ASTNode> > matchKeys;
+            while (tryConsume(Token::PIPE)) {
+                auto nextKey = tryParseToken();
+                if (!nextKey) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected match key after '|' in a match expression!"
+                    });
+                    return std::nullopt;
+                }
+                matchKeys.push_back(std::move(nextKey.value()));
+            }
+            consume(Token::EQUAL);
+            consume(Token::GREATER);
+            auto expression = parseExpression(false);
+            if (!expression) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "Missing expression after '=>' in a match expression!"
+                });
+                return std::nullopt;
+            }
+            consume(Token::COMMA);
+ matchKeys.push_back(std::move(token.value()));
+            return ast::MatchCase{
+                .matchKeys = std::move(matchKeys),
+                .expression = std::move(expression.value())
+            };
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseMatchStatement() {
+            Token name = current();
+            if (!canConsumeKeyWord("match")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("match");
+            auto identifier = tryParseToken();
+            consume(Token::Type::OPEN_BRACE);
+            std::vector<ast::MatchCase> matchCases;
+            while (true) {
+                auto parsedMatch = parseMatch();
+                if (!parsedMatch) {
+                    break;
+                }
+                matchCases.emplace_back(std::move(parsedMatch.value()));
+            }
+            consume(Token::Type::CLOSE_BRACE);
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::MatchExpression>(name, std::move(identifier.value()), std::move(matchCases));
         }
 
         std::vector<std::unique_ptr<ast::ASTNode> > parseBlock() {
@@ -934,6 +1014,8 @@ namespace parser {
                     nodes.push_back(std::move(forLoop.value()));
                 } else if (auto breakStmt = parseBreak()) {
                     nodes.push_back(std::move(breakStmt.value()));
+                } else if (auto matchStatement = parseMatchStatement()) {
+                    nodes.push_back(std::move(matchStatement.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),

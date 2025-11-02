@@ -51,7 +51,9 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
+#include "ast/MatchExpression.h"
 #include "ast/NumberConstant.h"
+#include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -247,6 +249,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -314,6 +318,9 @@ namespace llvm_backend {
         if (const auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node)) {
             return llvm_backend::codegen(refAccess, llvmState);
         }
+        if (const auto matchExpr = dynamic_cast<ast::MatchExpression *>(node)) {
+            return llvm_backend::codegen(matchExpr, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
@@ -324,6 +331,87 @@ namespace llvm_backend {
         const auto value = codegen_base(node->accessNode(), llvmState);
         return value;
         //return (value->getType()->isPointerTy()) ? getLoadStorePointerOperand(value) : value;
+    }
+
+    llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState) {
+        const auto value = codegen_base(node->accessNode(), llvmState);
+
+        const auto function = llvmState.Builder->GetInsertBlock()->getParent();
+        llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "default", function);
+        llvm::BasicBlock *defaultStep2Block = llvm::BasicBlock::Create(*llvmState.TheContext, "defaultStep2", function);
+        llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "caseEnd", function);
+        const auto switchInstruction = llvmState.Builder->CreateSwitch(value, defaultBlock,
+                                                                       node->matchCases().size() + 1);
+
+        for (const auto &[selectorNodes, expression]: node->matchCases()) {
+            if (selectorNodes.at(0)->expressionToken().lexical() == "_")
+                continue;
+
+            if (const auto range = dynamic_cast<ast::RangeExpression *>(selectorNodes.at(0).get())) {
+                continue;
+            }
+            const auto selectorBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "case", function);
+            llvmState.Builder->SetInsertPoint(selectorBlock);
+            codegen_base(expression.get(), llvmState);
+            llvmState.Builder->CreateBr(endBlock);
+            for (auto &selectorNode: selectorNodes) {
+                const auto selectorValue = codegen_base(selectorNode.get(), llvmState);
+                switchInstruction->addCase(llvm::cast<llvm::ConstantInt>(selectorValue), selectorBlock);
+            }
+        }
+        llvmState.Builder->SetInsertPoint(defaultBlock);
+        for (const auto &[selectorNodes, expression]: node->matchCases()) {
+            if (const auto range = dynamic_cast<ast::RangeExpression *>(selectorNodes.at(0).get())) {
+                const auto startValue = codegen_base(range->start(), llvmState);
+                const auto endValue = codegen_base(range->end(), llvmState);
+                const auto isInclusive = range->isInclusive();
+                const auto rangeBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "rangeCheck", function);
+                llvmState.Builder->CreateBr(rangeBlock);
+
+                llvmState.Builder->SetInsertPoint(rangeBlock);
+
+                const auto greaterEqual = llvmState.Builder->CreateICmpSGE(value,
+                                                                           startValue,
+                                                                           "range_start_check");
+                llvm::Value *rangeEndCheck;
+                if (isInclusive)
+                    rangeEndCheck = llvmState.Builder->CreateICmpSLE(value,
+                                                                     endValue,
+                                                                     "range_end_check");
+                else
+                    rangeEndCheck = llvmState.Builder->CreateICmpSLT(value,
+                                                                     endValue,
+                                                                     "range_end_check");
+                const auto inRange = llvmState.Builder->CreateAnd(greaterEqual, rangeEndCheck, "in_range_check");
+
+                llvm::BasicBlock *inRangeBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "inRange", function);
+                llvm::BasicBlock *notInRangeBlock = llvm::BasicBlock::Create(
+                    *llvmState.TheContext, "notInRange", function);
+
+                llvmState.Builder->CreateCondBr(inRange, inRangeBlock, notInRangeBlock);
+
+                // In range block
+                llvmState.Builder->SetInsertPoint(inRangeBlock);
+                codegen_base(expression.get(), llvmState);
+                llvmState.Builder->CreateBr(endBlock);
+
+                // Not in range block
+                llvmState.Builder->SetInsertPoint(notInRangeBlock);
+            }
+        }
+        llvmState.Builder->CreateBr(defaultStep2Block);
+        llvmState.Builder->SetInsertPoint(defaultStep2Block);
+
+        for (const auto &[selectorNode, expression]: node->matchCases()) {
+            if (selectorNode.at(0)->expressionToken().lexical() == "_") {
+                codegen_base(expression.get(), llvmState);
+            }
+        }
+        llvmState.Builder->CreateBr(endBlock);
+
+        llvmState.Builder->SetInsertPoint(endBlock);
+
+        return nullptr;
     }
 
     llvm::Value *codegen(const ast::FieldAssignment *node, LLVMBackendState &llvmState) {
@@ -641,8 +729,8 @@ namespace llvm_backend {
         llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2);
 
 
-        const auto iterableValue = codegen_base(node->rangeStart(), llvmState);
-        const auto iterableType = node->rangeStart()->expressionType();
+        const auto iterableValue = codegen_base(node->range(), llvmState);
+        const auto iterableType = node->range()->expressionType();
         if (!iterableValue) {
             assert(false && "Failed to generate iterable value for a for loop");
             return nullptr;
@@ -658,8 +746,8 @@ namespace llvm_backend {
         llvm::Value *startValue = llvmState.Builder->getInt32(0);
 
         // load array value
-        const auto arrayType = resolveLlvmType(node->rangeStart()->expressionType().value(), llvmState);
-        const auto arrayAllocation = llvmState.findVariable(node->rangeStart()->expressionToken().lexical());
+        const auto arrayType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
+        const auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
 
         if (startValue->getType() != llvmVarType) {
             startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
@@ -749,9 +837,9 @@ namespace llvm_backend {
 
         llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2, node->iteratorToken().lexical());
         llvmState.NamedValues[node->iteratorToken().lexical()] = Variable;
-
+        auto range = dynamic_cast<ast::RangeExpression *>(node->range());
         // Initialize the PHI node with the start value.
-        auto startValue = codegen_base(node->rangeStart(), llvmState);
+        auto startValue = codegen_base(range->start(), llvmState);
         if (!startValue) {
             assert(false && "Failed to generate start value for the for loop");
             return nullptr;
@@ -777,7 +865,7 @@ namespace llvm_backend {
         const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
         // Compute the end condition.
-        auto endValue = codegen_base(node->rangeEnd(), llvmState);
+        auto endValue = codegen_base(range->end(), llvmState);
         if (!endValue) {
             assert(false && "Failed to generate end value for the for loop");
             return nullptr;
@@ -786,7 +874,7 @@ namespace llvm_backend {
             endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
         }
         llvm::Value *endCond = nullptr;
-        if (node->inclusive()) {
+        if (range->isInclusive()) {
             endCond = llvmState.Builder->CreateICmpSLE(nextVar, endValue, "loopcond");
         } else {
             endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
@@ -802,10 +890,9 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(const ast::ForLoop *node, LLVMBackendState &llvmState) {
-        if (!node->rangeEnd())
-            return codegen_iterator_for(node, llvmState);
-
-        return codegen_range_for(node, llvmState);
+        if (auto range = dynamic_cast<ast::RangeExpression *>(node->range()))
+            return codegen_range_for(node, llvmState);
+        return codegen_iterator_for(node, llvmState);
     }
 
 

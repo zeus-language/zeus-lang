@@ -16,6 +16,9 @@ namespace types {
 
         ~TypeRegistry() = default;
 
+        static std::optional<std::shared_ptr<VariableType> > getRangeType(
+            const std::optional<std::shared_ptr<types::VariableType> >::value_type &value);
+
         static std::optional<std::shared_ptr<VariableType> > getArrayType(
             const std::shared_ptr<VariableType> &base_type, size_t size);
 

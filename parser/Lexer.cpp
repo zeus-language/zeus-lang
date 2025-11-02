@@ -8,7 +8,7 @@
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use",
-        "or", "and", "as", "struct", "extern"
+        "or", "and", "as", "struct", "extern", "match"
     };
 
 
@@ -308,6 +308,9 @@ namespace lexer {
                         break;
                     case '&':
                         tokens.emplace_back(Token::AND, source_location);
+                        break;
+                    case '|':
+                        tokens.emplace_back(Token::PIPE, source_location);
                         break;
                     default:
                         break;

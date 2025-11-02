@@ -12,7 +12,8 @@ namespace types {
         VOID,
         STRUCT,
         POINTER,
-        ARRAY
+        ARRAY,
+        RANGE
     };
 
     class VariableType {
@@ -127,5 +128,18 @@ namespace types {
             assert(false && "invalid index for struct definition");
             return 0;
         }
+    };
+
+    class RangeType final : public VariableType {
+    private:
+        std::optional<std::shared_ptr<VariableType> > m_valueType;
+
+    public:
+        RangeType(std::string name, const std::optional<std::shared_ptr<VariableType> > &valueType) : VariableType(
+                std::move(name),
+                TypeKind::RANGE), m_valueType(valueType) {
+        }
+
+        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > valueType() const { return m_valueType; }
     };
 }

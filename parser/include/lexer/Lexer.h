@@ -63,12 +63,12 @@ struct Token {
         OPEN_BRACE,
         CLOSE_BRACE,
         RANGE,
-        NS_SEPARATOR
+        NS_SEPARATOR,
+        PIPE
     } type;
 
     SourceLocation source_location;
-
-    Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
+      Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
     }
 
     [[nodiscard]] std::string lexical() const {

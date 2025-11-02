@@ -17,6 +17,7 @@ add_library(${PROJECT_NAME} STATIC
         include/parser/module.h
         module.cpp
         include/ast/ExternFunctionDefinition.h
+        include/ast/RangeExpression.h
 
 )
 target_sources(${PROJECT_NAME} PRIVATE
