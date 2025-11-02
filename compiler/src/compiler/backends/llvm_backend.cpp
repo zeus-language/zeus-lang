@@ -44,6 +44,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/EnumAccess.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -175,6 +176,8 @@ namespace llvm_backend {
                 return llvm::Type::getInt1Ty(*context.TheContext);
             case types::TypeKind::VOID:
                 return llvm::Type::getVoidTy(*context.TheContext);
+            case types::TypeKind::ENUM:
+                return context.Builder->getInt64Ty();
             case types::TypeKind::STRUCT:
                 break;
             case types::TypeKind::ARRAY:
@@ -251,6 +254,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -321,10 +326,23 @@ namespace llvm_backend {
         if (const auto matchExpr = dynamic_cast<ast::MatchExpression *>(node)) {
             return llvm_backend::codegen(matchExpr, llvmState);
         }
+        if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
+            return llvm_backend::codegen(enumAccess, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState) {
+        const auto enumType = std::dynamic_pointer_cast<types::EnumType>(node->expressionType().value());
+        const auto enumVariant = enumType->getVariantByName(node->variantName().lexical());
+        if (!enumVariant) {
+            throw std::runtime_error("Enum value not found: " + node->variantName().lexical());
+        }
+        const auto enumValue = enumVariant.value().value;
+        return llvm::ConstantInt::get(llvmState.Builder->getInt64Ty(), enumValue);
     }
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState) {

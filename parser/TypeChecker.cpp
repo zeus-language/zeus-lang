@@ -10,6 +10,8 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/EnumAccess.h"
+#include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -156,6 +158,8 @@ namespace types {
 
     void type_check(ast::RangeExpression *node, Context &context);
 
+    void type_check(ast::EnumAccess *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -255,6 +259,9 @@ namespace types {
         if (dynamic_cast<ast::StructDeclaration *>(node)) {
             return;
         }
+        if (dynamic_cast<ast::EnumDeclaration *>(node)) {
+            return;
+        }
         if (const auto structInit = dynamic_cast<ast::StructInitialization *>(node)) {
             return type_check(structInit, context);
         }
@@ -274,12 +281,51 @@ namespace types {
         if (const auto rangeExpr = dynamic_cast<ast::RangeExpression *>(node)) {
             return type_check(rangeExpr, context);
         }
+        if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
+            return type_check(enumAccess, context);
+        }
         assert(node != nullptr && "Node is null");
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::EnumAccess *node, Context &context) {
+        if (const auto type = context.registry.getTypeByName(node->expressionToken().lexical())) {
+            if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(
+                type.value())) {
+                const auto variantIt = std::ranges::find_if(enumType->variants(),
+                                                            [&](const types::EnumVariant &variant) {
+                                                                return variant.name == node->variantName().lexical();
+                                                            });
+                if (variantIt == enumType->variants().end()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Enum '" + enumType->name() + "' does not have a variant named '" +
+                        node->variantName().lexical() + "'."
+                    });
+                    return;
+                }
+                node->setExpressionType(type.value());
+            } else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Attempting to access enum variant on a non-enum type '" +
+                    node->variantName().lexical() + "'."
+                });
+                return;
+            }
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of enum access base."
+            });
+        }
     }
 
     void type_check(ast::RangeExpression *node, Context &context) {
@@ -834,10 +880,9 @@ namespace types {
             node->setExpressionType(context.registry.getTypeByName("void").value());
             return;
         }
-        auto functions = context.findFunctionsByName(node->modulePathName(), node->functionName());
 
-        for (const auto funcDef: functions) {
-            auto oldVariables = context.currentVariables;
+        for (const auto funcDef: context.findFunctionsByName(node->modulePathName(), node->functionName())) {
+            const auto oldVariables = context.currentVariables;
             type_check_base(funcDef, context);
             context.currentVariables = oldVariables;
             if (funcDef->functionName() == node->functionName()) {
@@ -1095,6 +1140,24 @@ namespace types {
         // Further type checking logic would go here...
     }
 
+
+    std::optional<int64_t> resolveEnumValue(const std::optional<std::unique_ptr<ast::ASTNode> > &value,
+                                            Context &context) {
+        if (!value)
+            return std::nullopt;
+
+        if (const auto intLiteral = dynamic_cast<ast::NumberConstant *>(value->get())) {
+            return std::get<int64_t>(intLiteral->value());
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                value->get()->expressionToken(),
+                "Enum variant value must be an integer literal."
+            });
+            return std::nullopt;
+        }
+    }
+
     void type_check(const std::shared_ptr<parser::Module> &module, Context &context, TypeCheckResult &result) {
         context.module = module;
         for (auto &childModule: module->modules) {
@@ -1115,15 +1178,26 @@ namespace types {
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
                                                                 structFields);
                 context.registry.registerType(type);
+            } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
+                std::vector<EnumVariant> enumVariants;
+                int64_t nextValue = 0;
+                for (const auto &value: enumDecl->variants()) {
+                    auto resolvedValue = resolveEnumValue(value.value, context).value_or(nextValue);
+                    enumVariants.push_back(EnumVariant{
+                        .name = value.name.lexical(),
+                        .value = resolvedValue
+                    });
+                    nextValue = resolvedValue + 1;
+                }
+                auto type = std::make_shared<types::EnumType>(enumDecl->expressionToken().lexical(),
+                                                              enumVariants);
+                context.registry.registerType(type);
             }
         }
         for (auto &node: module->nodes) {
             type_check_base(node.get(), context);
         }
-        // collect function definitions second
-        // for (const auto &node: module->functions) {
-        //     context.functions.push_back(node.get());
-        // }
+
         for (const auto &node: module->functions) {
             type_check_base(node.get(), context);
         }

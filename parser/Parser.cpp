@@ -14,6 +14,8 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/EnumAccess.h"
+#include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -304,6 +306,19 @@ namespace parser {
                                                           std::move(endExpr.value()), inclusive);
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseEnumAccess() {
+            if (!canConsume(Token::IDENTIFIER) or !canConsume(Token::NS_SEPARATOR, 1) or !canConsume(
+                    Token::IDENTIFIER, 2)) {
+                return std::nullopt;
+            }
+            Token enumNameToken = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::NS_SEPARATOR);
+            Token variantNameToken = current();
+            consume(Token::IDENTIFIER);
+            return std::make_unique<ast::EnumAccess>(enumNameToken, variantNameToken);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > tryParseToken(bool allowInit = false) {
             std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
 
@@ -317,6 +332,8 @@ namespace parser {
                 result = std::move(boolean.value());
             } else if (auto functionCall = parseFunctionCall()) {
                 result = std::move(functionCall.value());
+            } else if (auto enumAccess = parseEnumAccess()) {
+                result = std::move(enumAccess.value());
             } else if (auto referenceAccess = parseReferenceAccess()) {
                 result = std::move(referenceAccess.value());
             } else if (auto structInitilization = parseStructInitialization(allowInit)) {
@@ -963,7 +980,7 @@ namespace parser {
                 return std::nullopt;
             }
             consume(Token::COMMA);
- matchKeys.push_back(std::move(token.value()));
+            matchKeys.push_back(std::move(token.value()));
             return ast::MatchCase{
                 .matchKeys = std::move(matchKeys),
                 .expression = std::move(expression.value())
@@ -1141,10 +1158,26 @@ namespace parser {
                                                              std::move(block));
         }
 
+        bool isFunctionCall() const {
+            int lookaheadIndex = 0;
+            if (!canConsume(Token::IDENTIFIER))
+                return false;
+            lookaheadIndex++;
+            while (canConsume(Token::NS_SEPARATOR, lookaheadIndex)) {
+                lookaheadIndex++;
+                if (!canConsume(Token::IDENTIFIER, lookaheadIndex)) {
+                    return false;
+                }
+                lookaheadIndex++;
+            }
+            if (!canConsume(Token::LEFT_CURLY, lookaheadIndex)) {
+                return false;
+            }
+            return true;
+        }
+
         std::optional<std::unique_ptr<ast::FunctionCallNode> > parseFunctionCall() {
-            if ((!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::LEFT_CURLY, 1))
-                && (!canConsume(Token::IDENTIFIER) || !canConsume(Token::Type::NS_SEPARATOR, 1))
-            ) {
+            if (!isFunctionCall()) {
                 return std::nullopt;
             }
             Token nameToken = current();
@@ -1267,6 +1300,53 @@ namespace parser {
             return std::make_unique<ast::StructDeclaration>(std::move(structName), std::move(fields));
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseEnumDeclaration() {
+            if (!canConsumeKeyWord("enum")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("enum");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected enum name after 'enum'!"
+                });
+                return std::nullopt;
+            }
+            Token enumName = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::OPEN_BRACE);
+            std::vector<ast::EnumVariant> variants;
+            while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected variant name in enum declaration!"
+                    });
+                }
+                auto variantName = current();
+                consume(Token::IDENTIFIER);
+                std::optional<std::unique_ptr<ast::ASTNode> > value = std::nullopt;
+                if (tryConsume(Token::EQUAL)) {
+                    if (!canConsume(Token::NUMBER)) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected number after '=' in enum variant declaration!"
+                        });
+                        return std::nullopt;
+                    }
+                    // Currently we do not use the value, but we can extend this later
+                    value = parseNumber();
+                }
+                variants.push_back(ast::EnumVariant{.name = variantName, .value = std::move(value)});
+                if (!tryConsume(Token::COMMA)) {
+                    break;
+                }
+            }
+            consume(Token::CLOSE_BRACE);
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::EnumDeclaration>(std::move(enumName), std::move(variants));
+        }
+
         ParseResult parse() {
             auto module = std::make_shared<parser::Module>();
             while (!canConsume(Token::END_OF_FILE) && hasNext()) {
@@ -1278,6 +1358,8 @@ namespace parser {
                     module->useModuleNodes.push_back(std::move(useModule.value()));
                 } else if (auto structDecl = parseStructDeclaration()) {
                     module->nodes.push_back(std::move(structDecl.value()));
+                } else if (auto enumDecl = parseEnumDeclaration()) {
+                    module->nodes.push_back(std::move(enumDecl.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),

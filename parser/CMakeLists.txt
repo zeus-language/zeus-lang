@@ -18,6 +18,8 @@ add_library(${PROJECT_NAME} STATIC
         module.cpp
         include/ast/ExternFunctionDefinition.h
         include/ast/RangeExpression.h
+        include/ast/EnumDeclaration.h
+        include/ast/EnumAccess.h
 
 )
 target_sources(${PROJECT_NAME} PRIVATE

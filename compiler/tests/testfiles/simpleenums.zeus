@@ -1,0 +1,34 @@
+enum Color {
+    Red,
+    Green,
+    Blue
+};
+
+enum Direction {
+    North = 1,
+    East = 2,
+    South = 3,
+    West = 4
+};
+fn print_color(color : Color) : void {
+    match color {
+        Color::Red => println("Color is Red"),
+        Color::Green => println("Color is Green"),
+        Color::Blue => println("Color is Blue"),
+    };
+}
+fn print_direction(direction : Direction) : void {
+    match direction {
+        Direction::North => println("Direction is North"),
+        Direction::East => println("Direction is East"),
+        Direction::South => println("Direction is South"),
+        Direction::West => println("Direction is West"),
+    };
+}
+fn main() : i32 {
+    let my_color : Color = Color::Green;
+    print_color(my_color);
+    let my_direction : Direction = Direction::South;
+    print_direction(my_direction);
+    return 0;
+}

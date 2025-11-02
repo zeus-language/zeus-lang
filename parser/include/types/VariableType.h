@@ -13,7 +13,8 @@ namespace types {
         STRUCT,
         POINTER,
         ARRAY,
-        RANGE
+        RANGE,
+        ENUM
     };
 
     class VariableType {
@@ -141,5 +142,34 @@ namespace types {
         }
 
         [[nodiscard]] std::optional<std::shared_ptr<VariableType> > valueType() const { return m_valueType; }
+    };
+
+    struct EnumVariant {
+        std::string name;
+        int64_t value;
+        // Additional fields can be added here for variant data
+    };
+
+    class EnumType final : public VariableType {
+        std::vector<EnumVariant> m_variants;
+
+    public:
+        explicit EnumType(std::string name, std::vector<EnumVariant> variants) : VariableType(std::move(name),
+                TypeKind::ENUM),
+            m_variants(std::move(variants)) {
+        }
+
+        [[nodiscard]] const std::vector<EnumVariant> &variants() const {
+            return m_variants;
+        }
+
+        std::optional<EnumVariant> getVariantByName(const std::string &name) const {
+            for (const auto &variant: m_variants) {
+                if (variant.name == name) {
+                    return variant;
+                }
+            }
+            return std::nullopt;
+        }
     };
 }
