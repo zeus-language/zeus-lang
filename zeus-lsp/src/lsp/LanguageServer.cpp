@@ -139,7 +139,7 @@ void LanguageServer::handleRequest() {
                     };
                     result.capabilities.completionProvider = lsp::CompletionOptions{
                         .triggerCharacters = std::vector<std::string>{"."},
-                        .resolveProvider = false,
+                        .resolveProvider = true,
 
                     };
 
@@ -297,19 +297,26 @@ bool tokenInRange(const Token &token, size_t line, size_t character) {
            character + 1 <= token.source_location.col + token.source_location.num_bytes;
 }
 
+void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, const std::string token,
+                                  lsp::CompletionList &completionList) {
+    auto definedName = function->functionName();
+    auto containsName = definedName.find(token);
+    std::cerr << "Checking function: " << definedName << " contains: " << containsName << "\n";
+    if (containsName != std::string::npos) {
+        lsp::CompletionItem item;
+        item.label = function->functionName();
+        item.insertText = function->functionName() + "()";
+        item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
+        item.kind = lsp::CompletionItemKind::Function;
+        item.detail = function->functionSignature();
+        completionList.items.push_back(std::move(item));
+    }
+}
+
 lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     const lsp::requests::TextDocument_Completion::Params &params) {
     auto result = lsp::requests::TextDocument_Completion::Result();
-    // auto completionItem = lsp::CompletionItem{
-    //     .label = "HelloWorld",
-    //     .kind = lsp::CompletionItemKind::Function,
-    //     .detail = "Example completion item",
-    //     .documentation = lsp::MarkupContent{
-    //         .kind = lsp::MarkupKind::Markdown,
-    //         .value = "This is an example completion item provided by Zeus LSP."
-    //     }
-    // };
-    //
+
     auto uri = params.textDocument.uri.toString();
     auto document = m_openDocuments.at(uri);
 
@@ -328,7 +335,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
         }
     }
     if (!foundToken.has_value()) {
-        std::cerr << "No token found at position\n";
+        std::cerr << "No token found at position for completion\n";
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
@@ -354,13 +361,39 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
                     for (auto &method: structType->methods()) {
                         lsp::CompletionItem item;
                         item.label = method->functionName();
+                        item.insertText = method->functionName() + "()";
+                        item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
                         item.kind = lsp::CompletionItemKind::Method;
                         item.detail = structType->name() + "." + method->functionSignature();
                         completionList.items.push_back(std::move(item));
                     }
                 }
+                result = completionList;
+                return result;
             } else {
-                std::cerr << "Variable " << varName.lexical() << " has no type information\n";
+                if (auto functionDef = dynamic_cast<ast::FunctionDefinition *>(parent)) {
+                    for (const auto &statement: functionDef->statements()) {
+                        if (auto varDefinition = dynamic_cast<ast::VariableDeclaration *>(statement.get())) {
+                            auto definedName = varDefinition->expressionToken().lexical();
+                            auto containsName = definedName.find(varName.lexical());
+                            if (containsName != std::string::npos) {
+                                lsp::CompletionItem item;
+                                item.label = definedName;
+                                item.kind = (varDefinition->constant())
+                                                ? lsp::CompletionItemKind::Constant
+                                                : lsp::CompletionItemKind::Variable;
+                                if (varDefinition->expressionType()) {
+                                    item.detail = varDefinition->expressionType().value()->name();
+                                } else {
+                                    item.detail = "Unknown type";
+                                }
+                                completionList.items.push_back(std::move(item));
+                            }
+                        }
+                    }
+                } else {
+                    std::cerr << "Variable " << varName.lexical() << " has no type information\n";
+                }
             }
         } else if (auto fieldAccess = dynamic_cast<const ast::FieldAccess *>(node)) {
             if (fieldAccess->expressionType()) {
@@ -376,10 +409,14 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
                     for (auto &method: structType->methods()) {
                         lsp::CompletionItem item;
                         item.label = method->functionName();
+                        item.insertText = method->functionName() + "()";
+                        item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
                         item.kind = lsp::CompletionItemKind::Method;
                         item.detail = structType->name() + "." + method->functionSignature();
                         completionList.items.push_back(std::move(item));
                     }
+                    result = completionList;
+                    return result;
                 }
             } else {
                 std::cerr << "Field access has no struct type information\n";
@@ -388,12 +425,21 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     } else {
         std::cerr << "No node found for token " << foundToken.value().lexical() << "\n";
     }
+    for (auto &function: parseResult.module->functions) {
+        addCompletionItemForFunction(function.get(), foundToken.value().lexical(), completionList);
+    }
+    for (auto &importModule: parseResult.module->modules) {
+        for (auto &function: importModule->functions) {
+            addCompletionItemForFunction(function.get(), foundToken.value().lexical(), completionList);
+        }
+    }
+
     std::cerr << "Found token: " << foundToken.value().lexical() << "\n";
     std::cerr << "Providing " << completionList.items.size() << " completion items\n";
     result = completionList;
-
     return result;
 }
+
 
 lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
     const lsp::requests::TextDocument_Definition::Params &params) {
@@ -495,9 +541,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 return result;
             }
             if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
-                if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
-                    instanceType = refType->baseType();
-                }
+                instanceType = refType->baseType();
             }
             if (auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType.value())) {
                 bool methodFound = false;
