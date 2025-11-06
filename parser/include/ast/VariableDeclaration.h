@@ -10,7 +10,6 @@
 
 #include "ASTNode.h"
 #include "lexer/Lexer.h"
-#include "types/VariableType.h"
 
 namespace ast {
     enum class TypeModifier {

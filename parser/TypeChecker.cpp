@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <map>
+#include <ranges>
 
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
@@ -21,6 +22,7 @@
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
+#include "ast/MethodCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
@@ -160,6 +162,8 @@ namespace types {
 
     void type_check(ast::EnumAccess *node, Context &context);
 
+    void type_check(ast::MethodCallNode *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -284,12 +288,121 @@ namespace types {
         if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
             return type_check(enumAccess, context);
         }
+        if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
+            return type_check(methodCall, context);
+        }
         assert(node != nullptr && "Node is null");
+
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::MethodCallNode *node, Context &context) {
+        type_check_base(node->instanceNode(), context);
+        for (auto &arg: node->args()) {
+            type_check_base(arg.get(), context);
+        }
+
+        if (!node->instanceNode()->expressionType()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of method call instance."
+            });
+            return;
+        }
+
+        const auto methodName = node->functionName();
+        ast::FunctionDefinitionBase *matchedMethod = nullptr;
+
+        auto instanceType = node->instanceNode()->expressionType().value();
+        if (auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node->instanceNode())) {
+            if (refAccess->expressionType()) {
+                if (auto ptrType = std::dynamic_pointer_cast<
+                    types::ReferenceType>(refAccess->expressionType().value())) {
+                    instanceType = ptrType->baseType();
+                }
+            }
+        }
+
+
+        if (auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType)) {
+            const auto methods = structType->methods();
+            auto filteredMethods = methods | std::ranges::views::filter([methodName](auto method) {
+                return method->functionName() == methodName;
+            });
+            if (filteredMethods.empty()) {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type '" + instanceType->name() + "' does not have a method named '" + methodName + "'."
+                });
+                return;
+            }
+
+
+            for (const auto method: filteredMethods) {
+                if (method->args().size() - 1 != node->args().size()) {
+                    continue;
+                }
+                auto oldVars = context.currentVariables;
+                type_check_base(method, context);
+                context.currentVariables = oldVars;
+
+                bool allParamsMatch = true;
+                for (size_t i = 1; i < method->args().size(); ++i) {
+                    if (node->args()[i - 1]->expressionType() == nullptr ||
+                        node->args()[i - 1]->expressionType().value()->name() !=
+                        method->args()[i].type.value()->name()) {
+                        allParamsMatch = false;
+                        break;
+                    }
+                }
+
+                if (allParamsMatch) {
+                    matchedMethod = method;
+                    break;
+                }
+            }
+        } else if (auto arrayType = std::dynamic_pointer_cast<types::ArrayType>(instanceType)) {
+            // OK
+            if (methodName == "length" && node->args().empty()) {
+                matchedMethod = nullptr; // No actual method definition for array length
+                node->setExpressionType(context.registry.getTypeByName("i32").value());
+                return;
+            } else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Array type does not have a method named '" + methodName + "'."
+                });
+                return;
+            }
+        } else if (auto enumType = std::dynamic_pointer_cast<types::EnumType>(instanceType)) {
+            // OK
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Type '" + instanceType->name() + "' does not support method calls."
+            });
+            return;
+        }
+
+
+        if (!matchedMethod) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "No matching overload found for method '" + methodName + "' with the given argument types."
+            });
+            return;
+        }
+        if (matchedMethod->expressionType())
+            node->setExpressionType(matchedMethod->expressionType().value());
     }
 
     void type_check(ast::EnumAccess *node, Context &context) {
@@ -400,7 +513,8 @@ namespace types {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Type mismatch in field assignment: field '" + node->accessNode()->expressionToken().lexical() +
+                    "Type mismatch in field assignment: field '" + node->accessNode()->expressionToken().
+                    lexical() +
                     "' is of type '" + node->accessNode()->expressionType().value()->name() +
                     "', but assigned expression is of type '" + node->expression()->expressionType().value()->name() +
                     "'."
@@ -978,7 +1092,8 @@ namespace types {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->initialValue().value()->expressionToken(),
-                    "Could not determine type of initial value for variable '" + node->expressionToken().lexical() +
+                    "Could not determine type of initial value for variable '" + node->expressionToken().
+                    lexical() +
                     "'."
                 });
             }
@@ -1170,13 +1285,27 @@ namespace types {
             if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 std::vector<types::StructField> structFields;
                 for (const auto &[name, type]: structDecl->fields()) {
+                    const auto fieldType = resolveFromRawType(type.get(), context.registry);
+                    if (!fieldType) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            type->typeToken,
+                            "Unknown type '" + type->typeToken.lexical() + "' for field '" + name.lexical() +
+                            "' in struct '" + structDecl->expressionToken().lexical() + "'."
+                        });
+                        continue;
+                    }
                     structFields.push_back({
-                        .type = resolveFromRawType(type.get(), context.registry).value(),
+                        .type = fieldType.value(),
                         .name = name.lexical()
                     });
                 }
+                std::vector<ast::FunctionDefinitionBase *> methods;
+                for (const auto &method: structDecl->methods()) {
+                    methods.push_back(method.get());
+                }
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                                structFields);
+                                                                structFields, methods);
                 context.registry.registerType(type);
             } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
                 std::vector<EnumVariant> enumVariants;

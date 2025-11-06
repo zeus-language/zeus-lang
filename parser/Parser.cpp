@@ -25,6 +25,7 @@
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
+#include "ast/MethodCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
@@ -178,7 +179,7 @@ namespace parser {
             return std::make_unique<ast::ArrayInitializer>(startToken, std::move(elements));
         }
 
-        bool canParseTypeCast() const {
+        [[nodiscard]] bool canParseTypeCast() const {
             return canConsumeKeyWord("as");
         }
 
@@ -273,7 +274,7 @@ namespace parser {
                                                           std::move(refNode.value()));
         }
 
-        bool canParseRange() const {
+        [[nodiscard]] bool canParseRange() const {
             return canConsume(Token::RANGE);
         }
 
@@ -418,8 +419,8 @@ namespace parser {
             }
             consume(Token::LEFT_CURLY);
             std::vector<std::unique_ptr<ast::ASTNode> > args;
-            args.push_back(
-                std::make_unique<ast::ReferenceAccess>(origLhs.value()->expressionToken(), std::move(origLhs.value())));
+            auto instanceNode = std::make_unique<ast::ReferenceAccess>(origLhs.value()->expressionToken(),
+                                                                       std::move(origLhs.value()));
             while (!canConsume(Token::RIGHT_CURLY) && !canConsume(Token::END_OF_FILE)) {
                 if (auto arg = parseExpression(true)) {
                     args.push_back(std::move(arg.value()));
@@ -434,14 +435,14 @@ namespace parser {
                 m_messages.push_back(ParserMessasge{
                     .outputType = OutputType::ERROR,
                     .token = current(),
-                    .message = "expected ')' at the end of function call",
+                    .message = "expected ')' at the end of a method call",
                 });
                 return std::nullopt;
             }
             consume(Token::RIGHT_CURLY);
             std::vector<Token> namespacePrefix;
 
-            return std::make_unique<ast::FunctionCallNode>(funcNameToken, namespacePrefix, std::move(args));
+            return std::make_unique<ast::MethodCallNode>(funcNameToken, std::move(instanceNode), std::move(args));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAccess() {
@@ -525,9 +526,10 @@ namespace parser {
                 consume(Token::RIGHT_CURLY);
                 if (lhs.has_value())
                     if (auto binOp = dynamic_cast<ast::BinaryExpression *>(lhs.value().get())) {
-                        result = std::make_unique<ast::BinaryExpression>(binOp->expressionToken(), binOp->binoperator(),
-                                                                         binOp->movelhs(),
-                                                                         std::move(result.value()));
+                        result = std::make_unique<ast::BinaryExpression>(
+                            binOp->expressionToken(), binOp->binoperator(),
+                            binOp->movelhs(),
+                            std::move(result.value()));
                     }
                 return parseExpression(allowInit, std::move(result));
             }
@@ -699,7 +701,7 @@ namespace parser {
                     .token = nameToken,
                     .message = "expected '=' after variable name in assignment!"
                 });
-                return std::nullopt;
+                return varAccess;
             }
             auto value = parseExpression(false);
             if (!value) {
@@ -1019,6 +1021,8 @@ namespace parser {
                     nodes.push_back(std::move(returnStatement.value()));
                 } else if (auto varDecl = parseVariableDeclaration()) {
                     nodes.push_back(std::move(varDecl.value()));
+                } else if (auto methodCall = parseMethodCall()) {
+                    nodes.push_back(std::move(methodCall.value()));
                 } else if (auto varAssign = parseVariableAssignment()) {
                     nodes.push_back(std::move(varAssign.value()));
                 } else if (auto fieldAssign = parseFieldAssignment()) {
@@ -1176,6 +1180,30 @@ namespace parser {
             return true;
         }
 
+        bool isMethodCall() {
+            int lookaheadIndex = 0;
+            if (!canConsume(Token::IDENTIFIER))
+                return false;
+            lookaheadIndex++;
+            if (!canConsume(Token::DOT, lookaheadIndex))
+                return false;
+            lookaheadIndex++;
+            if (!canConsume(Token::IDENTIFIER, lookaheadIndex))
+                return false;
+            lookaheadIndex++;
+            if (!canConsume(Token::LEFT_CURLY, lookaheadIndex)) {
+                return false;
+            }
+            return true;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseMethodCall() {
+            if (!isMethodCall()) {
+                return std::nullopt;
+            }
+            return parseMemberAccess(parseVariableAccess());
+        }
+
         std::optional<std::unique_ptr<ast::FunctionCallNode> > parseFunctionCall() {
             if (!isFunctionCall()) {
                 return std::nullopt;
@@ -1272,7 +1300,13 @@ namespace parser {
             consume(Token::IDENTIFIER);
             consume(Token::OPEN_BRACE);
             std::vector<ast::StructField> fields;
+            std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods;
+
             while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                if (auto method = parseFunctionDefinition()) {
+                    methods.push_back(std::move(method.value()));
+                    continue;
+                }
                 if (!canConsume(Token::IDENTIFIER)) {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -1296,8 +1330,11 @@ namespace parser {
                     break;
                 }
             }
+
+
             consume(Token::CLOSE_BRACE);
-            return std::make_unique<ast::StructDeclaration>(std::move(structName), std::move(fields));
+            return std::make_unique<ast::StructDeclaration>(std::move(structName), std::move(fields),
+                                                            std::move(methods));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseEnumDeclaration() {

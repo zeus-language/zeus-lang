@@ -25,11 +25,6 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getRef
         std::make_shared<types::ReferenceType>("&" + base_type->name(), base_type));
 }
 
-std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getRangeType(
-    const std::optional<std::shared_ptr<types::VariableType> >::value_type &value) {
-    return std::make_optional(
-        std::make_shared<RangeType>("range<" + value->name() + ">", value));
-}
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArrayType(
     const std::shared_ptr<VariableType> &base_type, size_t size) {

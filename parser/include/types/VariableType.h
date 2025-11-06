@@ -1,6 +1,15 @@
 #pragma once
 #include <cassert>
+#include <memory>
+#include <optional>
 #include <string>
+#include <vector>
+
+
+namespace ast {
+    class FunctionDefinitionBase;
+    class IntrinsicFunctionDefinition;
+}
 
 namespace types {
     enum class TypeKind {
@@ -13,7 +22,6 @@ namespace types {
         STRUCT,
         POINTER,
         ARRAY,
-        RANGE,
         ENUM
     };
 
@@ -104,13 +112,18 @@ namespace types {
     class StructType final : public VariableType {
     private:
         std::vector<StructField> m_fields;
+        std::vector<ast::FunctionDefinitionBase *> m_methods;
 
     public:
-        StructType(std::string name, const std::vector<StructField> &fields) : VariableType(std::move(name),
-                                                                                   TypeKind::STRUCT), m_fields(fields) {
+        StructType(std::string name, const std::vector<StructField> &fields,
+                   std::vector<ast::FunctionDefinitionBase *> methods) : VariableType(std::move(name),
+                                                                             TypeKind::STRUCT), m_fields(fields),
+                                                                         m_methods(std::move(methods)) {
         }
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
+
+        [[nodiscard]] const std::vector<ast::FunctionDefinitionBase *> &methods() const { return m_methods; }
 
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {
@@ -131,18 +144,6 @@ namespace types {
         }
     };
 
-    class RangeType final : public VariableType {
-    private:
-        std::optional<std::shared_ptr<VariableType> > m_valueType;
-
-    public:
-        RangeType(std::string name, const std::optional<std::shared_ptr<VariableType> > &valueType) : VariableType(
-                std::move(name),
-                TypeKind::RANGE), m_valueType(valueType) {
-        }
-
-        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > valueType() const { return m_valueType; }
-    };
 
     struct EnumVariant {
         std::string name;

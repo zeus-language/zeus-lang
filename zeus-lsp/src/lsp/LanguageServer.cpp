@@ -17,6 +17,7 @@
 #include "ast/FieldAccess.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/MethodCallNode.h"
 #include "ast/VariableAccess.h"
 #include "lexer/Lexer.h"
 #include "parser/module.h"
@@ -350,6 +351,13 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
                         item.detail = "Field of struct " + structType->name();
                         completionList.items.push_back(std::move(item));
                     }
+                    for (auto &method: structType->methods()) {
+                        lsp::CompletionItem item;
+                        item.label = method->functionName();
+                        item.kind = lsp::CompletionItemKind::Method;
+                        item.detail = structType->name() + "." + method->functionSignature();
+                        completionList.items.push_back(std::move(item));
+                    }
                 }
             } else {
                 std::cerr << "Variable " << varName.lexical() << " has no type information\n";
@@ -363,6 +371,13 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
                         item.label = field.name;
                         item.kind = lsp::CompletionItemKind::Field;
                         item.detail = "Field of struct " + structType->name();
+                        completionList.items.push_back(std::move(item));
+                    }
+                    for (auto &method: structType->methods()) {
+                        lsp::CompletionItem item;
+                        item.label = method->functionName();
+                        item.kind = lsp::CompletionItemKind::Method;
+                        item.detail = structType->name() + "." + method->functionSignature();
                         completionList.items.push_back(std::move(item));
                     }
                 }
@@ -399,6 +414,8 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
     }
     auto parseResult = parser::parse_tokens(tokens);
     modules::include_modules(this->m_options.stdlibDirectories, parseResult);
+    types::TypeCheckResult typeCheckResult;
+    types::type_check(parseResult.module, typeCheckResult);
 
     auto resultPair = parseResult.module->getNodeByToken(foundToken.value());
     if (resultPair) {
@@ -469,6 +486,46 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                                                        func->expressionToken().source_location.num_bytes) - 1;
                     result.emplace(std::move(location));
                 }
+            }
+        } else if (auto methodCall = dynamic_cast<const ast::MethodCallNode *>(node)) {
+            auto funcName = methodCall->functionName();
+            auto instanceType = methodCall->instanceNode()->expressionType();
+            if (!instanceType) {
+                std::cerr << "Method call instance has no type information\n";
+                return result;
+            }
+            if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
+                if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
+                    instanceType = refType->baseType();
+                }
+            }
+            if (auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType.value())) {
+                bool methodFound = false;
+                for (const auto &method: structType->methods()) {
+                    if (method->functionName() == funcName) {
+                        std::cerr << "Found method definition for " << funcName << " in struct " << structType->name()
+                                << "\n";
+                        lsp::Location location;
+                        location.uri = toUri(
+                            method->expressionToken().source_location.filename);
+                        location.range.start.line = static_cast<int>(
+                                                        method->expressionToken().source_location.row) - 1;
+                        location.range.start.character = static_cast<int>(
+                                                             method->expressionToken().source_location.col) - 1;
+                        location.range.end.line = static_cast<int>(
+                                                      method->expressionToken().source_location.row) - 1;
+                        location.range.end.character = static_cast<int>(
+                                                           method->expressionToken().source_location.col
+                                                           +
+                                                           method->expressionToken().source_location.
+                                                           num_bytes) - 1;
+                        result.emplace(std::move(location));
+                        methodFound = true;
+                        break;
+                    }
+                }
+                if (methodFound)
+                    return result;
             }
         }
     }

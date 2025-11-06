@@ -53,11 +53,13 @@
 #include "ast/IfCondition.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
+#include "ast/MethodCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/RangeExpression.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/StructDeclaration.h"
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
 #include "ast/VariableAccess.h"
@@ -256,6 +258,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -328,6 +332,9 @@ namespace llvm_backend {
         }
         if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
             return llvm_backend::codegen(enumAccess, llvmState);
+        }
+        if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
+            return llvm_backend::codegen(methodCall, llvmState);
         }
 
         // Handle other node types or throw an error
@@ -1228,7 +1235,8 @@ namespace llvm_backend {
         }
 
 
-        llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr, node->expressionToken().lexical());
+        llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr,
+                                                                   node->expressionToken().lexical());
         llvmState.NamedAllocations[node->expressionToken().lexical()] = alloca;
 
         if (const auto initialValue = node->initialValue()) {
@@ -1310,6 +1318,54 @@ namespace llvm_backend {
     llvm::Value *codegen(const ast::StringConstant *node, const LLVMBackendState &llvmState) {
         return getOrCreateGlobalString(llvmState, node->value(), "");
     }
+
+    llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState) {
+        const auto methodName = node->functionName();
+        const auto objectValue = codegen_base(node->instanceNode(), llvmState);
+        if (!objectValue) {
+            assert(false && "Failed to generate object value for method call");
+            return nullptr;
+        }
+        if (methodName == "length") {
+            assert(node->args().size() == 0 && "length expects exactly zero argument");
+            if (!objectValue) {
+                assert(false && "Failed to generate argument for length function");
+                return nullptr;
+            }
+            auto referenceType = node->instanceNode()->expressionType().value();
+            if (const auto &pointerType = std::dynamic_pointer_cast<types::ReferenceType>(referenceType)) {
+                referenceType = pointerType->baseType();
+            }
+            const auto arrayType = resolveLlvmType(referenceType, llvmState);
+            if (!arrayType->isArrayTy()) {
+                assert(false && "length function argument is not an array");
+                return nullptr;
+            }
+            const auto length = arrayType->getArrayNumElements();
+            return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), length);
+        }
+        std::vector<llvm::Value *> args;
+        args.push_back(objectValue);
+        for (const auto &arg: node->args()) {
+            if (const auto value = codegen_base(arg.get(), llvmState)) {
+                args.push_back(value);
+            } else {
+                return nullptr; // Error handling
+            }
+        }
+        const auto functionCall = llvmState.TheModule->getFunction(methodName);
+        if (!functionCall) {
+            std::cerr << "Method " << methodName << " not found in module.\n";
+            assert(false && "Method not declared before call");
+
+            return nullptr; // Error handling
+        }
+        const auto call = llvmState.Builder->CreateCall(functionCall, args);
+        if (!functionCall->getReturnType()->isVoidTy())
+            return call;
+        return nullptr;
+    }
+
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState) {
         if (node->functionName() == "println") {
@@ -1646,6 +1702,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         }
         if (auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node.get())) {
             llvm_backend::codegen(funcDef, context);
+        } else if (auto structDef = dynamic_cast<ast::StructDeclaration *>(node.get())) {
+            for (auto &method: structDef->methods()) {
+                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
+                llvm_backend::codegen_functionstub(methodDef, context);
+                llvm_backend::codegen(dynamic_cast<ast::FunctionDefinition *>(method.get()), context);
+            }
         }
     }
     for (auto &node: nodes) {
