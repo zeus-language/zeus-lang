@@ -48,15 +48,14 @@ namespace types {
         TypeRegistry registry;
         std::map<std::string, std::optional<Variable> > currentVariables;
         std::vector<parser::ParserMessasge> messages;
-        //std::vector<ast::FunctionDefinitionBase *> functions;
         std::shared_ptr<parser::Module> module;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
             const std::string &name) const {
             std::vector<ast::FunctionDefinitionBase *> result;
-            std::optional<std::string> aliasName = module->aliasName.has_value()
-                                                       ? std::make_optional(module->aliasName.value() + "::")
-                                                       : std::nullopt;
+            const std::optional<std::string> aliasName = module->aliasName.has_value()
+                                                             ? std::make_optional(module->aliasName.value() + "::")
+                                                             : std::nullopt;
 
             for (const auto &f: module->functions) {
                 if (f->functionName() == name and (
@@ -89,7 +88,7 @@ namespace types {
 
 
     std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType, TypeRegistry &registry) {
-        if (auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
+        if (const auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(arrayType->baseType.get(), registry);
             if (!baseType) return std::nullopt;
             auto type = types::TypeRegistry::getArrayType(baseType.value(), arrayType->size);
@@ -316,12 +315,12 @@ namespace types {
         }
 
         const auto methodName = node->functionName();
-        ast::FunctionDefinitionBase *matchedMethod = nullptr;
+        const ast::FunctionDefinitionBase *matchedMethod = nullptr;
 
         auto instanceType = node->instanceNode()->expressionType().value();
-        if (auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node->instanceNode())) {
+        if (const auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node->instanceNode())) {
             if (refAccess->expressionType()) {
-                if (auto ptrType = std::dynamic_pointer_cast<
+                if (const auto ptrType = std::dynamic_pointer_cast<
                     types::ReferenceType>(refAccess->expressionType().value())) {
                     instanceType = ptrType->baseType();
                 }
@@ -329,7 +328,7 @@ namespace types {
         }
 
 
-        if (auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType)) {
+        if (const auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType)) {
             const auto methods = structType->methods();
             auto filteredMethods = methods | std::ranges::views::filter([methodName](auto method) {
                 return method->functionName() == methodName;
@@ -348,7 +347,7 @@ namespace types {
                 if (method->args().size() - 1 != node->args().size()) {
                     continue;
                 }
-                auto oldVars = context.currentVariables;
+                const auto oldVars = context.currentVariables;
                 type_check_base(method, context);
                 context.currentVariables = oldVars;
 
@@ -370,7 +369,6 @@ namespace types {
         } else if (auto arrayType = std::dynamic_pointer_cast<types::ArrayType>(instanceType)) {
             // OK
             if (methodName == "length" && node->args().empty()) {
-                matchedMethod = nullptr; // No actual method definition for array length
                 node->setExpressionType(context.registry.getTypeByName("i32").value());
                 return;
             } else {
@@ -1311,7 +1309,7 @@ namespace types {
                 std::vector<EnumVariant> enumVariants;
                 int64_t nextValue = 0;
                 for (const auto &value: enumDecl->variants()) {
-                    auto resolvedValue = resolveEnumValue(value.value, context).value_or(nextValue);
+                    const auto resolvedValue = resolveEnumValue(value.value, context).value_or(nextValue);
                     enumVariants.push_back(EnumVariant{
                         .name = value.name.lexical(),
                         .value = resolvedValue
