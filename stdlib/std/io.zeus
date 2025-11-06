@@ -6,7 +6,7 @@ fn print(fmt: *u8, arg1 : &std::str::string) : void {
 
     let replaced : string = std::str::replace(&formatted,"{}" as *u8,arg1);
 
-    printf("%s",std::str::as_c_str(&replaced));
+    printf("%s",replaced.as_c_str());
     core::libc::free(formatted.data);
     core::libc::free(replaced.data);
 }

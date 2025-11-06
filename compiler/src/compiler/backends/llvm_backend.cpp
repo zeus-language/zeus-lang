@@ -1337,12 +1337,10 @@ namespace llvm_backend {
                 referenceType = pointerType->baseType();
             }
             const auto arrayType = resolveLlvmType(referenceType, llvmState);
-            if (!arrayType->isArrayTy()) {
-                assert(false && "length function argument is not an array");
-                return nullptr;
+            if (arrayType->isArrayTy()) {
+                const auto length = arrayType->getArrayNumElements();
+                return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), length);
             }
-            const auto length = arrayType->getArrayNumElements();
-            return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), length);
         }
         std::vector<llvm::Value *> args;
         args.push_back(objectValue);

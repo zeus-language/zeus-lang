@@ -1170,7 +1170,7 @@ namespace types {
                 });
             }
             context.currentVariables.emplace(arg.name.lexical(), Variable{
-                                                 arg.name.lexical(), arg.type.value_or(nullptr), false
+                                                 arg.name.lexical(), arg.type.value_or(nullptr), arg.isConstant
                                              });
         }
         for (auto &stmt: node->statements()) {

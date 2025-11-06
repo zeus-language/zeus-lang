@@ -24,7 +24,7 @@ namespace ast {
     }
 
     std::string FunctionDefinitionBase::functionName() const {
-        return expressionToken().lexical();
+        return m_functionName;
     }
 
     std::vector<FunctionArgument> &FunctionDefinitionBase::args() {

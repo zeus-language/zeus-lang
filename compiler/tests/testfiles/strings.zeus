@@ -6,8 +6,8 @@ use std::str;
 fn main() : i32 {
     let mut hello : std::str::string = from_c_str("Hello, World!" as *u8);
     println2("String: {}" as *u8, &hello);
-    printf("length: %d\n" as *u8, length(&hello));
-    printf("capacity: %d\n" as *u8, capacity(&hello));
+    printf("length: %d\n" as *u8, hello.length());
+    printf("capacity: %d\n" as *u8, hello.capacity());
     //std::io::println2("Length: {}" as *u8, hello.length());
     //std::io::println2("Capacity: {}" as *u8, hello.capacity());
 

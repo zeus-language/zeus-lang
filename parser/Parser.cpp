@@ -449,7 +449,7 @@ namespace parser {
             if (!canConsume(Token::IDENTIFIER)) {
                 return std::nullopt;
             }
-            Token nameToken = current();
+            auto nameToken = current();
             consume(Token::IDENTIFIER);
 
             return std::make_unique<ast::VariableAccess>(std::move(nameToken));
@@ -776,7 +776,7 @@ namespace parser {
                 consume(Token::IDENTIFIER);
                 consume(Token::NS_SEPARATOR);
             }
-            Token typeToken = current();
+            auto &typeToken = current();
 
             if (tryConsume(Token::IDENTIFIER)) {
                 return std::make_unique<ast::RawType>(typeToken, namespaceElements, typeModifier);
@@ -799,7 +799,7 @@ namespace parser {
                     });
                     return std::nullopt;
                 }
-                Token sizeToken = current();
+                const auto &sizeToken = current();
                 consume(Token::NUMBER);
                 consume(Token::RIGHT_SQUAR);
                 size_t size = 0;
@@ -1059,6 +1059,7 @@ namespace parser {
             const Token nameToken = current();
             consume(Token::Type::IDENTIFIER);
             consume(Token::Type::COLON);
+            const auto isConstant = !tryConsumeKeyWord("mut");
             auto rawType = parseRawType();
             if (!rawType) {
                 m_messages.push_back(ParserMessasge{
@@ -1067,9 +1068,7 @@ namespace parser {
                 });
                 return std::nullopt;
             }
-            return ast::FunctionArgument(std::move(nameToken),
-                                         std::move(rawType.value())
-            );
+            return ast::FunctionArgument(std::move(nameToken), std::move(rawType.value()), isConstant);
         }
 
         std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseExternFunctionDefinition() {
@@ -1208,7 +1207,7 @@ namespace parser {
             if (!isFunctionCall()) {
                 return std::nullopt;
             }
-            Token nameToken = current();
+            auto nameToken = current();
             std::vector<Token> namespacePrefix;
             consume(Token::Type::IDENTIFIER);
             while (canConsume(Token::NS_SEPARATOR)) {

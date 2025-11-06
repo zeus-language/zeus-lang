@@ -32,7 +32,7 @@ namespace ast {
         virtual ~RawType() = default;
     };
 
-    struct ArrayRawType final : public RawType {
+    struct ArrayRawType final : RawType {
         std::unique_ptr<RawType> baseType;
         size_t size;
 

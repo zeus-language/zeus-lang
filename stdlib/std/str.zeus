@@ -6,6 +6,16 @@ struct string {
     data : *u8, // Pointer to the string data
     length : i32, // Length of the string
     capacity : i32, // Capacity of the string
+
+    fn as_c_str(self : &string) : *u8 {
+        return self.data;
+    }
+    fn length(self : &string) : u32 {
+        return self.length as u32;
+    }
+    fn capacity(self : &string) : u32 {
+        return self.capacity as u32;
+    }
 }
 
 fn from_c_str(cstr: *u8) : string {
@@ -19,17 +29,9 @@ fn from_c_str(cstr: *u8) : string {
 
     return str_obj;
 }
-fn as_c_str(self : &string) : *u8 {
-    return self.data;
-}
-fn length(self : &string) : u32 {
-    return self.length as u32;
-}
-fn capacity(self : &string) : u32 {
-    return self.capacity as u32;
-}
 
-fn destroy(self : &string) : void {
+
+fn destroy(self : mut &string) : void {
     if self.data != 0 as *u8 {
         core::libc::free(self.data);
     }

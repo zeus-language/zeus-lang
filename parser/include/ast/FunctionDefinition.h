@@ -12,15 +12,17 @@ namespace ast {
     struct FunctionArgument {
         Token name;
         std::unique_ptr<RawType> rawType;
+        bool isConstant;
 
         std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
 
-        FunctionArgument(Token name, std::unique_ptr<RawType> type)
-            : name(std::move(name)), rawType(std::move(type)) {
+        FunctionArgument(Token name, std::unique_ptr<RawType> type, const bool isConstant)
+            : name(std::move(name)), rawType(std::move(type)), isConstant(isConstant) {
         }
     };
 
     class FunctionDefinitionBase : public ASTNode {
+        std::string m_functionName;
         std::vector<FunctionArgument> m_args;
         std::optional<std::unique_ptr<RawType> > m_returnType;
         std::vector<Token> m_namespacePrefix;
@@ -62,6 +64,7 @@ namespace ast {
         explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,
                                         std::optional<std::unique_ptr<RawType> > returnType) : ASTNode(std::move(
                 functionName)),
+            m_functionName(expressionToken().lexical()),
             m_args(std::move(args)),
             m_returnType(std::move(returnType)) {
         }
