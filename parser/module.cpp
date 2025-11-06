@@ -59,32 +59,32 @@ namespace modules {
                     result.messages.push_back(message);
                 }
 
-                if (!result.hasError()) {
-                    result.module->modules.push_back(moduleResult.module);
 
-                    std::vector<ast::ASTNode *> nodesToDelete;
-                    for (auto &node: moduleResult.module->useModuleNodes) {
-                        if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
-                            useModuleFile(stdlibDirectories, moduleResult, subUseModule);
-                        }
-                    }
-                    for (auto &function: moduleResult.module->functions) {
-                        function->setModulePath(useModule->modulePath());
-                        // if (funcDef->isPrivate()) {
-                        //     result.messages.push_back(parser::ParserMessasge{
-                        //         .outputType = parser::OutputType::ERROR,
-                        //         .token = funcDef->expressionToken(),
-                        //         .message = "Cannot use private function '" + funcDef->functionName() +
-                        //                    "' from module '" + fullPath.string() + "'!"
-                        //     });
-                        // }
+                result.module->modules.push_back(moduleResult.module);
+
+                std::vector<ast::ASTNode *> nodesToDelete;
+                for (auto &node: moduleResult.module->useModuleNodes) {
+                    if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
+                        useModuleFile(stdlibDirectories, moduleResult, subUseModule);
                     }
                 }
-
-
-                break;
+                for (auto &function: moduleResult.module->functions) {
+                    function->setModulePath(useModule->modulePath());
+                    // if (funcDef->isPrivate()) {
+                    //     result.messages.push_back(parser::ParserMessasge{
+                    //         .outputType = parser::OutputType::ERROR,
+                    //         .token = funcDef->expressionToken(),
+                    //         .message = "Cannot use private function '" + funcDef->functionName() +
+                    //                    "' from module '" + fullPath.string() + "'!"
+                    //     });
+                    // }
+                }
             }
+
+
+            break;
         }
+
 
         if (!moduleLoadedSuccessfully) {
             result.messages.push_back(parser::ParserMessasge{
