@@ -1646,6 +1646,8 @@ namespace llvm_backend {
         if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {
             llvmState.TheFPM->run(*functionDefinition, *llvmState.TheFAM);
         }
+        llvmState.NamedAllocations.clear();
+        llvmState.NamedValues.clear();
     }
 
     void init_context(LLVMBackendState &context, const std::string &moduleName,

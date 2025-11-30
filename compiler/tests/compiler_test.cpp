@@ -110,7 +110,7 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
     options.runProgram = true;
-    options.runArguments.push_back(output_path);
+    options.runArguments.push_back(output_path.string());
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
     compiler::parse_and_compile(options, input_path, erstream, ostream);

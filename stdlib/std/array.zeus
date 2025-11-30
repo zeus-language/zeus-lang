@@ -27,13 +27,8 @@ struct array<T>{
 
             self.capacity = new_capacity;
         }
-        let _index : i64 = self.length as i64 * size_of_t;
-        self.data[_index] = value;
-//        printf("current length: %ld\n" as *u8, self.length);
+        self.data[self.length] = value;
         self.length = self.length + 1 as i64;
-  //      printf("Pushed value, new length: %ld\n" as *u8, self.length);
-//        printf("Current capacity: %ld\n" as *u8, self.capacity);
-//        printf("-------------------------\n" as *u8);
     }
 
 //    fn [](index : i32) : T {
@@ -47,7 +42,7 @@ struct array<T>{
         if index < 0 as i64 or index >= self.length {
             panic("Index out of bounds" as *u8);
         }
-        self.data[index * sizeof<T>()] = value;
+        self.data[index ] = value;
     }
 
     fn pop(self: mut &array<T>) : T {
@@ -55,13 +50,15 @@ struct array<T>{
             panic("Pop from empty array" as *u8);
         }
         self.length = self.length - 1 as i64;
-        return self.data[self.length* sizeof<T>()];
+        return self.data[self.length];
     }
     fn get(self: &array<T>,index : i64) : T {
         if index < 0 as i64 or index >= self.length {
             panic("Index out of bounds" as *u8);
         }
-        return self.data[index * sizeof<T>()];
+
+        let value: T = self.data[index];
+        return value;
     }
 
     fn clear(self: mut &array<T>) : void {
