@@ -1,0 +1,24 @@
+use std::array;
+
+fn main() : i32 {
+    let mut arr : array<i32> = new_array<i32>();
+    arr.push(10);
+    arr.push(20);
+    arr.push(30);
+
+    for i in 0 as i64 .. arr.length() {
+        printf("Element at index %d: %d\n" as *u8, i, arr.get(i));
+    }
+
+    let popped_value : i32 = arr.pop();
+    printf("Popped value: %d\n" as *u8, popped_value);
+
+    arr.set(0 as i64, 100);
+    printf("Element at index 0 after set: %d\n" as *u8, arr.get(0 as i64));
+
+    arr.clear();
+    printf("Array length after clear: %d\n" as *u8, arr.length());
+
+    arr.destroy();
+    return 0;
+}

@@ -40,6 +40,14 @@ namespace ast {
             auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<VariableAssignment *>(this)) : std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<VariableAssignment>(expressionToken(),
+                                                                  m_expression->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

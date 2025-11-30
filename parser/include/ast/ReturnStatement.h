@@ -37,6 +37,24 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::optional<std::unique_ptr<ASTNode> > returnValueClone = std::nullopt;
+            if (m_returnValue.has_value()) {
+                returnValueClone = std::make_optional<std::unique_ptr<ASTNode> >(m_returnValue.value()->clone());
+            }
+            auto cloneNode = std::make_unique<ReturnStatement>(expressionToken(), std::move(returnValueClone));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            if (m_returnValue.has_value()) {
+                m_returnValue.value()->makeNonGeneric(genericParam);
+            }
+        }
     };
 } // ast
 

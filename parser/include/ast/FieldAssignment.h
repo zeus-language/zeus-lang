@@ -62,6 +62,23 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<FieldAssignment>(expressionToken(),
+                                                               m_accessNode->clone(),
+                                                               m_expression->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            if (m_structType)
+                cloneNode->setStructType(m_structType.value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            m_accessNode->makeNonGeneric(genericParam);
+            m_expression->makeNonGeneric(genericParam);
+        }
     };
 } // ast
 

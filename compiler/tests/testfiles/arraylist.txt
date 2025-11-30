@@ -1,0 +1,6 @@
+Element at index 0: 10
+Element at index 1: 0
+Element at index 2: 30
+Popped value: 30
+Element at index 0 after set: 100
+Array length after clear: 0

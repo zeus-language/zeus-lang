@@ -74,11 +74,13 @@ namespace ast {
 
     class FunctionDefinition final : public FunctionDefinitionBase {
         std::vector<std::unique_ptr<ASTNode> > m_statements;
+        std::optional<Token> genericParam;
 
     public:
         explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
                                     std::optional<std::unique_ptr<RawType> > returnType,
-                                    std::vector<std::unique_ptr<ASTNode> > statements);
+                                    std::vector<std::unique_ptr<ASTNode> > statements,
+                                    std::optional<Token> genericParam);
 
         ~FunctionDefinition() override = default;
 
@@ -95,6 +97,10 @@ namespace ast {
         FunctionDefinition &operator=(FunctionDefinition &&) = delete;
 
         FunctionDefinition &operator=(const FunctionDefinition &) = delete;
+
+        [[nodiscard]] std::optional<Token> getGenericParam() const {
+            return genericParam;
+        }
     };
 } // ast
 

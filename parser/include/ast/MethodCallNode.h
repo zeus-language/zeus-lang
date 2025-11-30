@@ -62,6 +62,19 @@ namespace ast {
             const auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<MethodCallNode *>(this)) : std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::vector<std::unique_ptr<ASTNode> > argsClones;
+            for (auto &arg: m_args) {
+                argsClones.push_back(arg->clone());
+            }
+            auto cloneNode = std::make_unique<MethodCallNode>(expressionToken(),
+                                                              m_instanceNode->clone(),
+                                                              std::move(argsClones));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

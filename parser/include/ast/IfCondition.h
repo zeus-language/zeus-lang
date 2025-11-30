@@ -52,5 +52,33 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto ifBlock = std::vector<std::unique_ptr<ASTNode> >();
+            for (auto &stmt: m_ifBlock) {
+                ifBlock.push_back(stmt->clone());
+            }
+            auto elseBlock = std::vector<std::unique_ptr<ASTNode> >();
+            for (auto &stmt: m_elseBlock) {
+                elseBlock.push_back(stmt->clone());
+            }
+            auto conditionClone = m_condition->clone();
+            auto cloneNode = std::make_unique<IfCondition>(expressionToken(), std::move(conditionClone),
+                                                           std::move(ifBlock), std::move(elseBlock));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            m_condition->makeNonGeneric(genericParam);
+            for (auto &stmt: m_ifBlock) {
+                stmt->makeNonGeneric(genericParam);
+            }
+            for (auto &stmt: m_elseBlock) {
+                stmt->makeNonGeneric(genericParam);
+            }
+        }
     };
 }

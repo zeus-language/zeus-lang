@@ -203,12 +203,49 @@ namespace parser {
             return std::make_unique<ast::TypeCast>(asToken, std::move(rawType.value()), std::move(value.value()));
         }
 
+        bool isStructInitializationAhead() const {
+            int lookaheadIndex = 0;
+            if (!canConsume(Token::IDENTIFIER)) {
+                return false;
+            }
+            lookaheadIndex++;
+            if (canConsume(Token::LESS, lookaheadIndex)) {
+                lookaheadIndex++;
+                // Skip generic parameters
+                while (canConsume(Token::IDENTIFIER, lookaheadIndex) || canConsume(Token::COMMA, lookaheadIndex)) {
+                    lookaheadIndex++;
+                }
+                if (!canConsume(Token::GREATER, lookaheadIndex)) {
+                    return false;
+                }
+                lookaheadIndex++;
+            }
+            return canConsume(Token::OPEN_BRACE, lookaheadIndex);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseStructInitialization(bool allowInit) {
-            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::OPEN_BRACE, 1) || !allowInit) {
+            if (!isStructInitializationAhead() || !allowInit) {
                 return std::nullopt;
             }
             auto structNameToken = current();
             consume(Token::IDENTIFIER);
+
+            std::optional<Token> genericParam = std::nullopt;
+            if (tryConsume(Token::LESS)) {
+                genericParam = current();
+                consume(Token::IDENTIFIER);
+
+
+                if (!canConsume(Token::GREATER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected '>' to close generic struct declaration!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::GREATER);
+            }
+
             consume(Token::OPEN_BRACE);
             std::vector<ast::StructInitField> fields;
             while (!canConsume(Token::CLOSE_BRACE) && !canConsume(Token::END_OF_FILE)) {
@@ -251,7 +288,7 @@ namespace parser {
             }
             consume(Token::CLOSE_BRACE);
 
-            return std::make_unique<ast::StructInitialization>(structNameToken, std::move(fields));
+            return std::make_unique<ast::StructInitialization>(structNameToken, genericParam, std::move(fields));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseReferenceAccess() {
@@ -320,6 +357,15 @@ namespace parser {
             return std::make_unique<ast::EnumAccess>(enumNameToken, variantNameToken);
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseNull() {
+            if (!canConsumeKeyWord("null")) {
+                return std::nullopt;
+            }
+            Token nullToken = current();
+            consumeKeyWord("null");
+            return std::make_unique<ast::NumberConstant>(nullToken, ast::NumberType::NULLPTR);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > tryParseToken(bool allowInit = false) {
             std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
 
@@ -331,6 +377,8 @@ namespace parser {
                 result = std::move(character.value());
             } else if (auto boolean = parseBoolean()) {
                 result = std::move(boolean.value());
+            } else if (auto nullPointer = parseNull()) {
+                result = std::move(nullPointer.value());
             } else if (auto functionCall = parseFunctionCall()) {
                 result = std::move(functionCall.value());
             } else if (auto enumAccess = parseEnumAccess()) {
@@ -779,8 +827,27 @@ namespace parser {
             auto &typeToken = current();
 
             if (tryConsume(Token::IDENTIFIER)) {
-                return std::make_unique<ast::RawType>(typeToken, namespaceElements, typeModifier);
+                std::optional<Token> genericParam = std::nullopt;
+                if (tryConsume(Token::LESS)) {
+                    genericParam = current();
+                    consume(Token::IDENTIFIER);
+
+
+                    if (!canConsume(Token::GREATER)) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected '>' to close generic struct declaration!"
+                        });
+                        return std::nullopt;
+                    }
+                    consume(Token::GREATER);
+                }
+
+
+                return std::make_unique<ast::RawType>(typeToken, namespaceElements, typeModifier, genericParam);
             }
+
+
             if (tryConsume(Token::LEFT_SQUAR)) {
                 typeToken = current();
                 if (!canConsume(Token::IDENTIFIER)) {
@@ -815,7 +882,8 @@ namespace parser {
 
                 return std::make_unique<ast::ArrayRawType>(typeToken, namespaceElements, typeModifier,
                                                            std::make_unique<ast::RawType>(
-                                                               typeToken, namespaceElements, ast::TypeModifier::NONE),
+                                                               typeToken, namespaceElements, ast::TypeModifier::NONE,
+                                                               std::nullopt),
                                                            size);
             }
             return std::nullopt;
@@ -1068,7 +1136,7 @@ namespace parser {
                 });
                 return std::nullopt;
             }
-            return ast::FunctionArgument(std::move(nameToken), std::move(rawType.value()), isConstant);
+            return ast::FunctionArgument(nameToken, std::move(rawType.value()), isConstant);
         }
 
         std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseExternFunctionDefinition() {
@@ -1135,6 +1203,22 @@ namespace parser {
             }
             consume(Token::Type::IDENTIFIER);
 
+            std::optional<Token> genericParam = std::nullopt;
+            if (tryConsume(Token::LESS)) {
+                genericParam = current();
+                consume(Token::IDENTIFIER);
+
+
+                if (!canConsume(Token::GREATER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected '>' to close generic struct declaration!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::GREATER);
+            }
+
             consume(Token::Type::LEFT_CURLY);
             std::vector<ast::FunctionArgument> functionArgs;
             while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
@@ -1158,7 +1242,8 @@ namespace parser {
             auto block = parseBlock();
             return std::make_unique<ast::FunctionDefinition>(std::move(nameToken), std::move(functionArgs),
                                                              std::move(returnType),
-                                                             std::move(block));
+                                                             std::move(block)
+                                                             , std::move(genericParam));
         }
 
         bool isFunctionCall() const {
@@ -1173,6 +1258,18 @@ namespace parser {
                 }
                 lookaheadIndex++;
             }
+            if (canConsume(Token::LESS, lookaheadIndex)) {
+                lookaheadIndex++;
+                if (!canConsume(Token::IDENTIFIER, lookaheadIndex)) {
+                    return false;
+                }
+                lookaheadIndex++;
+                if (!canConsume(Token::GREATER, lookaheadIndex)) {
+                    return false;
+                }
+                lookaheadIndex++;
+            }
+
             if (!canConsume(Token::LEFT_CURLY, lookaheadIndex)) {
                 return false;
             }
@@ -1223,6 +1320,23 @@ namespace parser {
                 }
                 consume(Token::Type::IDENTIFIER);
             }
+
+            std::optional<Token> genericParam = std::nullopt;
+            if (tryConsume(Token::LESS)) {
+                genericParam = current();
+                consume(Token::IDENTIFIER);
+
+
+                if (!canConsume(Token::GREATER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected '>' to close generic struct declaration!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::GREATER);
+            }
+
             consume(Token::Type::LEFT_CURLY);
             std::vector<std::unique_ptr<ast::ASTNode> > args;
             while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
@@ -1241,7 +1355,7 @@ namespace parser {
                 }
             }
             consume(Token::Type::RIGHT_CURLY);
-            return std::make_unique<ast::FunctionCallNode>(nameToken, namespacePrefix, std::move(args));
+            return std::make_unique<ast::FunctionCallNode>(nameToken, namespacePrefix, std::move(args), genericParam);
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseUseModule() {
@@ -1297,6 +1411,21 @@ namespace parser {
             }
             Token structName = current();
             consume(Token::IDENTIFIER);
+            std::optional<Token> genericParam = std::nullopt;
+            if (tryConsume(Token::LESS)) {
+                genericParam = current();
+                consume(Token::IDENTIFIER);
+
+
+                if (!canConsume(Token::GREATER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected '>' to close generic struct declaration!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::GREATER);
+            }
             consume(Token::OPEN_BRACE);
             std::vector<ast::StructField> fields;
             std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods;
@@ -1333,7 +1462,7 @@ namespace parser {
 
             consume(Token::CLOSE_BRACE);
             return std::make_unique<ast::StructDeclaration>(std::move(structName), std::move(fields),
-                                                            std::move(methods));
+                                                            std::move(methods), std::move(genericParam));
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseEnumDeclaration() {

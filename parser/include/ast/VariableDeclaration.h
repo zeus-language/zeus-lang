@@ -22,14 +22,30 @@ namespace ast {
         Token typeToken;
         std::vector<Token> namespaceElements;
         TypeModifier typeModifier = TypeModifier::NONE;
+        std::optional<Token> genericParam = std::nullopt;
 
 
-        RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier)
+        RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
+                std::optional<Token> genericParam)
             : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
-              typeModifier(typeModifier) {
+              typeModifier(typeModifier), genericParam(std::move(genericParam)) {
         }
 
         virtual ~RawType() = default;
+
+        [[nodiscard]] std::string fullTypeName() const {
+            std::string name;
+
+            name += typeToken.lexical();
+            if (genericParam.has_value()) {
+                name += "<" + genericParam.value().lexical() + ">";
+            }
+            return name;
+        }
+
+        [[nodiscard]] virtual std::unique_ptr<RawType> clone() const {
+            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam);
+        }
     };
 
     struct ArrayRawType final : RawType {
@@ -38,12 +54,16 @@ namespace ast {
 
         ArrayRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
                      std::unique_ptr<RawType> base_type, size_t size)
-            : RawType(type_token, namespaceElements, typeModifier),
+            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
               baseType(std::move(base_type)),
               size(size) {
         }
 
         ~ArrayRawType() override = default;
+
+        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
+            return std::make_unique<ArrayRawType>(typeToken, namespaceElements, typeModifier, baseType->clone(), size);
+        }
     };
 
     class VariableDeclaration final : public ASTNode {
@@ -79,6 +99,26 @@ namespace ast {
                 return m_initialValue.value()->getNodeByToken(token);
             }
             return std::nullopt;
+        }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<VariableDeclaration>(expressionToken(),
+                                                                   m_type->clone(),
+                                                                   m_constant,
+                                                                   m_initialValue.has_value()
+                                                                       ? std::make_optional<std::unique_ptr<ASTNode> >(
+                                                                           m_initialValue.value()->clone())
+                                                                       : std::nullopt);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            if (m_initialValue.has_value()) {
+                m_initialValue.value()->makeNonGeneric(genericParam);
+            }
         }
     };
 } // ast

@@ -22,7 +22,8 @@ namespace types {
         STRUCT,
         POINTER,
         ARRAY,
-        ENUM
+        ENUM,
+        GENERIC,
     };
 
     class VariableType {
@@ -37,12 +38,24 @@ namespace types {
 
         virtual ~VariableType() = default;
 
-        [[nodiscard]] const std::string &name() const { return m_typename; }
+        [[nodiscard]] const std::string &rawTypeName() const {
+            return m_typename;
+        }
+
+        [[nodiscard]] virtual const std::string &name() const { return m_typename; }
+
+        [[nodiscard]] virtual const std::string &linkageName() const { return m_typename; }
 
         [[nodiscard]] TypeKind typeKind() const { return m_typeKind; }
 
         bool operator==(const VariableType &other) const {
             return this->name() == other.name();
+        }
+
+        virtual std::shared_ptr<VariableType> makeNonGenericType(
+            const std::shared_ptr<VariableType> &genericParam) {
+            assert(false && "makeNonGenericType not implemented for this type");
+            return nullptr;
         }
     };
 
@@ -73,6 +86,8 @@ namespace types {
         }
 
         [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+
+        std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
     };
 
     class ReferenceType final : public VariableType {
@@ -112,18 +127,21 @@ namespace types {
     class StructType final : public VariableType {
     private:
         std::vector<StructField> m_fields;
-        std::vector<ast::FunctionDefinitionBase *> m_methods;
+        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > m_methods;
+        std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
+        std::string m_typename;
+        std::string m_linkageName;
 
     public:
         StructType(std::string name, const std::vector<StructField> &fields,
-                   std::vector<ast::FunctionDefinitionBase *> methods) : VariableType(std::move(name),
-                                                                             TypeKind::STRUCT), m_fields(fields),
-                                                                         m_methods(std::move(methods)) {
-        }
+                   std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods,
+                   std::optional<std::shared_ptr<VariableType> > genericParam);
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
 
-        [[nodiscard]] const std::vector<ast::FunctionDefinitionBase *> &methods() const { return m_methods; }
+        [[nodiscard]] const std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > &methods() const {
+            return m_methods;
+        }
 
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {
@@ -142,6 +160,19 @@ namespace types {
             assert(false && "invalid index for struct definition");
             return 0;
         }
+
+        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > genericParam() const {
+            return m_genericParam;
+        }
+
+        [[nodiscard]] const std::string &name() const override {
+            return m_typename;
+        }
+
+        [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
+
+        std::shared_ptr<VariableType> makeNonGenericType(
+            const std::shared_ptr<VariableType> &genericParam) override;
     };
 
 
@@ -171,6 +202,16 @@ namespace types {
                 }
             }
             return std::nullopt;
+        }
+    };
+
+    struct GenericType final : public VariableType {
+        std::string m_genericParam;
+
+    public:
+        explicit GenericType(const std::string &genericParam) : VariableType(genericParam,
+                                                                             TypeKind::GENERIC),
+                                                                m_genericParam(genericParam) {
         }
     };
 }

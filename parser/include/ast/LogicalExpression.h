@@ -59,6 +59,20 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::unique_ptr<ASTNode> lhsClone = nullptr;
+            if (m_lhs) {
+                lhsClone = m_lhs->clone();
+            }
+            auto cloneNode = std::make_unique<LogicalExpression>(expressionToken(),
+                                                                 m_operator,
+                                                                 std::move(lhsClone),
+                                                                 m_rhs->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

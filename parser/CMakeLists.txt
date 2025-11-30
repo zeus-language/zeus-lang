@@ -20,6 +20,9 @@ add_library(${PROJECT_NAME} STATIC
         include/ast/RangeExpression.h
         include/ast/EnumDeclaration.h
         include/ast/EnumAccess.h
+        Scope.cpp
+        include/types/Scope.h
+        VariableType.cpp
 
 )
 target_sources(${PROJECT_NAME} PRIVATE

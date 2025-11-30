@@ -16,6 +16,8 @@ namespace types {
 
         ~TypeRegistry() = default;
 
+        std::vector<std::shared_ptr<VariableType> > registeredTypes();
+
         static std::optional<std::shared_ptr<VariableType> > getRangeType(
             const std::optional<std::shared_ptr<types::VariableType> >::value_type &value);
 
@@ -36,8 +38,9 @@ namespace types {
 
         TypeRegistry &operator=(TypeRegistry &&) = delete;
 
-        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > getTypeByName(const std::string &name) const;
+        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > getTypeByName(
+            const std::string &name, bool rawGenericName) const;
 
-        void registerType(const std::shared_ptr<VariableType> &type) { m_types.push_back(type); }
+        void registerType(const std::shared_ptr<VariableType> &type);
     };
 }

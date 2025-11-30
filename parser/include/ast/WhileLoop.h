@@ -40,5 +40,18 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::vector<std::unique_ptr<ASTNode> > blockClones;
+            for (auto &stmt: m_block) {
+                blockClones.push_back(stmt->clone());
+            }
+            auto cloneNode = std::make_unique<WhileLoop>(expressionToken(),
+                                                         m_condition->clone(),
+                                                         std::move(blockClones));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 }

@@ -60,6 +60,24 @@ namespace ast {
             auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<ArrayAccess *>(this)) : std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<ArrayAccess>(expressionToken(),
+                                                           m_accessExpression->clone(),
+                                                           m_indexExpression->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            if (m_arrayType)
+                cloneNode->setArrayType(m_arrayType.value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            m_accessExpression->makeNonGeneric(genericParam);
+            m_indexExpression->makeNonGeneric(genericParam);
+            m_arrayType = m_arrayType.value()->makeNonGenericType(genericParam);
+        }
     };
 } // ast
 

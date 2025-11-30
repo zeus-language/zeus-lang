@@ -15,9 +15,10 @@ namespace compiler {
     void compile(CompilerOptions options, const std::string &moduleName,
                  std::ostream &errorStream,
                  std::ostream &outputStream,
-                 const std::vector<std::unique_ptr<ast::ASTNode> > &nodes) {
+                 const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
+                 const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes) {
         llvm_backend::generateExecutable(options, moduleName, errorStream, outputStream,
-                                         nodes);
+                                         nodes, registeredTypes);
     }
 
     std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
@@ -79,11 +80,11 @@ namespace compiler {
             message.msg(errorStream, options.colorOutput);
         }
         std::vector<std::string> visitedModules;
-        auto nodes = moveNodesFromResult(result.module, visitedModules);
+        const auto nodes = moveNodesFromResult(result.module, visitedModules);
 
         if (!result.hasError() && !typeCheckResult.hasError()) {
             compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
-                    nodes);
+                    nodes, typeCheckResult.registeredTypes);
         }
     }
 }

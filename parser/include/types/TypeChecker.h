@@ -6,6 +6,7 @@
 namespace types {
     struct TypeCheckResult {
         std::vector<parser::ParserMessasge> messages;
+        std::vector<std::shared_ptr<VariableType> > registeredTypes;
 
         [[nodiscard]] bool hasError() const {
             return std::ranges::any_of(

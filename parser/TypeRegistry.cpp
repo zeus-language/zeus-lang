@@ -1,5 +1,7 @@
 #include  "types/TypeRegistry.h"
 
+#include <algorithm>
+
 types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("i32", 4, true));
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
@@ -11,6 +13,10 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
     registerType(std::make_shared<types::VariableType>("double", types::TypeKind::DOUBLE));
+}
+
+std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::registeredTypes() {
+    return m_types;
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
@@ -33,11 +39,21 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArr
                                            size, base_type));
 }
 
-std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(const std::string &name) const {
+std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(
+    const std::string &name, bool rawGenericName) const {
     for (const auto &type: m_types) {
+        if (rawGenericName && type->rawTypeName() == name) {
+            return type;
+        }
         if (type->name() == name) {
             return type;
         }
     }
     return std::nullopt;
+}
+
+void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type) {
+    if (std::ranges::none_of(m_types, [&type](const auto &t) { return t->name() == type->name(); })) {
+        m_types.push_back(type);
+    }
 }

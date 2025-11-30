@@ -16,7 +16,8 @@ namespace ast {
         INTEGER,
         FLOAT,
         CHAR,
-        BOOLEAN
+        BOOLEAN,
+        NULLPTR
     };
 
     typedef std::variant<int64_t, double, bool> NumberValue;
@@ -49,6 +50,13 @@ namespace ast {
         NumberConstant &operator=(NumberConstant &&) = delete;
 
         NumberConstant &operator=(const NumberConstant &) = delete;
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<NumberConstant>(expressionToken(), m_numberType);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

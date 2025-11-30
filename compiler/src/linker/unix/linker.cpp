@@ -14,7 +14,7 @@ bool link_modules(std::ostream &errStream, const std::filesystem::path &baseDir,
     for (auto &flag: flags)
         args.emplace_back(flag);
 
-    args.emplace_back("-fuse-ld=gold");
+    //args.emplace_back("-fuse-ld=gold");
 
     return execute_command_list(errStream, errStream, "cc", args);
 }

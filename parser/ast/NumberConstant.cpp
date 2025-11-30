@@ -16,6 +16,8 @@ namespace ast {
                 return std::stod(lexical);
             case NumberType::BOOLEAN:
                 return static_cast<bool>(lexical == "true");
+            case NumberType::NULLPTR:
+                return static_cast<int64_t>(0);
             case NumberType::CHAR:
                 if (lexical.front() == '\\') {
                     switch (lexical[1]) {

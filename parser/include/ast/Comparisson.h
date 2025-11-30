@@ -48,6 +48,16 @@ namespace ast {
             }
             return std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<Comparisson>(expressionToken(),
+                                                           m_operator,
+                                                           m_lhs->clone(),
+                                                           m_rhs->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

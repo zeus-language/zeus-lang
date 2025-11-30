@@ -40,5 +40,21 @@ namespace ast {
         [[nodiscard]] bool isInclusive() const {
             return m_is_inclusive;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<RangeExpression>(expressionToken(),
+                                                               m_start->clone(),
+                                                               m_end->clone(),
+                                                               m_is_inclusive);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            m_start->makeNonGeneric(genericParam);
+            m_end->makeNonGeneric(genericParam);
+        }
     };
 }

@@ -28,6 +28,13 @@ namespace ast {
         [[nodiscard]] std::string value() const;
 
         [[nodiscard]] bool constant() const override;
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<StringConstant>(expressionToken());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

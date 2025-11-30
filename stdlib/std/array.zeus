@@ -1,66 +1,82 @@
-
+use core::libc;
+fn panic(msg : *u8) : void {
+    printf("Panic: %s\n" as *u8, msg);
+    exit(1);
+}
 struct array<T>{
-    data : *T;
-    length : i32;
-    capacity : i32;
+    length : i64,
+    capacity : i64,
+    data : *T,
 
-    fn length() : i32 {
-        return length;
+    fn length(self: &array<T>) : i64 {
+        return self.length;
     }
 
-    fn push(value : T) : void {
-        if length >= capacity {
+    fn push(self: mut &array<T>,value : T) : void {
+        let size_of_t : i64 = sizeof<T>();
+        if self.length >= self.capacity {
             // Resize logic (simple doubling strategy)
-            let new_capacity : i32 = if capacity == 0 { 1 } else { capacity * 2 };
-            let new_data : *T = allocate(new_capacity);
-            for i in 0 .. length {
-                new_data[i] = data[i];
+            let mut new_capacity : i64;
+            if self.capacity == 0 as i64 {
+                new_capacity = 1 as i64;
             }
-            deallocate(data);
-            data = new_data;
-            capacity = new_capacity;
+            else {
+                new_capacity = self.capacity * 2 as i64;
+            }
+            self.data = realloc(self.data as *u8, new_capacity as u64 * size_of_t as u64) as *T;
+
+            self.capacity = new_capacity;
         }
-        data[length] = value;
-        length = length + 1;
+        let _index : i64 = self.length as i64 * size_of_t;
+        self.data[_index] = value;
+//        printf("current length: %ld\n" as *u8, self.length);
+        self.length = self.length + 1 as i64;
+  //      printf("Pushed value, new length: %ld\n" as *u8, self.length);
+//        printf("Current capacity: %ld\n" as *u8, self.capacity);
+//        printf("-------------------------\n" as *u8);
     }
 
-    fn [](index : i32) : T {
-        if index < 0 || index >= length {
-            panic("Index out of bounds");
+//    fn [](index : i32) : T {
+//        if index < 0 or index >= length {
+//            panic("Index out of bounds");
+//        }
+//        return data[index];
+//    }
+
+    fn set(self: mut &array<T>,index : i64, value : T) : void {
+        if index < 0 as i64 or index >= self.length {
+            panic("Index out of bounds" as *u8);
         }
-        return data[index];
+        self.data[index * sizeof<T>()] = value;
     }
 
-    fn set(index : i32, value : T) : void {
-        if index < 0 || index >= length {
-            panic("Index out of bounds");
+    fn pop(self: mut &array<T>) : T {
+        if self.length == 0 as i64 {
+            panic("Pop from empty array" as *u8);
         }
-        data[index] = value;
+        self.length = self.length - 1 as i64;
+        return self.data[self.length* sizeof<T>()];
     }
-
-    fn pop() : T {
-        if length == 0 {
-            panic("Pop from empty array");
+    fn get(self: &array<T>,index : i64) : T {
+        if index < 0 as i64 or index >= self.length {
+            panic("Index out of bounds" as *u8);
         }
-        length = length - 1;
-        return data[length];
+        return self.data[index * sizeof<T>()];
     }
 
-    fn new() : array {
-        return array<T> { data: null, length: 0, capacity: 0 };
+    fn clear(self: mut &array<T>) : void {
+        self.length = 0 as i64;
     }
 
-    fn clear() : void {
-        length = 0;
+    fn destroy(self: mut &array<T>) : void {
+        core::libc::free(self.data as *u8);
+        self.data = null as *T;
+        self.length = 0 as i64;
+        self.capacity = 0 as i64;
+        self = null as *array<T>;
     }
+}
 
-    fn free() : void {
-        deallocate(data);
-        data = null;
-        length = 0;
-        capacity = 0;
-    }
-
-
-
+fn new_array<T>() : array<T> {
+    return array<T> { data: null, length: 0, capacity: 0 };
 }

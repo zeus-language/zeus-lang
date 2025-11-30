@@ -66,7 +66,7 @@ fn replace(self : &string, old : *u8, new : &string) : string {
             let mut prefix : string;
             prefix.length = i;
             prefix.capacity = i + 1;
-                        prefix.length = i;
+            prefix.length = i;
 
             prefix.data = core::libc::malloc(prefix.capacity as u64);
             core::libc::memcpy(prefix.data, self.data, prefix.length as u64);
@@ -75,9 +75,8 @@ fn replace(self : &string, old : *u8, new : &string) : string {
 
             let mut suffix : string;
             suffix.length = self.length - (i + old_length);
-
-
             suffix.capacity = suffix.length + 1;
+            suffix.data = null as *u8;
 
             if suffix.length > 0 {
                 suffix.data = core::libc::malloc(suffix.capacity as u64);
@@ -93,13 +92,8 @@ fn replace(self : &string, old : *u8, new : &string) : string {
                 let suffix_start : *u8 = self.data + i as *u8+ old_length as *u8;
                 // Only copy if there's something to copy
                 core::libc::memcpy(suffix.data, suffix_start, suffix.length as u64);
+                suffix.data[suffix.length] = 0 as u8; // Null-terminate
             }
-            suffix.data[suffix.length] = 0 as u8; // Null-terminate
-//           // suffix.data = self.data + (i + old_length) as *u8;
-//
-
-            //printf("prefix length: %d\n" as *u8, prefix.length);
-            //printf("new length: %d\n" as *u8, new.length);
             let mut result : string = concat(&prefix, new);
 
             let mut final_result : string = concat(&result, &suffix);

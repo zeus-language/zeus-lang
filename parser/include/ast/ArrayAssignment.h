@@ -57,6 +57,43 @@ namespace ast {
         ArrayAssignment &operator=(ArrayAssignment &&) = delete;
 
         ArrayAssignment &operator=(const ArrayAssignment &) = delete;
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_accessNode->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            result = m_value->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            result = m_index->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            auto ownToken = expressionToken();
+            return ownToken == token ? std::make_optional(const_cast<ArrayAssignment *>(this)) : std::nullopt;
+        }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<ArrayAssignment>(expressionToken(),
+                                                               m_accessNode->clone(),
+                                                               m_value->clone(),
+                                                               m_index->clone());
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            if (m_arrayType)
+                cloneNode->setArrayType(m_arrayType);
+            return cloneNode;
+        }
+
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(genericParam);
+            m_accessNode->makeNonGeneric(genericParam);
+            m_value->makeNonGeneric(genericParam);
+            m_index->makeNonGeneric(genericParam);
+            m_arrayType = m_arrayType->makeNonGenericType(genericParam);
+        }
     };
 } // ast
 

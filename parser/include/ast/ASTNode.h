@@ -22,6 +22,29 @@ namespace ast {
     public:
         virtual ~ASTNode() = default;
 
+        virtual std::unique_ptr<ASTNode> clone() {
+            assert(false && "clone not implemented for this ASTNode type");
+            return nullptr;
+        }
+
+        virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) {
+            if (!m_expressionType.has_value()) {
+                return;
+            }
+            if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
+                m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
+            } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
+                       m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
+                if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
+                    if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
+                        auto newBaseType = genericParam;
+                        auto newPtrType = std::make_shared<types::PointerType>("*" + newBaseType->name(), newBaseType);
+                        m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(newPtrType);
+                    }
+                }
+            }
+        }
+
 
         ASTNode(ASTNode &&) = default;
 

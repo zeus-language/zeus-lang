@@ -32,7 +32,13 @@ namespace ast {
         [[nodiscard]] bool constant() const override {
             return m_constant;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<VariableAccess>(expressionToken());
+            cloneNode->setConstant(m_constant);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
-
-

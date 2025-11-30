@@ -66,6 +66,23 @@ namespace ast {
             auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<MatchExpression *>(this)) : std::nullopt;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::vector<MatchCase> matchCaseClones;
+            for (auto &matchCase: m_matchCases) {
+                std::vector<std::unique_ptr<ASTNode> > keyClones;
+                for (auto &key: matchCase.matchKeys) {
+                    keyClones.push_back(key->clone());
+                }
+                matchCaseClones.push_back(MatchCase{std::move(keyClones), matchCase.expression->clone()});
+            }
+            auto cloneNode = std::make_unique<MatchExpression>(expressionToken(),
+                                                               m_accessNode->clone(),
+                                                               std::move(matchCaseClones));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 } // ast
 

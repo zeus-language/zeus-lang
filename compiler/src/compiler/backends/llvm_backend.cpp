@@ -139,7 +139,7 @@ namespace llvm_backend {
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context);
 
     llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType, LLVMBackendState &context) {
-        const auto typeName = structType->name();
+        const auto typeName = structType->linkageName();
         const auto cached_type = llvm::StructType::getTypeByName(*context.TheContext, typeName);
         if (cached_type == nullptr) {
             std::vector<llvm::Type *> types;
@@ -182,6 +182,9 @@ namespace llvm_backend {
                 return context.Builder->getInt64Ty();
             case types::TypeKind::STRUCT:
                 break;
+            case types::TypeKind::GENERIC:
+                assert(false && "Generic types should be resolved before LLVM codegen");
+                return nullptr;
             case types::TypeKind::ARRAY:
                 if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(value)) {
                     const auto baseType = resolveLlvmType(arrayType->baseType(), context);
@@ -592,12 +595,9 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ArrayAssignment *node, LLVMBackendState &llvmState) {
         const auto baseType = node->arrayType();
+        assert(baseType && "Array type is null in array assignment");
+        const auto arrayPtr = codegen_base(node->accessNode(), llvmState);
 
-        auto arrayPtr = llvmState.findVariable(node->expressionToken().lexical(),
-                                               baseType->typeKind() == types::TypeKind::POINTER);
-        arrayPtr = (arrayPtr->getType()->isPointerTy())
-                       ? arrayPtr
-                       : getLoadStorePointerOperand(arrayPtr);
         const auto arrayType = resolveLlvmType(baseType, llvmState);
         auto indexValue = codegen_base(node->index(), llvmState);
         if (!indexValue) {
@@ -693,10 +693,7 @@ namespace llvm_backend {
             assert(false && "Array index is not an integer");
             return nullptr;
         }
-        auto arrayPtr = codegen_base(node->accessExpression(), llvmState);
-        arrayPtr = (arrayPtr->getType()->isPointerTy())
-                       ? arrayPtr
-                       : getLoadStorePointerOperand(arrayPtr);
+        const auto arrayPtr = codegen_base(node->accessExpression(), llvmState);
         std::vector<llvm::Value *> indices;
         if (baseType->typeKind() == types::TypeKind::ARRAY) {
             indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0));
@@ -1307,6 +1304,8 @@ namespace llvm_backend {
                     return llvm::ConstantInt::getTrue(*llvmState.TheContext);
                 }
                 return llvm::ConstantInt::getFalse(*llvmState.TheContext);
+            case ast::NumberType::NULLPTR:
+                return llvm::ConstantPointerNull::get(llvmState.Builder->getPtrTy());
             case ast::NumberType::CHAR:
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(8, static_cast<uint64_t>(std::get<int64_t>(node->value())),
@@ -1397,7 +1396,16 @@ namespace llvm_backend {
                 }
             }
             return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
+        } else if (node->functionName() == "sizeof") {
+            assert(node->args().size() == 0 && "sizeof expects exactly zero arguments");
+
+            const auto llvmType = resolveLlvmType(node->genericType().value(), llvmState);
+            const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+            const uint64_t typeSize = DL.getTypeAllocSize(llvmType);
+            return llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), typeSize);
         }
+
+
         const auto functionCall = llvmState.TheModule->getFunction(node->functionName());
 
         if (!functionCall) {
@@ -1658,7 +1666,8 @@ namespace llvm_backend {
 void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, const std::string &moduleName,
                                       std::ostream &errorStream,
                                       std::ostream &outputStream,
-                                      const std::vector<std::unique_ptr<ast::ASTNode> > &nodes) {
+                                      const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
+                                      const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes) {
     initializeLLVMBackend();
     LLVMBackendState context;
     init_context(context, moduleName, options);
@@ -1690,8 +1699,15 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         }
         if (auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node.get())) {
             llvm_backend::codegen(funcDef, context);
-        } else if (auto structDef = dynamic_cast<ast::StructDeclaration *>(node.get())) {
-            for (auto &method: structDef->methods()) {
+        }
+    }
+    for (auto &type: registeredTypes) {
+        if (auto structType = std::dynamic_pointer_cast<types::StructType>(type)) {
+            if (structType->genericParam() and structType->genericParam().value()->typeKind() ==
+                types::TypeKind::GENERIC) {
+                continue;
+            }
+            for (auto &method: structType->methods()) {
                 auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
                 llvm_backend::codegen_functionstub(methodDef, context);
                 llvm_backend::codegen(dynamic_cast<ast::FunctionDefinition *>(method.get()), context);

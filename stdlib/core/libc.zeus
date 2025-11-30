@@ -1,10 +1,12 @@
 
 
 extern fn malloc(size: u64) : *u8;
+extern fn realloc(ptr: *u8, size: u64) : *u8;
 extern fn free(ptr: *u8) : void;
 extern fn memcpy(dest: *u8, src: *u8, n: u64) : void;
 extern fn println(msg: *u8) : void;
 extern fn puts(msg: *u8) : i32;
+extern fn exit(code: i32) : void;
 
 extern fn strlen(s: *u8) : u64;
 extern fn strcmp(s1: *u8, s2: *u8) : i32;
