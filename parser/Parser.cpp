@@ -1,16 +1,13 @@
-//
-// Created by stefan on 29.08.25.
-//
+
 
 #include  "parser/Parser.h"
 
 #include <cassert>
 #include <iomanip>
-#include <iostream>
-
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
+#include "ast/ArrayRepeatInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -68,7 +65,7 @@ namespace parser {
         return Color::FG_DEFAULT;
     }
 
-    void ParserMessasge::msg(std::ostream &ostream, bool printColor) const {
+    void ParserMessasge::msg(std::ostream &ostream, const bool printColor) const {
         if (printColor)
             ostream << token.source_location.filename << ":" << token.source_location.row << ":" << token.
                     source_location.col << ": "
@@ -90,7 +87,6 @@ namespace parser {
     }
 
     class Parser {
-    private:
         size_t m_current = 0;
         std::vector<Token> m_tokens;
         std::vector<ParserMessasge> m_messages;
@@ -163,6 +159,31 @@ namespace parser {
                 }
                 if (canConsume(Token::COMMA)) {
                     consume(Token::COMMA);
+                } else if (canConsume(Token::SEMICOLON)) {
+                    consume(Token::SEMICOLON);
+                    auto repeatCountNode = parseExpression(true);
+                    if (!repeatCountNode) {
+                        m_messages.push_back(ParserMessasge{
+                            .outputType = OutputType::ERROR,
+                            .token = current(),
+                            .message = "expected expression for array initializer repeat count",
+                        });
+                        return std::nullopt;
+                    }
+                    if (!canConsume(Token::RIGHT_SQUAR)) {
+                        m_messages.push_back(ParserMessasge{
+                            .outputType = OutputType::ERROR,
+                            .token = current(),
+                            .message = "expected ']' at the end of array initializer",
+                        });
+                        return std::nullopt;
+                    }
+                    consume(Token::RIGHT_SQUAR);
+                    return std::make_unique<ast::ArrayRepeatInitializer>(
+                        startToken,
+                        std::move(elements.back()),
+                        std::move(repeatCountNode.value())
+                    );
                 } else {
                     break;
                 }
@@ -811,11 +832,15 @@ namespace parser {
         }
 
         std::optional<std::unique_ptr<ast::RawType> > parseRawType() {
-            ast::TypeModifier typeModifier = ast::TypeModifier::NONE;
+            auto typeModifier = ast::TypeModifier::NONE;
             if (tryConsume(Token::MUL)) {
                 typeModifier = ast::TypeModifier::POINTER;
             } else if (tryConsume(Token::AND)) {
                 typeModifier = ast::TypeModifier::REFERENCE;
+            }
+            auto secondModifier = ast::TypeModifier::NONE;
+            if (tryConsume(Token::MUL)) {
+                secondModifier = ast::TypeModifier::POINTER;
             }
 
             std::vector<Token> namespaceElements;
@@ -842,7 +867,12 @@ namespace parser {
                     }
                     consume(Token::GREATER);
                 }
-
+                if (secondModifier != ast::TypeModifier::NONE) {
+                    return std::make_unique<ast::PointerRawType>(typeToken, namespaceElements, typeModifier,
+                                                                 std::make_unique<ast::RawType>(
+                                                                     typeToken, namespaceElements, secondModifier,
+                                                                     genericParam));
+                }
 
                 return std::make_unique<ast::RawType>(typeToken, namespaceElements, typeModifier, genericParam);
             }
@@ -1137,6 +1167,18 @@ namespace parser {
                 return std::nullopt;
             }
             return ast::FunctionArgument(nameToken, std::move(rawType.value()), isConstant);
+        }
+
+        std::optional<std::unique_ptr<ast::RawType> > parseExternType() {
+            if (canConsumeKeyWord("extern") && canConsumeKeyWord("type", 1)) {
+                consumeKeyWord("extern");
+                consumeKeyWord("type");
+
+                auto type = parseRawType();
+                consume(Token::SEMICOLON);
+                return type;
+            }
+            return std::nullopt;
         }
 
         std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseExternFunctionDefinition() {
@@ -1517,6 +1559,8 @@ namespace parser {
             while (!canConsume(Token::END_OF_FILE) && hasNext()) {
                 if (auto functionDef = parseFunctionDefinition()) {
                     module->functions.push_back(std::move(functionDef.value()));
+                } else if (auto externType = parseExternType()) {
+                    module->externTypes.push_back(std::move(externType.value()));
                 } else if (auto externFnDefintion = parseExternFunctionDefinition()) {
                     module->functions.push_back(std::move(externFnDefintion.value()));
                 } else if (auto useModule = parseUseModule()) {
@@ -1608,8 +1652,12 @@ namespace parser {
             return false;
         }
 
+        [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword, const size_t next) const {
+            return canConsume(Token::Type::KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
+        }
+
         [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword) const {
-            return canConsume(Token::Type::KEYWORD) && m_tokens[m_current].lexical() == keyword;
+            return canConsumeKeyWord(keyword, 0);
         }
     };
 

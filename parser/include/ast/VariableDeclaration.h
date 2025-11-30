@@ -48,6 +48,22 @@ namespace ast {
         }
     };
 
+    struct PointerRawType final : RawType {
+        std::unique_ptr<RawType> baseType;
+
+        PointerRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
+                       std::unique_ptr<RawType> base_type)
+            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
+              baseType(std::move(base_type)) {
+        }
+
+        ~PointerRawType() override = default;
+
+        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
+            return std::make_unique<PointerRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
+        }
+    };
+
     struct ArrayRawType final : RawType {
         std::unique_ptr<RawType> baseType;
         size_t size;

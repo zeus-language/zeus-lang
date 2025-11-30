@@ -8,6 +8,7 @@
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
+#include "ast/ArrayRepeatInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -96,6 +97,10 @@ namespace types {
                 return types::TypeRegistry::getReferenceType(type.value());
             }
             return type;
+        } else if (auto pointerType = dynamic_cast<ast::PointerRawType *>(rawType)) {
+            const auto baseType = resolveFromRawType(pointerType->baseType.get(), currentScope);
+            if (!baseType) return std::nullopt;
+            return types::TypeRegistry::getPointerType(baseType.value());
         } else if (rawType->typeModifier == ast::TypeModifier::POINTER) {
             const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
             if (!baseType) return std::nullopt;
@@ -144,6 +149,8 @@ namespace types {
     void type_check(ast::ForLoop *node, Context &context);
 
     void type_check(ast::ArrayInitializer *node, Context &context);
+
+    void type_check(ast::ArrayRepeatInitializer *node, Context &context);
 
     void type_check(ast::ArrayAccess *node, Context &context);
 
@@ -299,6 +306,9 @@ namespace types {
         }
         if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
             return type_check(methodCall, context);
+        }
+        if (const auto arrayRepeatInit = dynamic_cast<ast::ArrayRepeatInitializer *>(node)) {
+            return type_check(arrayRepeatInit, context);
         }
         assert(node != nullptr && "Node is null");
 
@@ -801,6 +811,46 @@ namespace types {
         }
     }
 
+    void type_check(ast::ArrayRepeatInitializer *node, Context &context) {
+        type_check_base(node->value(), context);
+        type_check_base(node->count(), context);
+        if (!node->value()->expressionType()) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of array value."
+            });
+            return;
+        }
+        if (node->count()->expressionType()) {
+            if (node->count()->expressionType().value()->name() != "i32") {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Array repeat count must be of type 'i32', but got '" +
+                    node->count()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of array repeat count."
+            });
+            return;
+        }
+        size_t countValue = 0;
+        if (const auto numberConst = dynamic_cast<ast::NumberConstant *>(node->count())) {
+            if (numberConst->numberType() == ast::NumberType::INTEGER) {
+                countValue = std::get<int64_t>(numberConst->value());
+            }
+        }
+        node->setExpressionType(
+            types::TypeRegistry::getArrayType(node->value()->expressionType().value(),
+                                              countValue).value());
+    }
+
     void type_check(ast::ArrayInitializer *node, Context &context) {
         auto elementType = std::shared_ptr<VariableType>(nullptr);
         for (auto &element: node->elements()) {
@@ -1187,14 +1237,6 @@ namespace types {
 
         context.currentScope = std::make_shared<Scope>(context.currentScope);
 
-        // Example type checking logic for a function definition
-        if (node->functionName() == "main" && !node->args().empty()) {
-            context.messages.push_back({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "The 'main' function must not have parameters."
-            });
-        }
 
         if (node->returnType()) {
             if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
@@ -1333,6 +1375,11 @@ namespace types {
         }
 
         context.module = module;
+        for (auto &externType: module->externTypes) {
+            context.currentScope->registerType(
+                std::make_shared<types::VariableType>(externType->fullTypeName(), types::TypeKind::VOID));
+        }
+
         // resolve global type declarations first
         for (auto &node: module->nodes) {
             if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {

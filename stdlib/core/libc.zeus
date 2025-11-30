@@ -11,3 +11,9 @@ extern fn exit(code: i32) : void;
 extern fn strlen(s: *u8) : u64;
 extern fn strcmp(s1: *u8, s2: *u8) : i32;
 extern fn strcpy(dest: *u8, src: *u8) : *u8;
+
+// file api
+extern type FILE;
+extern fn fopen(filename: *u8, mode: *u8) : *FILE;
+extern fn fclose(file: *FILE) : i32;
+extern fn fgets(buf: *u8, size: i32, file: *FILE) : *u8;

@@ -41,6 +41,7 @@
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
+#include "ast/ArrayRepeatInitializer.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -243,6 +244,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ArrayInitializer *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(const ast::ArrayRepeatInitializer *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen(const ast::ArrayAccess *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(const ast::ArrayAssignment *node, LLVMBackendState &llvmState);
@@ -338,6 +341,9 @@ namespace llvm_backend {
         }
         if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
             return llvm_backend::codegen(methodCall, llvmState);
+        }
+        if (auto arayRepeatInit = dynamic_cast<ast::ArrayRepeatInitializer *>(node)) {
+            return llvm_backend::codegen(arayRepeatInit, llvmState);
         }
 
         // Handle other node types or throw an error
@@ -636,6 +642,46 @@ namespace llvm_backend {
         }
         llvmState.Builder->CreateStore(valueToStore, elementPtr);
         return valueToStore;
+    }
+
+    llvm::Value *codegen(const ast::ArrayRepeatInitializer *node, LLVMBackendState &llvmState) {
+        const auto elementValue = codegen_base(node->value(), llvmState);
+        if (!elementValue) {
+            assert(false && "Failed to generate element value for array repeat initializer");
+            return nullptr;
+        }
+        if (!llvm::isa<llvm::Constant>(elementValue)) {
+            assert(false && "Array repeat initializer element is not a constant");
+            return nullptr;
+        }
+        const auto repeatCountValue = codegen_base(node->count(), llvmState);
+        if (!repeatCountValue) {
+            assert(false && "Failed to generate repeat count value for array repeat initializer");
+            return nullptr;
+        }
+        if (!llvm::isa<llvm::ConstantInt>(repeatCountValue)) {
+            assert(false && "Array repeat initializer count is not a constant integer");
+            return nullptr;
+        }
+        const auto repeatCount = llvm::cast<llvm::ConstantInt>(repeatCountValue)->getZExtValue();
+        std::vector<llvm::Constant *> elements;
+        for (size_t i = 0; i < repeatCount; i++) {
+            elements.push_back(llvm::cast<llvm::Constant>(elementValue));
+        }
+        const auto firstElemType = elements[0]->getType();
+        const auto arrayType = llvm::ArrayType::get(firstElemType, elements.size());
+        const auto arrayConstant = llvm::ConstantArray::get(arrayType, elements);
+        const auto hash = std::hash<std::string>{}(node->expressionToken().lexical());
+        const std::string arrayName = "array." + std::to_string(hash);
+        const auto arrayVar = new llvm::GlobalVariable(
+            *llvmState.TheModule,
+            arrayType,
+            true,
+            llvm::GlobalValue::PrivateLinkage,
+            arrayConstant,
+            arrayName
+        );
+        return arrayVar;
     }
 
     llvm::Value *codegen(const ast::ArrayInitializer *node, LLVMBackendState &llvmState) {
@@ -1790,7 +1836,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
 
     if (options.runProgram) {
-        if (!execute_command(outputStream, errorStream, (basePath / executableName).string())) {
+        if (!execute_command(outputStream, errorStream, (basePath / executableName).string(), options.runArguments)) {
             errorStream << "program could not be executed!\n";
         }
     }

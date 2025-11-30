@@ -19,6 +19,7 @@ namespace compiler {
         bool printAST = false;
         bool lsp = false;
         bool colorOutput = true;
+        std::vector<std::string> runArguments;
     };
 
     std::string shiftarg(std::vector<std::string> &args);

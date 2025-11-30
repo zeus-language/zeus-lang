@@ -1,0 +1,4 @@
+This is a sample text file used for testing purposes.
+It contains multiple lines of text.
+The quick brown fox jumps over the lazy dog.
+End of the file.

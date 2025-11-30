@@ -12,6 +12,7 @@
 #include "ast/ASTNode.h"
 
 namespace ast {
+    struct RawType;
     class FunctionDefinitionBase;
 }
 
@@ -61,6 +62,7 @@ namespace parser {
     struct Module {
         std::vector<std::shared_ptr<Module> > modules;
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
+        std::vector<std::unique_ptr<ast::RawType> > externTypes;
         std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > functions;
 
         std::vector<std::unique_ptr<ast::ASTNode> > useModuleNodes;

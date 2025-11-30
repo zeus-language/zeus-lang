@@ -8,7 +8,7 @@
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use",
-        "or", "and", "as", "struct", "extern", "match", "enum", "null"
+        "or", "and", "as", "struct", "extern", "match", "enum", "null", "type"
     };
 
 

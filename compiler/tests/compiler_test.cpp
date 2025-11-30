@@ -16,6 +16,12 @@ public:
     }
 };
 
+class CompilerIOTest : public testing::TestWithParam<std::string> {
+public:
+    static void SetUpTestSuite() {
+    }
+};
+
 class ProjectEulerTest : public testing::TestWithParam<std::string> {
 public:
     static void SetUpTestSuite() {
@@ -59,6 +65,56 @@ TEST_P(CompilerTest, TestNoError) {
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
     compiler::parse_and_compile(options, input_path, erstream, ostream);
+
+    std::ifstream file;
+    std::istringstream is;
+    std::string s;
+    std::string group;
+
+    file.open(output_path, std::ios::in);
+
+    if (!file.is_open()) {
+        std::cerr << input_path.string() << "\n";
+        std::cerr << std::filesystem::absolute(input_path);
+        FAIL();
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto expected = buffer.str();
+    std::string result = ostream.str();
+
+    result.erase(std::ranges::remove(result, '\r').begin(), result.end());
+
+
+    ASSERT_EQ(erstream.str(), "");
+    ASSERT_EQ(result, expected);
+}
+
+TEST_P(CompilerIOTest, TestReadFileNoError) {
+    // Inside a test, access the test parameter with the GetParam() method
+    // of the TestWithParam<T> class:
+    std::filesystem::path base_path = "testfiles";
+    auto name = GetParam();
+    std::filesystem::path input_path = base_path / (name + ".zeus");
+    std::filesystem::path output_path = base_path / (name + ".txt");
+    std::cerr << "current path" << std::filesystem::current_path();
+
+    if (!std::filesystem::exists(input_path))
+        std::cerr << "absolute input path: " << std::filesystem::absolute(input_path);
+    if (!std::filesystem::exists(output_path))
+        std::cerr << "absolute input path: " << std::filesystem::absolute(output_path);
+    ASSERT_TRUE(std::filesystem::exists(input_path));
+    ASSERT_TRUE(std::filesystem::exists(output_path));
+    std::stringstream ostream;
+    std::stringstream erstream;
+    compiler::CompilerOptions options;
+    options.stdlibDirectories.emplace_back("stdlib");
+    options.runProgram = true;
+    options.runArguments.push_back(output_path);
+    options.buildMode = compiler::BuildMode::Debug;
+    options.outputDirectory = std::filesystem::current_path();
+    compiler::parse_and_compile(options, input_path, erstream, ostream);
+
 
     std::ifstream file;
     std::istringstream is;
@@ -231,6 +287,9 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
                              "strings","matchint","simpleenums","structmethod","arraylist"));
+INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
+                         testing::Values("readfile"));
+
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                          testing::Values("returntype","constmodification"));
