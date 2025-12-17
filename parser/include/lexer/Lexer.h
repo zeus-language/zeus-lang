@@ -64,11 +64,14 @@ struct Token {
         CLOSE_BRACE,
         RANGE,
         NS_SEPARATOR,
-        PIPE
+        PIPE,
+        LINE_COMMENT,
+        BLOCK_COMMENT,
     } type;
 
     SourceLocation source_location;
-      Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
+
+    Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
     }
 
     [[nodiscard]] std::string lexical() const {
@@ -81,7 +84,7 @@ struct Token {
 };
 
 namespace lexer {
-    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code);
+    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments = true);
 };
 
 

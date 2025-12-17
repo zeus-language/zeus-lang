@@ -109,6 +109,101 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
     return errorsMap;
 }
 
+/**
+ *
+ * @param type
+ *                                 "namespace", "enum", "interface", "struct", "typeParameter",
+                                "parameter", "variable", "property", "enumMember", "event", "function", "method",
+                                "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator"
+ * @return
+ */
+std::optional<int> mapTokenType(Token::Type type) {
+    switch (type) {
+        case Token::Type::KEYWORD:
+            return 13;
+        case Token::Type::STRING:
+        case Token::Type::CHAR:
+            return 16;
+        case Token::Type::NUMBER:
+            return 17;
+        case Token::Type::LINE_COMMENT:
+        case Token::Type::BLOCK_COMMENT:
+            return 15;
+        case Token::Type::IDENTIFIER:
+        default:
+            return std::nullopt;
+    }
+}
+
+
+void processMultiLineToken(const Token &token, int tokenType,
+                           std::vector<uint32_t> &semanticTokens,
+                           size_t &lastRow, size_t &lastCol) {
+    const auto &source = token.source_location.source;
+    const std::string &text = token.source_location.text();
+
+    // Count newlines in token to determine if it's multi-line
+    size_t newlineCount = 0;
+
+    for (size_t i = 0; i < text.length(); ++i) {
+        if (text[i] == '\n') {
+            newlineCount++;
+            break;
+        }
+    }
+
+    if (newlineCount == 0) {
+        // Single-line token - simple case
+        if (lastRow != token.source_location.row - 1) {
+            lastCol = 0;
+        }
+
+        semanticTokens.push_back(
+            static_cast<uint32_t>(token.source_location.row - lastRow - 1)); // line delta
+        semanticTokens.push_back(
+            static_cast<uint32_t>(token.source_location.col - lastCol - 1)); // startChar delta
+        semanticTokens.push_back(static_cast<uint32_t>(token.source_location.num_bytes)); // length
+        semanticTokens.push_back(tokenType); // tokenType
+        semanticTokens.push_back(0); // tokenModifiers
+
+        lastRow = token.source_location.row - 1;
+        lastCol = token.source_location.col - 1;
+    } else {
+        // Multi-line token
+        size_t startCol = token.source_location.col - 1;
+        size_t currentRow = token.source_location.row - 1;
+
+        size_t segmentStart = 0;
+        for (size_t i = 0; i <= text.length(); ++i) {
+            if (i == text.length() || text[i] == '\n') {
+                size_t segmentLength = i - segmentStart;
+                if (segmentLength > 0) {
+                    // Emit token for this segment
+                    if (lastRow != currentRow) {
+                        lastCol = 0;
+                    }
+
+                    semanticTokens.push_back(
+                        static_cast<uint32_t>(currentRow - lastRow)); // line delta
+                    semanticTokens.push_back(
+                        static_cast<uint32_t>(startCol - lastCol)); // startChar delta
+                    semanticTokens.push_back(static_cast<uint32_t>(segmentLength)); // length
+                    semanticTokens.push_back(tokenType); // tokenType
+                    semanticTokens.push_back(0); // tokenModifiers
+
+                    lastRow = currentRow;
+                    lastCol = startCol + segmentLength;
+                }
+
+                // Move to next line
+                currentRow++;
+                startCol = 0;
+                segmentStart = i + 1;
+            }
+        }
+    }
+}
+
 LanguageServer::LanguageServer(lsp::LspOptions options) : m_options(std::move(options)) {
 }
 
@@ -141,6 +236,21 @@ void LanguageServer::handleRequest() {
                         .triggerCharacters = std::vector<std::string>{"."},
                         .resolveProvider = true,
 
+                    };
+                    result.capabilities.semanticTokensProvider = lsp::SemanticTokensOptions{
+                        .legend = lsp::SemanticTokensLegend{
+                            .tokenTypes = {
+                                "namespace", "enum", "interface", "struct", "typeParameter",
+                                "parameter", "variable", "property", "enumMember", "event", "function", "method",
+                                "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator"
+                            },
+                            .tokenModifiers = {
+                                "declaration", "definition", "readonly", "static", "deprecated", "abstract",
+                                "async", "modification", "documentation", "defaultLibrary"
+                            }
+                        },
+                        .range = false,
+                        .full = true
                     };
 
                     result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = "0.1"};
@@ -269,6 +379,27 @@ void LanguageServer::handleRequest() {
                 .add<lsp::requests::TextDocument_Completion>(
                     [&](lsp::requests::TextDocument_Completion::Params &&item) {
                         return findCompletions(item);
+                    }).add<lsp::requests::TextDocument_SemanticTokens_Full>(
+                    [&](lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
+                        auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+                        auto uri = params.textDocument.uri.toString();
+                        auto document = m_openDocuments.at(uri);
+                        auto tokens = lexer::lex_file(uri, document.text, false);
+                        auto semanticTokens = lsp::SemanticTokens{
+                            .data = std::vector<uint32_t>{}
+                        };
+                        size_t lastRow = 0;
+                        size_t lastCol = 0;
+                        for (const auto &token: tokens) {
+                            if (auto tokenType = mapTokenType(token.type)) {
+                                // Use helper function to properly handle multi-line tokens
+                                // (especially block comments that span multiple lines)
+                                processMultiLineToken(token, tokenType.value(), semanticTokens.data,
+                                                      lastRow, lastCol);
+                            }
+                        }
+                        result.emplace(semanticTokens);
+                        return result;
                     });
 
         // Main loop

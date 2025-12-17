@@ -2,9 +2,9 @@ use std::math;
 
 fn main():i32 {
     let x: float = 0.5;
-    let y: float = math::sin(x);
-    let z: float = math::cos(x);
-    let r: float = math::sqrt(x * x + y * y + z * z);
+    let y: float = sin(x);
+    let z: float = cos(x);
+    let r: float = sqrt(x * x + y * y + z * z);
 
     println("sin($x) = $y");
     println("cos($x) = $z");

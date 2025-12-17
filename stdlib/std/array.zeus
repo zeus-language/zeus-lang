@@ -3,6 +3,10 @@ fn panic(msg : *u8) : void {
     printf("Panic: %s\n" as *u8, msg);
     exit(1);
 }
+/**
+* A dynamic array implementation in Zeus
+* @tparam T The type of elements stored in the array
+*/
 struct array<T>{
     length : i64,
     capacity : i64,

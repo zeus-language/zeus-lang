@@ -82,11 +82,12 @@ namespace lexer {
             char next = content[start + 1];
             *endPosition = start + 1;
 
-            while (current != '*' && next != '/' && current != 0) {
+            while (!(current == '*' && next == '/') && current != 0) {
                 *endPosition += 1;
                 current = content[*endPosition];
                 next = content[*endPosition + 1];
             }
+            *endPosition += 1;
             return true;
         }
         if (content[start] == '/' && content[start + 1] == '/') {
@@ -127,7 +128,7 @@ namespace lexer {
         return true;
     }
 
-    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code) {
+    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments) {
         std::vector<Token> tokens;
         const auto contentPtr = std::make_shared<std::string>(source_code);
         size_t row = 1;
@@ -164,13 +165,27 @@ namespace lexer {
             found = find_comment(source_code, start, &endPosition);
             if (found) {
                 // count lines
+
+                size_t offset = endPosition - start + 1;
+
+                if (!skipComments) {
+                    SourceLocation source_location = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                        .row = row,
+                        .col = col
+                    };
+                    if (source_code[start] == '/' && source_code[start + 1] == '/') {
+                        tokens.emplace_back(Token::LINE_COMMENT, source_location);
+                    } else {
+                        tokens.emplace_back(Token::BLOCK_COMMENT, source_location);
+                    }
+                }
                 for (size_t i = start; i < endPosition; i++) {
                     if (source_code[i] == '\n')
                         row++;
                 }
-                size_t offset = endPosition - start;
                 start = endPosition;
-                col += offset + 1;
+                col += offset;
                 continue;
             }
             found = find_fixed_token(source_code, start, &endPosition);

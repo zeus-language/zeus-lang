@@ -41,6 +41,18 @@ namespace ast {
             return m_is_inclusive;
         }
 
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            auto result = m_start->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            result = m_end->getNodeByToken(token);
+            if (result.has_value()) {
+                return result;
+            }
+            return std::nullopt;
+        }
+
         std::unique_ptr<ASTNode> clone() override {
             auto cloneNode = std::make_unique<RangeExpression>(expressionToken(),
                                                                m_start->clone(),
