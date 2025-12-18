@@ -79,6 +79,10 @@ namespace ast {
                 arg->makeNonGeneric(genericParam);
             }
         }
+
+        void setNamespacePrefix(const std::vector<Token> &nsPrefix) {
+            m_namespacePrefix = nsPrefix;
+        }
     };
 } // ast
 

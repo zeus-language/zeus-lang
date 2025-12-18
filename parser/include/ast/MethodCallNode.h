@@ -28,6 +28,12 @@ namespace ast {
         [[nodiscard]] std::string functionSignature() const {
             std::string signature;
             signature += functionName() + "(";
+            signature += m_instanceNode->expressionType().has_value()
+                             ? m_instanceNode->expressionType().value()->name()
+                             : "unknown";
+            if (!m_args.empty()) {
+                signature += ", ";
+            }
             for (size_t i = 0; i < m_args.size(); ++i) {
                 if (m_args[i]->expressionType().has_value()) {
                     signature += m_args[i]->expressionType().value()->name();
@@ -51,7 +57,9 @@ namespace ast {
 
         MethodCallNode &operator=(const MethodCallNode &) = delete;
 
-        [[nodiscard]] ast::ASTNode *instanceNode() const { return m_instanceNode.get(); }
+        [[nodiscard]] ast::ASTNode *instanceNode() const {
+            return m_instanceNode.get();
+        }
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             for (auto &arg: m_args) {

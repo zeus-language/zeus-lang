@@ -1397,9 +1397,12 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
         }
-        const auto functionCall = llvmState.TheModule->getFunction(methodName);
+        auto functionCall = llvmState.TheModule->getFunction(methodName);
         if (!functionCall) {
-            std::cerr << "Method " << methodName << " not found in module.\n";
+            functionCall = llvmState.TheModule->getFunction(node->functionSignature());
+        }
+        if (!functionCall) {
+            std::cerr << "Method " << node->functionSignature() << " not found in module.\n";
             assert(false && "Method not declared before call");
 
             return nullptr; // Error handling
@@ -1450,12 +1453,13 @@ namespace llvm_backend {
             const uint64_t typeSize = DL.getTypeAllocSize(llvmType);
             return llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), typeSize);
         }
-
-
-        const auto functionCall = llvmState.TheModule->getFunction(node->functionName());
+        auto functionCall = llvmState.TheModule->getFunction(node->functionName());
+        if (!functionCall) {
+            functionCall = llvmState.TheModule->getFunction(node->functionSignature());
+        }
 
         if (!functionCall) {
-            std::cerr << "Function " << node->functionName() << " not found in module.\n";
+            std::cerr << "Function " << node->functionSignature() << " not found in module.\n";
             assert(false && "Function not declared before call");
 
             return nullptr; // Error handling
@@ -1561,12 +1565,15 @@ namespace llvm_backend {
         }
         llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
         auto linkage = llvm::Function::ExternalLinkage;
+        std::string mangledName = node->functionName();
         if (node->functionName() != "main") {
             linkage = llvm::Function::PrivateLinkage;
+            mangledName = node->functionSignature();
         }
+        // uncomment for debugging
+        //std::cerr << "Creating function stub for " << mangledName << "\n";
 
-
-        const auto functionDefinition = llvm::Function::Create(FT, linkage, node->functionName(),
+        const auto functionDefinition = llvm::Function::Create(FT, linkage, mangledName,
                                                                llvmState.TheModule.get());
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
         functionDefinition->addFnAttr(llvm::Attribute::NoFree);
@@ -1586,9 +1593,13 @@ namespace llvm_backend {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
             }
         }
+        auto mangledName = node->functionSignature();
+        if (node->functionName() == "main") {
+            mangledName = "main";
+        }
 
-
-        const auto functionDefinition = llvmState.TheModule->getFunction(node->functionName());
+        const auto functionDefinition = llvmState.TheModule->getFunction(mangledName);
+        assert(functionDefinition && "Function definition not found in module");
 
         llvm::BasicBlock *functionBaseBlock = llvm::BasicBlock::Create(*llvmState.TheContext,
                                                                        functionDefinition->getName(),

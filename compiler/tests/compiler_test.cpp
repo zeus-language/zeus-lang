@@ -144,7 +144,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "projecteuler";
-    auto name = GetParam();
+    const auto name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
     ASSERT_TRUE(std::filesystem::exists(input_path));
@@ -286,7 +286,7 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
-                             "strings","matchint","simpleenums","structmethod","arraylist"));
+                             "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

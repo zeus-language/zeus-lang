@@ -1,0 +1,18 @@
+
+fn add(x : i32, y : i32) : i32 {
+    return x + y;
+}
+
+fn add(x : double, y : double) : double {
+    return x + y;
+}
+
+fn main() : void {
+    let int_result : i32 = add(5, 10);
+    let float_result : double = add(5.5 as double, 10.2 as double);
+
+    println("Integer addition result:");
+    println(int_result);
+    println("Float addition result:");
+    println(float_result);
+}

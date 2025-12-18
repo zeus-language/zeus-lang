@@ -1,0 +1,4 @@
+Integer addition result:
+15
+Float addition result:
+15.700000

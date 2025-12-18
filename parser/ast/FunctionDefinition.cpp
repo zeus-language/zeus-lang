@@ -41,8 +41,11 @@ namespace ast {
 
         signature += functionName() + "(";
         for (size_t i = 0; i < m_args.size(); ++i) {
-            signature += m_args[i].rawType->typeToken.lexical();
-
+            if (m_args[i].type.has_value()) {
+                signature += m_args[i].type.value()->name();
+            } else {
+                signature += "unknown";
+            }
             if (i < m_args.size() - 1) {
                 signature += ", ";
             }

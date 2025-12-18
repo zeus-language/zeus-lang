@@ -1079,10 +1079,13 @@ namespace types {
             node->setExpressionType(context.currentScope->getTypeByName("i64").value());
             return;
         }
-
+        ast::FunctionDefinitionBase *lastFunctionDefinition = nullptr;
+        bool functionMatchFound = false;
+        std::vector<parser::ParserMessasge> messages;
         for (const auto funcDef: context.findFunctionsByName(node->modulePathName(), node->functionName())) {
             type_check_base(funcDef, context);
-
+            lastFunctionDefinition = funcDef;
+            messages.clear();
             if (funcDef->functionName() == node->functionName()) {
                 if (funcDef->args().size() != node->args().size()) {
                     context.messages.push_back({
@@ -1092,15 +1095,16 @@ namespace types {
                         std::to_string(funcDef->args().size()) + " arguments, but got " +
                         std::to_string(node->args().size()) + "."
                     });
-                    return;
+                    continue;
                 }
                 bool argsMatch = true;
+
                 for (size_t i = 0; i < funcDef->args().size(); ++i) {
                     if (!node->args()[i]->expressionType() ||
                         !funcDef->args()[i].type ||
                         *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
                     ) {
-                        context.messages.push_back({
+                        messages.push_back({
                             parser::OutputType::ERROR,
                             node->args()[i]->expressionToken(),
                             "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
@@ -1114,7 +1118,9 @@ namespace types {
                         argsMatch = false;
                     }
                 }
-                if (!argsMatch) return;
+                if (!argsMatch) {
+                    continue;
+                }
                 if (funcDef->returnType() && node->genericParam()) {
                     auto rawType = funcDef->returnType().value();
 
@@ -1133,9 +1139,25 @@ namespace types {
                 } else {
                     node->setExpressionType(context.currentScope->getTypeByName("void").value());
                 }
+                node->setNamespacePrefix(funcDef->modulePath());
                 return;
             }
         }
+        if (!functionMatchFound) {
+            if (lastFunctionDefinition) {
+                // there was a function with the same name but different arguments
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Function '" + node->functionName() + "' called with incorrect arguments."
+                });
+                for (const auto &msg: messages) {
+                    context.messages.push_back(msg);
+                }
+                return;
+            }
+        }
+
         context.messages.push_back({
             parser::OutputType::ERROR,
             node->expressionToken(),

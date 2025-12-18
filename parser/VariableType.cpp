@@ -5,7 +5,6 @@
 
 #include "ast/FieldAccess.h"
 #include "ast/FunctionDefinition.h"
-#include "ast/VariableAssignment.h"
 
 
 std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
@@ -95,15 +94,15 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
         for (auto &arg: method->args()) {
             if (arg.name.lexical() == "self") {
                 if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(arg.type.value())) {
-                    arg.type = std::make_shared<types::PointerType>(ptrType->name(), structType);
+                    arg.type = std::make_shared<types::PointerType>("*" + structType->name(), structType);
                 }
                 if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(arg.type.value())) {
-                    arg.type = std::make_shared<types::ReferenceType>(refType->name(), structType);
+                    arg.type = std::make_shared<types::ReferenceType>("&" + structType->name(), structType);
                 } else {
                     arg.type = structType;
                 }
             }
         }
-        return structType;
     }
+    return structType;
 }
