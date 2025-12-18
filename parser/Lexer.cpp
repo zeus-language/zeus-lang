@@ -111,20 +111,24 @@ namespace lexer {
 
 
     bool find_number(const std::string &content, const size_t start, size_t *endPosition) {
+        *endPosition = start;
         int index = 0;
         char current = content[start];
         if (current == '-' && !isNumberStart(content[start + 1]))
             return false;
         if (!isNumberStart(current))
             return false;
+        *endPosition += 1;
+        current = content[*endPosition];
+        index++;
         while (isNumber(current) or (index == 0 and current == '-') or
                (current == '.' and isNumber(content[*endPosition + 1]))) {
             *endPosition += 1;
             current = content[*endPosition];
             index++;
-        }
-        if (current < '0' || current > '9')
-            *endPosition -= 1;
+        };
+        // if (current < '0' || current > '9')
+        //     *endPosition -= 1;
         return true;
     }
 
@@ -204,7 +208,7 @@ namespace lexer {
 
             found = find_number(source_code, start, &endPosition);
             if (found) {
-                const size_t offset = endPosition - start + 1;
+                const size_t offset = endPosition - start;
 
 
                 SourceLocation source_location = {
