@@ -1158,6 +1158,36 @@ namespace parser {
             consume(Token::Type::IDENTIFIER);
             consume(Token::Type::COLON);
             const auto isConstant = !tryConsumeKeyWord("mut");
+            if (tryConsumeKeyWord("fn")) {
+                consume(Token::Type::LEFT_CURLY);
+                std::vector<std::unique_ptr<ast::RawType> > functionArgs;
+                while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                    if (auto arg = parseRawType()) {
+                        functionArgs.push_back(std::move(arg.value()));
+                        tryConsume(Token::COMMA);
+                    } else {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "a function argument but found '" + current().lexical() + "'"
+                        });
+                        break;
+                    }
+                }
+                consume(Token::Type::RIGHT_CURLY);
+                consume(Token::COLON);
+                auto returnType = parseRawType();
+                if (!returnType) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected return type after ':' in function argument!"
+                    });
+                    return std::nullopt;
+                }
+                return ast::FunctionArgument(nameToken,
+                                             std::make_unique<ast::FunctionRawType>(
+                                                 nameToken, std::move(functionArgs), std::move(returnType.value())),
+                                             isConstant);
+            }
             auto rawType = parseRawType();
             if (!rawType) {
                 m_messages.push_back(ParserMessasge{

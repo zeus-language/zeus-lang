@@ -1,0 +1,19 @@
+
+fn do_function(f: fn(i32) : i32, value: i32) : i32 {
+    return f(value);
+}
+fn square(x: i32) : i32 {
+    return x * x;
+}
+fn increment(x: i32) : i32 {
+    return x + 1;
+}
+fn main() : i32{
+    let val1 : i32 = do_function(square, 5);
+    let val2 : i32 = do_function(increment, 5);
+    println("Square of 5:");
+    println(val1);
+    println("Increment of 5:");
+    println(val2);
+    return 0;
+}

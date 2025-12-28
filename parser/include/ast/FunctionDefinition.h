@@ -61,6 +61,8 @@ namespace ast {
 
         std::vector<FunctionArgument> &args();
 
+        std::shared_ptr<types::VariableType> asFunctionType() const;
+
         explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,
                                         std::optional<std::unique_ptr<RawType> > returnType) : ASTNode(std::move(
                 functionName)),

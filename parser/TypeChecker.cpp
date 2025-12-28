@@ -101,6 +101,25 @@ namespace types {
             const auto baseType = resolveFromRawType(pointerType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
             return types::TypeRegistry::getPointerType(baseType.value());
+        } else if (auto functionType = dynamic_cast<ast::FunctionRawType *>(rawType)) {
+            // Function types are not supported as variable types
+            std::vector<std::shared_ptr<VariableType> > argTypes;
+            for (const auto &argRawType: functionType->argumentTypes) {
+                const auto argType = resolveFromRawType(argRawType.get(), currentScope);
+                if (!argType) return std::nullopt;
+                argTypes.push_back(argType.value());
+            }
+            const auto returnType = resolveFromRawType(functionType->returnType.get(), currentScope);
+            if (!returnType) return std::nullopt;
+            std::string name = "fn(";
+            for (size_t i = 0; i < argTypes.size(); ++i) {
+                name += argTypes[i]->name();
+                if (i < argTypes.size() - 1) {
+                    name += ",";
+                }
+            }
+            name += "):" + returnType.value()->name();
+            return std::make_shared<FunctionType>(name, argTypes, returnType.value());
         } else if (rawType->typeModifier == ast::TypeModifier::POINTER) {
             const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
             if (!baseType) return std::nullopt;
@@ -978,7 +997,15 @@ namespace types {
     void type_check(ast::VariableAccess *node, Context &context) {
         if (node->expressionToken().lexical() == "_")
             return;
-        auto var = context.currentScope->findVariable(node->expressionToken().lexical());
+        const auto var = context.currentScope->findVariable(node->expressionToken().lexical());
+        const auto functions = context.findFunctionsByName("", node->expressionToken().lexical());
+        if (!var && !functions.empty()) {
+            for (auto &func: functions) {
+                type_check_base(func, context);
+            }
+            node->setExpressionType(functions[0]->asFunctionType());
+            return;
+        }
         if (!var) {
             context.messages.push_back({
                 parser::OutputType::ERROR,
@@ -1057,7 +1084,7 @@ namespace types {
             node->setExpressionType(context.currentScope->getTypeByName("void").value());
             return;
         } else if (node->functionName() == "sizeof") {
-            if (node->args().size() != 0) {
+            if (!node->args().empty()) {
                 context.messages.push_back({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
@@ -1074,12 +1101,12 @@ namespace types {
                 return;
             }
             // 'sizeof' returns an integer type
-            if (auto type = context.currentScope->getTypeByName(node->genericParam().value().lexical(), false))
+            if (const auto type = context.currentScope->getTypeByName(node->genericParam().value().lexical(), false))
                 node->setGenericType(type.value());
             node->setExpressionType(context.currentScope->getTypeByName("i64").value());
             return;
         }
-        ast::FunctionDefinitionBase *lastFunctionDefinition = nullptr;
+        const ast::FunctionDefinitionBase *lastFunctionDefinition = nullptr;
         bool functionMatchFound = false;
         std::vector<parser::ParserMessasge> messages;
         for (const auto funcDef: context.findFunctionsByName(node->modulePathName(), node->functionName())) {
@@ -1122,12 +1149,14 @@ namespace types {
                     continue;
                 }
                 if (funcDef->returnType() && node->genericParam()) {
-                    auto rawType = funcDef->returnType().value();
+                    const auto rawType = funcDef->returnType().value();
 
                     auto nonGenericType = context.currentScope->getTypeByName(rawType->fullTypeName(), false);
                     if (nonGenericType) {
-                        auto param = context.currentScope->getTypeByName(node->genericParam().value().lexical(), false);
-                        auto typeWithGeneric = context.currentScope->getTypeByName(rawType->typeToken.lexical(), true);
+                        const auto param = context.currentScope->getTypeByName(
+                            node->genericParam().value().lexical(), false);
+                        const auto typeWithGeneric = context.currentScope->getTypeByName(
+                            rawType->typeToken.lexical(), true);
                         nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
                         context.currentScope->registerType(nonGenericType.value());
                     }
@@ -1143,6 +1172,52 @@ namespace types {
                 return;
             }
         }
+        // look for variable with function name
+        if (const auto var = context.currentScope->findVariable(node->functionName())) {
+            if (const auto funcType = std::dynamic_pointer_cast<types::FunctionType>(var->type)) {
+                if (funcType->argumentTypes().size() != node->args().size()) {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Function variable '" + node->functionName() + "' expects " +
+                        std::to_string(funcType->argumentTypes().size()) + " arguments, but got " +
+                        std::to_string(node->args().size()) + "."
+                    });
+                } else {
+                    bool argsMatch = true;
+                    for (size_t i = 0; i < funcType->argumentTypes().size(); ++i) {
+                        if (!node->args()[i]->expressionType() ||
+                            *funcType->argumentTypes()[i] != *node->args()[i]->expressionType().value()
+                        ) {
+                            messages.push_back({
+                                parser::OutputType::ERROR,
+                                node->args()[i]->expressionToken(),
+                                "Type mismatch for argument " + std::to_string(i + 1) + " in function variable '" +
+                                node->functionName() + "': expected '" +
+                                funcType->argumentTypes()[i]->name() + "', but got '" +
+                                (node->args()[i]->expressionType()
+                                     ? node->args()[i]->expressionType().value()->name()
+                                     : "unknown") + "'."
+                            });
+                            argsMatch = false;
+                        }
+                    }
+                    if (argsMatch) {
+                        node->setExpressionType(funcType->returnType());
+                        functionMatchFound = true;
+                        return;
+                    }
+                }
+            } else {
+                context.messages.push_back({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "'" + node->functionName() + "' is not a function."
+                });
+                return;
+            }
+        }
+
         if (!functionMatchFound) {
             if (lastFunctionDefinition) {
                 // there was a function with the same name but different arguments
@@ -1185,10 +1260,10 @@ namespace types {
                 "'."
             });
             return;
-        } else {
-            node->setExpressionType(varType.value());
         }
-        auto varName = node->expressionToken().lexical();
+        node->setExpressionType(varType.value());
+
+        const auto varName = node->expressionToken().lexical();
         if (context.currentScope->findVariable(varName)) {
             context.messages.push_back({
                 parser::OutputType::ERROR,
@@ -1397,7 +1472,7 @@ namespace types {
         }
 
         context.module = module;
-        for (auto &externType: module->externTypes) {
+        for (const auto &externType: module->externTypes) {
             context.currentScope->registerType(
                 std::make_shared<types::VariableType>(externType->fullTypeName(), types::TypeKind::VOID));
         }

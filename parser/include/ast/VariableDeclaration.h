@@ -82,6 +82,28 @@ namespace ast {
         }
     };
 
+    struct FunctionRawType final : RawType {
+        std::vector<std::unique_ptr<RawType> > argumentTypes;
+        std::unique_ptr<RawType> returnType;
+
+        FunctionRawType(const Token &type_token, std::vector<std::unique_ptr<RawType> > argument_types,
+                        std::unique_ptr<RawType> return_type)
+            : RawType(type_token, {}, TypeModifier::NONE, std::nullopt),
+              argumentTypes(std::move(argument_types)),
+              returnType(std::move(return_type)) {
+        }
+
+        ~FunctionRawType() override = default;
+
+        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
+            std::vector<std::unique_ptr<RawType> > argTypesClones;
+            for (const auto &argType: argumentTypes) {
+                argTypesClones.push_back(argType->clone());
+            }
+            return std::make_unique<FunctionRawType>(typeToken, std::move(argTypesClones), returnType->clone());
+        }
+    };
+
     class VariableDeclaration final : public ASTNode {
     private:
         std::unique_ptr<RawType> m_type;

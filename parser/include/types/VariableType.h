@@ -24,6 +24,7 @@ namespace types {
         ARRAY,
         ENUM,
         GENERIC,
+        FUNCTION
     };
 
     class VariableType {
@@ -212,6 +213,28 @@ namespace types {
         explicit GenericType(const std::string &genericParam) : VariableType(genericParam,
                                                                              TypeKind::GENERIC),
                                                                 m_genericParam(genericParam) {
+        }
+    };
+
+    class FunctionType final : public VariableType {
+        std::vector<std::shared_ptr<VariableType> > m_argumentTypes;
+        std::shared_ptr<VariableType> m_returnType;
+
+    public:
+        FunctionType(std::string name,
+                     std::vector<std::shared_ptr<VariableType> > argumentTypes,
+                     std::shared_ptr<VariableType> returnType) : VariableType(std::move(name),
+                                                                              TypeKind::FUNCTION),
+                                                                 m_argumentTypes(std::move(argumentTypes)),
+                                                                 m_returnType(std::move(returnType)) {
+        }
+
+        [[nodiscard]] const std::vector<std::shared_ptr<VariableType> > &argumentTypes() const {
+            return m_argumentTypes;
+        }
+
+        [[nodiscard]] std::shared_ptr<VariableType> returnType() const {
+            return m_returnType;
         }
     };
 }

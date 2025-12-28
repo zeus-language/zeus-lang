@@ -1,0 +1,4 @@
+Square of 5:
+25
+Increment of 5:
+6

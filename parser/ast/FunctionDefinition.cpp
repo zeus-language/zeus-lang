@@ -32,6 +32,32 @@ namespace ast {
         return m_args;
     }
 
+    std::shared_ptr<types::VariableType> FunctionDefinitionBase::asFunctionType() const {
+        std::vector<std::shared_ptr<types::VariableType> > argTypes;
+        std::string name = "fn(";
+        for (const auto &arg: m_args) {
+            if (arg.type.has_value()) {
+                argTypes.push_back(arg.type.value());
+            } else {
+                argTypes.push_back(nullptr);
+            }
+            name += argTypes.back() ? argTypes.back()->name() : "unknown";
+            name += ", ";
+        }
+        if (!m_args.empty()) {
+            name = name.substr(0, name.size() - 2); // Remove last ", "
+        }
+        name += ")";
+
+        std::shared_ptr<types::VariableType> returnType = nullptr;
+        if (expressionType()) {
+            returnType = expressionType().value();
+        }
+        name += ":" + (returnType ? returnType->name() : "unknown");
+
+        return std::make_shared<types::FunctionType>(name, argTypes, returnType);
+    }
+
 
     std::string FunctionDefinitionBase::functionSignature() const {
         std::string signature;

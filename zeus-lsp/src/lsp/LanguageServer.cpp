@@ -157,6 +157,9 @@ void processMultiLineToken(const Token &token, int tokenType,
         if (lastRow != token.source_location.row - 1) {
             lastCol = 0;
         }
+        // std::cerr << "type of token: " << tokenType << "\n";
+        // std::cerr << "Emitting token at row " << token.source_location.row - 1 << ", col "
+        //         << token.source_location.col - 1 << ", length " << token.source_location.num_bytes << "\n";
 
         semanticTokens.push_back(
             static_cast<uint32_t>(token.source_location.row - lastRow - 1)); // line delta

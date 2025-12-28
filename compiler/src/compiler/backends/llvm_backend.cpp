@@ -75,16 +75,22 @@ namespace llvm_backend {
         bool BlockUsed = false;
     };
 
+    struct Allocation {
+        llvm::AllocaInst *allocaInst;
+        std::shared_ptr<types::VariableType> type;
+    };
+
     struct LLVMBackendState {
     private:
         std::vector<ast::FunctionDefinitionBase *> function_definition;
+        std::unordered_map<std::string, Allocation> NamedAllocations;
+        std::unordered_map<std::string, llvm::Value *> NamedValues;
 
     public:
         std::unique_ptr<llvm::LLVMContext> TheContext;
         std::unique_ptr<llvm::Module> TheModule;
         std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > Builder;
-        std::unordered_map<std::string, llvm::AllocaInst *> NamedAllocations;
-        std::unordered_map<std::string, llvm::Value *> NamedValues;
+
         llvm::Function *TopLevelFunction{};
         std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
 
@@ -102,14 +108,48 @@ namespace llvm_backend {
                 return NamedValues[name];
             }
             if (NamedAllocations.contains(name)) {
-                if (!loadValue) return NamedAllocations[name];
-                return Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name], name);
+                if (!loadValue) return NamedAllocations[name].allocaInst;
+                return Builder->CreateLoad(NamedAllocations[name].allocaInst->getAllocatedType(),
+                                           NamedAllocations[name].allocaInst, name);
+            }
+            return nullptr;
+        }
+
+        std::shared_ptr<types::VariableType> findVariableType(const std::string &name) {
+            if (NamedAllocations.contains(name)) {
+                return NamedAllocations[name].type;
             }
             return nullptr;
         }
 
         void registerFunction(ast::FunctionDefinitionBase *function) {
             function_definition.emplace_back(function);
+        }
+
+        void addNamedValue(const std::string &name, llvm::Value *value) {
+            NamedValues[name] = value;
+        }
+
+        void removeNamedValue(const std::string &name) {
+            NamedValues.erase(name);
+        }
+
+        void removeNamedAllocation(const std::string &name) {
+            NamedAllocations.erase(name);
+        }
+
+        void clearNamedValues() {
+            NamedValues.clear();
+        }
+
+        void clearNamedAllocations() {
+            NamedAllocations.clear();
+        }
+
+        llvm::AllocaInst *addNamedAllocation(const std::string &name, llvm::AllocaInst *allocaInst,
+                                             const std::shared_ptr<types::VariableType> &type) {
+            NamedAllocations[name] = Allocation{allocaInst, type};
+            return allocaInst;
         }
 
         std::optional<ast::FunctionDefinitionBase *> findFunction(const std::string &name) {
@@ -137,7 +177,8 @@ namespace llvm_backend {
         InitializeNativeTargetAsmPrinter();
     }
 
-    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context);
+    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
+                                bool functionTypeAsPointer = true);
 
     llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType, LLVMBackendState &context) {
         const auto typeName = structType->linkageName();
@@ -156,7 +197,8 @@ namespace llvm_backend {
         return cached_type;
     }
 
-    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context) {
+    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
+                                bool functionTypeAsPointer) {
         assert(value != nullptr && "Type is null");
         if (const auto &intType = std::dynamic_pointer_cast<types::IntegerType>(value)) {
             //return llvm::Type::getIntNTy(*context.TheContext, intType->size() * 8);
@@ -186,6 +228,22 @@ namespace llvm_backend {
             case types::TypeKind::GENERIC:
                 assert(false && "Generic types should be resolved before LLVM codegen");
                 return nullptr;
+            case types::TypeKind::FUNCTION:
+                if (functionTypeAsPointer)
+                    return llvm::PointerType::getUnqual(*context.TheContext);
+
+                if (const auto &funcType = std::dynamic_pointer_cast<types::FunctionType>(value)) {
+                    std::vector<llvm::Type *> argTypes;
+                    for (const auto &argType: funcType->argumentTypes()) {
+                        const auto llvmArgType = resolveLlvmType(argType, context);
+                        if (llvmArgType == nullptr) return nullptr;
+                        argTypes.push_back(llvmArgType);
+                    }
+                    const auto returnType = resolveLlvmType(funcType->returnType(), context);
+                    if (returnType == nullptr) return nullptr;
+                    return llvm::FunctionType::get(returnType, argTypes, false);
+                }
+                break;
             case types::TypeKind::ARRAY:
                 if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(value)) {
                     const auto baseType = resolveLlvmType(arrayType->baseType(), context);
@@ -833,7 +891,7 @@ namespace llvm_backend {
                 loadedValue = llvmState.Builder->CreateIntCast(loadedValue, llvmVarType, true, "for_elem_cast");
             }
             if (node->isConstant()) {
-                llvmState.NamedValues[node->iteratorToken().lexical()] = loadedValue;
+                llvmState.addNamedValue(node->iteratorToken().lexical(), loadedValue);
             }
         }
 
@@ -903,7 +961,7 @@ namespace llvm_backend {
         }
 
         llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2, node->iteratorToken().lexical());
-        llvmState.NamedValues[node->iteratorToken().lexical()] = Variable;
+        llvmState.addNamedValue(node->iteratorToken().lexical(), Variable);
         auto range = dynamic_cast<ast::RangeExpression *>(node->range());
         // Initialize the PHI node with the start value.
         auto startValue = codegen_base(range->start(), llvmState);
@@ -1202,33 +1260,33 @@ namespace llvm_backend {
 
 
     llvm::Value *codegen(const ast::VariableAccess *node, LLVMBackendState &llvmState) {
-        const std::string name = node->expressionToken().lexical();
-        auto &NamedValues = llvmState.NamedValues;
-        auto &NamedAllocations = llvmState.NamedAllocations;
-
-        if (NamedValues.contains(name)) {
-            const auto value = NamedValues[name];
-
+        if (const auto value = llvmState.findVariable(node->expressionToken().lexical(), false)) {
+            if (auto alloca = llvm::dyn_cast<llvm::AllocaInst>(value)) {
+                if (alloca->getAllocatedType()->isArrayTy() or alloca->getAllocatedType()->isStructTy())
+                    return alloca;
+                return llvmState.Builder->CreateLoad(alloca->getAllocatedType(), alloca,
+                                                     node->expressionToken().lexical());
+            }
             return value;
         }
-        if (NamedAllocations.contains(name)) {
-            if (NamedAllocations[name]->getAllocatedType()->isArrayTy() or NamedAllocations[name]->getAllocatedType()->
-                isStructTy()) {
-                return NamedAllocations[name];
+        if (auto func = llvmState.findFunction(node->expressionToken().lexical())) {
+            auto result = llvmState.TheModule->getFunction(func.value()->functionName());
+            if (!result) {
+                result = llvmState.TheModule->getFunction(func.value()->functionSignature());
             }
-            return llvmState.Builder->CreateLoad(NamedAllocations[name]->getAllocatedType(), NamedAllocations[name],
-                                                 name);
+            assert(result != nullptr && "Function not found in module");
+            return result;
         }
         return nullptr;
     }
 
     llvm::Value *codegen(const ast::VariableAssignment *node, LLVMBackendState &llvmState) {
-        const auto alloca = llvmState.NamedAllocations.at(node->expressionToken().lexical());
+        const auto alloca = llvmState.findVariable(node->expressionToken().lexical(), false);
         if (!alloca) {
             assert(false && "Variable not declared before assignment");
             return nullptr;
         }
-        const auto type = alloca->getAllocatedType();
+        const auto type = alloca->getType();
         const auto expressionResult = codegen_base(node->expression(), llvmState);
         if (type->isStructTy()) {
             // we might have to free the value
@@ -1265,29 +1323,29 @@ namespace llvm_backend {
         llvm::Type *varType = resolveLlvmType(node->expressionType().value(), llvmState);
 
         if (node->constant() && !varType->isStructTy()) {
-            llvmState.NamedValues[node->expressionToken().lexical()] = nullptr;
+            llvmState.addNamedValue(node->expressionToken().lexical(), nullptr);
             // Handle constant variable declaration if needed
             if (const auto initialValue = node->initialValue()) {
                 if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
-                    llvmState.NamedValues[node->expressionToken().lexical()] = initValue;
+                    llvmState.addNamedValue(node->expressionToken().lexical(), initValue);
                 } else {
                     assert(false && "Failed to generate initial value for constant");
                     return nullptr;
                 }
             }
-            return llvmState.NamedValues[node->expressionToken().lexical()];
+            return llvmState.findVariable(node->expressionToken().lexical());
         }
 
 
         llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr,
                                                                    node->expressionToken().lexical());
-        llvmState.NamedAllocations[node->expressionToken().lexical()] = alloca;
+        llvmState.addNamedAllocation(node->expressionToken().lexical(), alloca, node->expressionType().value());
 
         if (const auto initialValue = node->initialValue()) {
             if (const auto stringConstant = dynamic_cast<ast::StringConstant *>(initialValue.value())) {
                 const auto strValue = codegen(stringConstant, llvmState);
 
-                llvmState.Builder->CreateMemCpy(llvmState.NamedAllocations[node->expressionToken().lexical()],
+                llvmState.Builder->CreateMemCpy(alloca,
                                                 llvm::MaybeAlign(),
                                                 strValue,
                                                 llvm::MaybeAlign(),
@@ -1301,7 +1359,7 @@ namespace llvm_backend {
                                        ? strValue
                                        : getLoadStorePointerOperand(strValue);
 
-                llvmState.Builder->CreateMemCpy(llvmState.NamedAllocations[node->expressionToken().lexical()],
+                llvmState.Builder->CreateMemCpy(alloca,
                                                 llvm::MaybeAlign(),
                                                 value,
                                                 llvm::MaybeAlign(),
@@ -1457,6 +1515,28 @@ namespace llvm_backend {
         if (!functionCall) {
             functionCall = llvmState.TheModule->getFunction(node->functionSignature());
         }
+        auto functionVar = llvmState.findVariable(node->functionName());
+        // call the function through function pointer
+        if (!functionCall && functionVar) {
+            auto type = llvmState.findVariableType(node->functionName());
+            auto functionType = resolveLlvmType(type, llvmState, false);
+
+            std::vector<llvm::Value *> args;
+            size_t i = 0;
+            for (const auto &arg: node->args()) {
+                if (auto value = codegen_base(arg.get(), llvmState)) {
+                    args.push_back(value);
+                } else {
+                    return nullptr; // Error handling
+                }
+                i++;
+            }
+            const auto call = llvmState.Builder->CreateCall(llvm::cast<llvm::FunctionType>(functionType),
+                                                            functionVar, args);
+            if (!llvm::cast<llvm::FunctionType>(functionType)->getReturnType()->isVoidTy())
+                return call;
+            return nullptr;
+        }
 
         if (!functionCall) {
             std::cerr << "Function " << node->functionSignature() << " not found in module.\n";
@@ -1470,6 +1550,7 @@ namespace llvm_backend {
             if (auto value = codegen_base(arg.get(), llvmState)) {
                 args.push_back(value);
             } else {
+                assert(false && "Failed to generate argument for function call");
                 return nullptr; // Error handling
             }
             i++;
@@ -1612,8 +1693,13 @@ namespace llvm_backend {
             arg.setName(param.name.lexical());
             // Create an alloca for this variable.
             const auto varType = resolveLlvmType(param.type.value(), llvmState);
-            llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType,
-                                                                       nullptr, arg.getName() + ".addr");
+            llvm::AllocaInst *alloca;
+            if (varType->isFunctionTy()) {
+                alloca = llvmState.Builder->CreateAlloca(llvm::PointerType::getUnqual(*llvmState.TheContext), nullptr,
+                                                         arg.getName() + ".addr");
+            } else {
+                alloca = llvmState.Builder->CreateAlloca(varType, nullptr, arg.getName() + ".addr");
+            }
             // Store the initial value into the alloca.
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
@@ -1623,11 +1709,15 @@ namespace llvm_backend {
                                                 &arg,
                                                 llvm::MaybeAlign(),
                                                 size);
+            } else if (varType->isFunctionTy()) {
+                llvmState.Builder->CreateStore(
+                    llvmState.Builder->CreatePointerCast(&arg, llvm::PointerType::getUnqual(*llvmState.TheContext)),
+                    alloca);
             } else {
                 llvmState.Builder->CreateStore(&arg, alloca);
             }
             // Add arguments to variable symbol table.
-            llvmState.NamedAllocations[std::string(arg.getName())] = alloca;
+            llvmState.addNamedAllocation(std::string(arg.getName()), alloca, param.type.value());
             argNames.push_back(arg.getName().str());
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
                 arg.addAttr(llvm::Attribute::getWithByValType(*llvmState.TheContext,
@@ -1643,7 +1733,7 @@ namespace llvm_backend {
         functionDefinition->addFnAttr(llvm::Attribute::NoFree);
 
         for (auto &argName: argNames) {
-            llvmState.NamedAllocations.erase(argName);
+            llvmState.removeNamedAllocation(argName);
         }
 
 
@@ -1657,8 +1747,8 @@ namespace llvm_backend {
         if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {
             llvmState.TheFPM->run(*functionDefinition, *llvmState.TheFAM);
         }
-        llvmState.NamedAllocations.clear();
-        llvmState.NamedValues.clear();
+        llvmState.clearNamedAllocations();
+        llvmState.clearNamedValues();
     }
 
     void init_context(LLVMBackendState &context, const std::string &moduleName,
