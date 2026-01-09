@@ -23,6 +23,10 @@ add_library(${PROJECT_NAME} STATIC
         Scope.cpp
         include/types/Scope.h
         VariableType.cpp
+        include/ast/RawAnnotation.h
+        include/types/Annotation.h
+        ast/AnnotatedNode.cpp
+        include/ast/AnnotatedNode.h
 
 )
 target_sources(${PROJECT_NAME} PRIVATE

@@ -18,3 +18,8 @@ fn min(a : i32, b : i32) : i32 {
     }
     return b;
 }
+@extern(libname="m", funcname="sqrtf")
+extern fn sqrtf(x: float) : float;
+
+@extern(libname="m", funcname="sqrt")
+extern fn sqrt(x: double) : double;

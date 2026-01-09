@@ -68,6 +68,7 @@
 #include "ast/VariableDeclaration.h"
 #include "ast/WhileLoop.h"
 
+
 namespace llvm_backend {
     struct BreakBlock {
         llvm::BasicBlock *afterLoop = nullptr;
@@ -101,6 +102,8 @@ namespace llvm_backend {
         std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
+
+        std::vector<std::string> linkerFlags;
 
 
         llvm::Value *findVariable(const std::string &name, const bool loadValue = true) {
@@ -160,6 +163,10 @@ namespace llvm_backend {
             }
             return std::nullopt;
         }
+
+        void addExternalLibrary(const std::string &value) {
+            linkerFlags.emplace_back(value);
+        }
     };
 
 
@@ -192,7 +199,7 @@ namespace llvm_backend {
             const llvm::ArrayRef<llvm::Type *> elements(types);
 
 
-            return llvm::StructType::create(*context.TheContext, elements, typeName);
+            return llvm::StructType::create(*context.TheContext, elements, typeName, false);
         }
         return cached_type;
     }
@@ -268,7 +275,7 @@ namespace llvm_backend {
 
         if (const auto var = llvmState.TheModule->getGlobalVariable(_name, true))
             return var;
-        return llvmState.Builder->CreateGlobalString(value, _name);
+        return llvmState.Builder->CreateGlobalString(value, _name, 0, llvmState.TheModule.get());
     }
 
 
@@ -1511,7 +1518,23 @@ namespace llvm_backend {
             const uint64_t typeSize = DL.getTypeAllocSize(llvmType);
             return llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), typeSize);
         }
+
+
         auto functionCall = llvmState.TheModule->getFunction(node->functionName());
+        if (!functionCall) {
+            auto functionDefinition = llvmState.findFunction(node->functionName());
+            if (functionDefinition) {
+                auto functionName = functionDefinition.value()->functionName();
+                auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
+                for (auto &annotation: external) {
+                    llvmState.addExternalLibrary(annotation->library());
+                    if (annotation->externalName()) {
+                        functionName = annotation->externalName().value();
+                    }
+                }
+                functionCall = llvmState.TheModule->getFunction(functionName);
+            }
+        }
         if (!functionCall) {
             functionCall = llvmState.TheModule->getFunction(node->functionSignature());
         }
@@ -1601,9 +1624,18 @@ namespace llvm_backend {
         }
         llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
         constexpr auto linkage = llvm::Function::ExternalLinkage;
+        // handle annotations
+        auto externalAnnotations = node->getAnnotationsOfType<types::ExternalAnnotation>();
+        std::string functionName = node->functionName();
+        for (auto &annotation: externalAnnotations) {
+            llvmState.addExternalLibrary(annotation->library());
+            if (annotation->externalName()) {
+                functionName = annotation->externalName().value();
+            }
+        }
 
 
-        const auto functionDefinition = llvm::Function::Create(FT, linkage, node->functionName(),
+        const auto functionDefinition = llvm::Function::Create(FT, linkage, functionName,
                                                                llvmState.TheModule.get());
 
 
@@ -1916,10 +1948,9 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     llvm::outs() << "Wrote " << objectFileName.string() << "\n";
 
     std::vector<std::string> flags;
-    // for (const auto &lib: context->programUnit()->collectLibsToLink())
-    // {
-    //     flags.push_back("-l" + lib);
-    // }
+    for (const auto &lib: context.linkerFlags) {
+        flags.push_back("-l" + lib);
+    }
 
 
     if (options.buildMode == compiler::BuildMode::Debug && target.getOS() != llvm::Triple::Win32) {

@@ -129,6 +129,8 @@ std::optional<int> mapTokenType(Token::Type type) {
         case Token::Type::LINE_COMMENT:
         case Token::Type::BLOCK_COMMENT:
             return 15;
+        case Token::Type::ANNOTATION:
+            return 20;
         case Token::Type::IDENTIFIER:
         default:
             return std::nullopt;
@@ -177,8 +179,8 @@ void processMultiLineToken(const Token &token, int tokenType,
         size_t currentRow = token.source_location.row - 1;
 
         size_t segmentStart = 0;
-        for (size_t i = 0; i <= text.length(); ++i) {
-            if (i == text.length() || text[i] == '\n') {
+        for (size_t i = 0; i < text.length(); ++i) {
+            if (i == text.length() - 1 || text[i] == '\n') {
                 size_t segmentLength = i - segmentStart;
                 if (segmentLength > 0) {
                     // Emit token for this segment
@@ -245,7 +247,8 @@ void LanguageServer::handleRequest() {
                             .tokenTypes = {
                                 "namespace", "enum", "interface", "struct", "typeParameter",
                                 "parameter", "variable", "property", "enumMember", "event", "function", "method",
-                                "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator"
+                                "macro", "keyword", "modifier", "comment", "string", "number", "regexp", "operator",
+                                "decorator"
                             },
                             .tokenModifiers = {
                                 "declaration", "definition", "readonly", "static", "deprecated", "abstract",

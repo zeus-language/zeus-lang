@@ -59,7 +59,7 @@ macro(package_add_test_with_libraries TESTNAME FILES LIBRARIES TEST_WORKING_DIRE
 endmacro()
 
 
-package_add_test(zeus_test compiler_test.cpp)
+package_add_test(zeus_test compiler_test.cpp lexer_test.cpp)
 message(STATUS $<TARGET_FILE_DIR:zeus_test>)
 message(STATUS ${CMAKE_SOURCE_DIR})
 add_custom_command(TARGET zeus_test POST_BUILD

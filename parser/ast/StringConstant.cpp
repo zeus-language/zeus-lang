@@ -10,7 +10,7 @@ namespace ast {
     }
 
     std::string StringConstant::value() const {
-        const auto val = expressionToken().lexical();
+        const auto val = expressionToken().lexical().substr(1, expressionToken().lexical().size() - 2);
         std::string result;
         for (size_t i = 0; i < val.size(); ++i) {
             if (val[i] == '\\') {

@@ -26,7 +26,7 @@ namespace lexer {
         if (!validStartNameChar(current))
             return false;
 
-        while (validNameChar(current)) {
+        while (validNameChar(current) && *endPosition < content.size()) {
             *endPosition += 1;
             current = content[*endPosition];
         }
@@ -44,12 +44,9 @@ namespace lexer {
         current = content[start + 1];
         while (true) {
             if (current == '"') {
-                if (content.size() - 1 > *endPosition + 1 && content[*endPosition + 1] == '"') {
-                    *endPosition += 2;
-                    current = content[*endPosition];
-                } else {
-                    break;
-                }
+                *endPosition += 1;
+
+                break;
             }
 
             *endPosition += 1;
@@ -132,6 +129,20 @@ namespace lexer {
         return true;
     }
 
+    bool lex_annotation(const std::string &content, const size_t start, size_t *endPosition) {
+        char current = content[start];
+        *endPosition = start;
+        if (!(current == '@' && validNameChar(content[start + 1])))
+            return false;
+
+        do {
+            *endPosition += 1;
+            current = content[*endPosition];
+        } while (validNameChar(current));
+
+        return true;
+    }
+
     std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments) {
         std::vector<Token> tokens;
         const auto contentPtr = std::make_shared<std::string>(source_code);
@@ -143,16 +154,16 @@ namespace lexer {
             bool found = find_string(source_code, start, &endPosition);
             if (found) {
                 size_t offset = endPosition - start;
-                auto string_length = (offset - 1);
+                auto string_length = (offset);
                 SourceLocation source_location = {
-                    .filename = file_path, .source = contentPtr, .byte_offset = start + 1, .num_bytes = string_length,
+                    .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = string_length,
                     .row = row,
                     .col = col
                 };
                 tokens.emplace_back(Token::STRING, source_location);
 
-                start = endPosition;
-                col += offset + 1;
+                start = endPosition - 1;
+                col += offset;
                 continue;
             }
             if (source_code[start] == '\'') {
@@ -218,6 +229,18 @@ namespace lexer {
                 tokens.emplace_back(Token::NUMBER, source_location);
                 start = endPosition;
                 col += offset;
+            }
+            found = lex_annotation(source_code, start, &endPosition);
+            if (found) {
+                const size_t offset = endPosition - start;
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset, .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(Token::ANNOTATION, source_location);
+                start = endPosition - 1;
+                col += offset;
+                continue;
             }
             found = find_token(source_code, start, &endPosition);
             if (found) {

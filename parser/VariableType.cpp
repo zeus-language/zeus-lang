@@ -3,6 +3,7 @@
 //
 #include "types/VariableType.h"
 
+#include "ast/RawAnnotation.h"
 #include "ast/FieldAccess.h"
 #include "ast/FunctionDefinition.h"
 
@@ -58,13 +59,18 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
                 auto stmtClone = stmtOld->clone();
                 statements.push_back(std::move(stmtClone));
             }
+            auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
+            for (auto &annotationOld: funcDef->rawAnnotations()) {
+                annotations.push_back(std::move(annotationOld->cloneAnnotation()));
+            }
 
             auto functionClone = std::make_unique<ast::FunctionDefinition>(
                 std::move(token),
                 std::move(args),
                 std::move(returnType),
                 std::move(statements),
-                funcDef->getGenericParam()
+                funcDef->getGenericParam(),
+                std::move(annotations)
             );
 
             if (method->returnType()) {

@@ -4,6 +4,8 @@
 
 #include <cassert>
 #include <iomanip>
+
+#include "ast/RawAnnotation.h"
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
@@ -79,10 +81,11 @@ namespace parser {
 
         ostream << token.source_location.sourceline() << "\n";
         const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-        size_t endOffset = (token.source_location.source->find('\n', token.source_location.byte_offset) - 1) -
-                           (token.source_location.byte_offset - 1);
+        size_t endOffset = token.source_location.num_bytes;
 
-        ostream << std::setw(startOffset) << std::setfill(' ') << '^' << std::setw(endOffset) << std::setfill('-') <<
+        ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
+                    static_cast<int>(endOffset)) <<
+                std::setfill('-') <<
                 "\n";
     }
 
@@ -90,6 +93,7 @@ namespace parser {
         size_t m_current = 0;
         std::vector<Token> m_tokens;
         std::vector<ParserMessasge> m_messages;
+        std::vector<std::unique_ptr<ast::RawAnnotation> > m_pendingAnnotations;
 
     public:
         explicit Parser(std::vector<Token> tokens) : m_tokens(std::move(tokens)) {
@@ -1211,6 +1215,41 @@ namespace parser {
             return std::nullopt;
         }
 
+        std::optional<std::unique_ptr<ast::RawAnnotation> > parseAnnotation() {
+            if (!canConsume(Token::ANNOTATION)) {
+                return std::nullopt;
+            }
+            Token annotationToken = current();
+            consume(Token::ANNOTATION);
+            std::string name = annotationToken.lexical().substr(1); // Remove '@' character
+            std::vector<ast::AnnotationArgument> args;
+            if (tryConsume(Token::LEFT_CURLY)) {
+                while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
+                    auto argName = current();
+                    consume(Token::IDENTIFIER);
+
+                    consume(Token::EQUAL);
+
+                    if (auto value = parseExpression(false)) {
+                        args.push_back(ast::AnnotationArgument{
+                            .name = argName.lexical(),
+                            .value = std::move(value.value())
+                        });
+                        tryConsume(Token::COMMA);
+                    } else {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected annotation argument but found '" + current().lexical() + "'"
+                        });
+                        break;
+                    }
+                }
+                consume(Token::RIGHT_CURLY);
+            }
+
+            return std::make_unique<ast::RawAnnotation>(annotationToken, name, std::move(args));
+        }
+
         std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseExternFunctionDefinition() {
             if (canConsumeKeyWord("extern")) {
                 consumeKeyWord("extern");
@@ -1252,10 +1291,16 @@ namespace parser {
                 consume(Token::COLON);
                 auto returnType = parseRawType();
                 consume(Token::SEMICOLON);
-
+                auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >{};
+                // Collect annotations
+                for (auto &m_pendingAnnotation: m_pendingAnnotations) {
+                    annotations.push_back(std::move(m_pendingAnnotation));
+                }
+                m_pendingAnnotations.clear();
                 return std::make_unique<ast::ExternFunctionDefinition>(std::move(nameToken),
                                                                        std::move(functionArgs),
-                                                                       std::move(returnType));
+                                                                       std::move(returnType),
+                                                                       std::move(annotations));
             }
             return std::nullopt;
         }
@@ -1312,10 +1357,16 @@ namespace parser {
             auto returnType = parseRawType();
 
             auto block = parseBlock();
+            auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >{};
+            // Collect annotations
+            for (auto &m_pendingAnnotation: m_pendingAnnotations) {
+                annotations.push_back(std::move(m_pendingAnnotation));
+            }
+            m_pendingAnnotations.clear();
             return std::make_unique<ast::FunctionDefinition>(std::move(nameToken), std::move(functionArgs),
                                                              std::move(returnType),
                                                              std::move(block)
-                                                             , std::move(genericParam));
+                                                             , std::move(genericParam), std::move(annotations));
         }
 
         bool isFunctionCall() const {
@@ -1587,7 +1638,9 @@ namespace parser {
         ParseResult parse() {
             auto module = std::make_shared<parser::Module>();
             while (!canConsume(Token::END_OF_FILE) && hasNext()) {
-                if (auto functionDef = parseFunctionDefinition()) {
+                if (auto annotation = parseAnnotation()) {
+                    m_pendingAnnotations.push_back(std::move(annotation.value()));
+                } else if (auto functionDef = parseFunctionDefinition()) {
                     module->functions.push_back(std::move(functionDef.value()));
                 } else if (auto externType = parseExternType()) {
                     module->externTypes.push_back(std::move(externType.value()));

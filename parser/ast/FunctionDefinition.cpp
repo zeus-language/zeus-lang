@@ -8,8 +8,10 @@ namespace ast {
     FunctionDefinition::FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
                                            std::optional<std::unique_ptr<RawType> > returnType,
                                            std::vector<std::unique_ptr<ASTNode> > statements,
-                                           std::optional<Token> genericParam)
-        : FunctionDefinitionBase(std::move(functionName), std::move(args), std::move(returnType)),
+                                           std::optional<Token> genericParam,
+                                           std::vector<std::unique_ptr<RawAnnotation> > annotations)
+        : FunctionDefinitionBase(std::move(functionName), std::move(args), std::move(returnType),
+                                 std::move(annotations)),
           m_statements(std::move(statements)), genericParam(std::move(genericParam)) {
     }
 

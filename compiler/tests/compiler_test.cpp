@@ -191,7 +191,7 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "errortests";
-    auto name = GetParam();
+    const auto name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
 
@@ -286,7 +286,8 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
-                             "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading","functionpointer"));
+                             "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
+                             "functionpointer","externannotation"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

@@ -1,0 +1,54 @@
+
+@extern(libname = "raylib")
+extern fn InitWindow(width: i32, height: i32, title: *u8) : void;
+extern fn CloseWindow(): void;
+extern fn WindowShouldClose() : bool;
+extern fn BeginDrawing() : void;
+extern fn EndDrawing() : void;
+
+extern fn ClearBackground(color: i32) : void;
+extern fn DrawText(text: *u8, posX: i32, posY: i32, fontSize: i32, color: i32) : void;
+extern fn SetTargetFPS(fps: i32) : void;
+struct Vector2 {
+    x: float,
+    y: float,
+}
+
+extern fn DrawCircle(x: i32,y:i32, radius: float, color: i32) : void;
+fn main() : i32 {
+    // Initialize the window
+    let width : i32 = 800;
+    let height :i32= 600;
+    InitWindow(width, height, "Raylib Test with Zeus" as *u8);
+    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    //--------------------------------------------------------------------------------------
+    let mut ballPosition : Vector2 = Vector2 { x: 200.0, y: 300.0 };
+    let ballRadius : float = 45.0;
+    let white : i32 = 16777215;
+    let black : i32 = -16777216;
+    let red : i32 = -16776961;
+    let green : i32 = 65280;
+    let blue : i32 = -65536;
+    let yellow : i32 = 99999;
+
+    // Main game loop
+    while WindowShouldClose() == false    // Detect window close button or ESC key
+    {
+        // Draw
+        //----------------------------------------------------------------------------------
+        BeginDrawing();
+            ClearBackground(yellow); // Light gray background
+            DrawCircle(150,150, ballRadius , blue);
+
+
+
+        DrawText("Hello World" as *u8, 190, 200, 20, black);
+        EndDrawing();
+        //----------------------------------------------------------------------------------
+    }
+
+
+    // Close the window
+    CloseWindow();
+    return 0;
+}

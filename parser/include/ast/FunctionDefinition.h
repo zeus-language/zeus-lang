@@ -3,7 +3,8 @@
 #include <memory>
 #include <vector>
 
-#include "ASTNode.h"
+#include "RawAnnotation.h"
+#include "AnnotatedNode.h"
 #include "VariableDeclaration.h"
 #include "lexer/Lexer.h"
 
@@ -21,11 +22,12 @@ namespace ast {
         }
     };
 
-    class FunctionDefinitionBase : public ASTNode {
+    class FunctionDefinitionBase : public AnnotatedNode {
         std::string m_functionName;
         std::vector<FunctionArgument> m_args;
         std::optional<std::unique_ptr<RawType> > m_returnType;
         std::vector<Token> m_namespacePrefix;
+        std::vector<std::unique_ptr<RawAnnotation> > m_rawAnnotations;
 
     public:
         [[nodiscard]] std::optional<RawType *> returnType() const {
@@ -61,14 +63,21 @@ namespace ast {
 
         std::vector<FunctionArgument> &args();
 
-        std::shared_ptr<types::VariableType> asFunctionType() const;
+        [[nodiscard]] std::shared_ptr<types::VariableType> asFunctionType() const;
+
+        std::vector<std::unique_ptr<RawAnnotation> > &rawAnnotations() {
+            return m_rawAnnotations;
+        }
 
         explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,
-                                        std::optional<std::unique_ptr<RawType> > returnType) : ASTNode(std::move(
-                functionName)),
+                                        std::optional<std::unique_ptr<RawType> > returnType,
+                                        std::vector<std::unique_ptr<RawAnnotation> > annotations) : AnnotatedNode(
+                std::move(
+                    functionName)),
             m_functionName(expressionToken().lexical()),
             m_args(std::move(args)),
-            m_returnType(std::move(returnType)) {
+            m_returnType(std::move(returnType)),
+            m_rawAnnotations(std::move(annotations)) {
         }
 
         [[nodiscard]] std::string functionSignature() const;
@@ -82,7 +91,8 @@ namespace ast {
         explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
                                     std::optional<std::unique_ptr<RawType> > returnType,
                                     std::vector<std::unique_ptr<ASTNode> > statements,
-                                    std::optional<Token> genericParam);
+                                    std::optional<Token> genericParam,
+                                    std::vector<std::unique_ptr<RawAnnotation> > annotations);
 
         ~FunctionDefinition() override = default;
 

@@ -67,6 +67,7 @@ struct Token {
         PIPE,
         LINE_COMMENT,
         BLOCK_COMMENT,
+        ANNOTATION,
     } type;
 
     SourceLocation source_location;

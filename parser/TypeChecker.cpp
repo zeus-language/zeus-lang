@@ -143,6 +143,90 @@ namespace types {
         }
     }
 
+    typedef std::variant<ast::NumberValue, std::string> Constant;
+
+    std::optional<Constant> evalConstantExpression(
+        ast::ASTNode *node,
+        Context &context) {
+        if (auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
+            switch (numberConst->numberType()) {
+                case ast::NumberType::INTEGER:
+                    return numberConst->value();
+                case ast::NumberType::FLOAT:
+                    return numberConst->value();
+                case ast::NumberType::CHAR:
+                    return numberConst->value();
+                case ast::NumberType::BOOLEAN:
+                    return numberConst->value();
+                default:
+                    return std::nullopt;
+            }
+        } else if (auto stringConst = dynamic_cast<ast::StringConstant *>(node)) {
+            return stringConst->value();
+        }
+        return std::nullopt;
+    }
+
+    std::shared_ptr<types::Annotation> resolveAnnotation(
+        const ast::RawAnnotation *rawAnnotation,
+        Context &context) {
+        if (rawAnnotation->name() == "extern") {
+            auto libName = rawAnnotation->getArgumentByName("libname");
+            auto funcname = rawAnnotation->getArgumentByName("funcname");
+            std::optional<std::string> funcNameValue;
+            if (funcname) {
+                if (auto value = evalConstantExpression(funcname->get(), context)) {
+                    if (!std::holds_alternative<std::string>(value.value())) {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            rawAnnotation->expressionToken(),
+                            "Expected string constant for 'funcname' argument in 'extern' annotation!"
+                        });
+                        return nullptr;
+                    }
+                    funcNameValue = std::get<std::string>(value.value());
+                } else {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        rawAnnotation->expressionToken(),
+                        "Failed to evaluate constant expression for 'funcname' argument in 'external' annotation!"
+                    });
+                    return nullptr;
+                }
+            }
+            if (libName) {
+                if (auto constValue = evalConstantExpression(libName->get(), context)) {
+                    if (std::holds_alternative<std::string>(constValue.value())) {
+                        return std::make_shared<types::ExternalAnnotation>(
+                            std::get<std::string>(constValue.value()), funcNameValue);
+                    } else {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            rawAnnotation->expressionToken(),
+                            "Expected string constant for 'libname' argument in 'external' annotation!"
+                        });
+                        return nullptr;
+                    }
+                } else {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        rawAnnotation->expressionToken(),
+                        "Failed to evaluate constant expression for 'libname' argument in 'external' annotation!"
+                    });
+                    return nullptr;
+                }
+            }
+            return nullptr;
+        } else {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                rawAnnotation->expressionToken(),
+                "Unknown annotation '" + rawAnnotation->name() + "'!"
+            });
+            return nullptr;
+        }
+    }
+
     void type_check(ast::FunctionDefinition *node, Context &context);
 
     void type_check(ast::ExternFunctionDefinition *node, Context &context);
@@ -202,7 +286,7 @@ namespace types {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
         node->setExpressionType(
-            types::TypeRegistry::getArrayType(u8Type, node->expressionToken().lexical().size() + 1).value());
+            types::TypeRegistry::getArrayType(u8Type, node->value().size() + 1).value());
     }
 
     void type_check(ast::NumberConstant *node, const Context &context) {
@@ -1334,7 +1418,11 @@ namespace types {
 
         context.currentScope = std::make_shared<Scope>(context.currentScope);
 
-
+        for (auto &raw: node->rawAnnotations()) {
+            if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
+                node->addAnnotation(annotationType);
+            }
+        }
         if (node->returnType()) {
             if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
                 node->setExpressionType(returnType.value());
@@ -1417,6 +1505,12 @@ namespace types {
     void type_check(ast::ExternFunctionDefinition *node, Context &context) {
         // Example type checking logic for a function definition
         context.currentScope = std::make_shared<Scope>(context.currentScope);
+
+        for (auto &raw: node->rawAnnotations()) {
+            if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
+                node->addAnnotation(annotationType);
+            }
+        }
 
         for (auto &arg: node->args()) {
             arg.type = resolveFromRawType(arg.rawType.get(), context.currentScope);
