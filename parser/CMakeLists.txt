@@ -10,6 +10,7 @@ add_library(${PROJECT_NAME} STATIC
         ast/FunctionCallNode.cpp
         ast/ReturnStatement.cpp
         ast/StringConstant.cpp
+        ast/RawStringConstant.cpp
         ast/NumberConstant.cpp
         ast/FunctionDefinition.cpp
         ast/VariableDeclaration.cpp

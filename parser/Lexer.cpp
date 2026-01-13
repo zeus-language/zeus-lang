@@ -35,6 +35,24 @@ namespace lexer {
         return std::ranges::any_of(possible_tokens, [tmp](const std::string &token) { return tmp == token; });
     }
 
+    bool find_raw_string(const std::string &content, size_t start, size_t *endPosition) {
+        char current = content[start];
+        if (current != 'r' || content[start + 1] != '"')
+            return false;
+        *endPosition = start + 2;
+        current = content[start + 2];
+        while (true) {
+            if (current == '"') {
+                *endPosition += 1;
+
+                break;
+            }
+
+            *endPosition += 1;
+            current = content[*endPosition];
+        }
+        return true;
+    }
 
     bool find_string(const std::string &content, size_t start, size_t *endPosition) {
         char current = content[start];
@@ -151,7 +169,22 @@ namespace lexer {
         size_t start;
         for (start = 0; start < source_code.length(); start++) {
             size_t endPosition = start;
-            bool found = find_string(source_code, start, &endPosition);
+            bool found = find_raw_string(source_code, start, &endPosition);
+            if (found) {
+                size_t offset = endPosition - start;
+                auto string_length = (offset);
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = string_length,
+                    .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(Token::RAW_STRING, source_location);
+
+                start = endPosition - 1;
+                col += offset;
+                continue;
+            }
+            found = find_string(source_code, start, &endPosition);
             if (found) {
                 size_t offset = endPosition - start;
                 auto string_length = (offset);

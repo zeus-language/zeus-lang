@@ -122,6 +122,7 @@ std::optional<int> mapTokenType(Token::Type type) {
         case Token::Type::KEYWORD:
             return 13;
         case Token::Type::STRING:
+        case Token::Type::RAW_STRING:
         case Token::Type::CHAR:
             return 16;
         case Token::Type::NUMBER:

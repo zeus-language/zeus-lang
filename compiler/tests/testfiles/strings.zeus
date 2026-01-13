@@ -4,10 +4,10 @@ use core::libc as libc;
 use std::str;
 
 fn main() : i32 {
-    let  hello : std::str::string = from_c_str("Hello, World!" as *u8);
-    println2("String: {}" as *u8, &hello);
-    printf("length: %d\n" as *u8, hello.length());
-    printf("capacity: %d\n" as *u8, hello.capacity());
+    let  hello : std::str::string = from_c_str(r"Hello, World!" as *u8);
+    println2("String: {}", &hello);
+    printf(r"length: %d\n" as *u8, hello.length());
+    printf(r"capacity: %d\n" as *u8, hello.capacity());
     //std::io::println2("Length: {}" as *u8, hello.length());
     //std::io::println2("Capacity: {}" as *u8, hello.capacity());
 

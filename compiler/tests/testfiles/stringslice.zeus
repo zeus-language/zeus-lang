@@ -1,0 +1,16 @@
+
+fn size_of_slice(s: [u8]) : u64 {
+    return s.length;
+}
+
+fn main() : i32 {
+    let my_string : [u8] = "Hello, Zeus!";
+    let size : u64 = size_of_slice(my_string);
+    println(my_string.data);
+    println("Size of string slice:");
+    println(size);
+    println("Contents of string slice:");
+    println(my_string);
+
+    return 0;
+}

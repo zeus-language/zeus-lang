@@ -1,15 +1,15 @@
 use core::libc;
 
 fn main() : i32 {
-    let mut string1 : *u8 = "Hello" as *u8;
-    let mut string2 : *u8 = "Hallo" as *u8;
+    let mut string1 : *u8 = r"Hello" as *u8;
+    let mut string2 : *u8 = r"Hallo" as *u8;
     for i in 0 as u64 .. core::libc::strlen(string1) {
-        printf("i: %d\n" as *u8, i);
+        printf(r"i: %d\n" as *u8, i);
         for j in 0 as u64 .. core::libc::strlen(string2) {
             if string1[i] == string2[j] {
-                printf("Match found: %c\n" as *u8, string1[i]);
+                printf(r"Match found: %c\n" as *u8, string1[i]);
             } else {
-                printf("No match: %c vs %c\n" as *u8, string1[i], string2[j]);
+                printf(r"No match: %c vs %c\n" as *u8, string1[i], string2[j]);
             }
         }
     }

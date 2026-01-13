@@ -27,6 +27,7 @@
 #include "ast/MethodCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/RangeExpression.h"
+#include "ast/RawStringConstant.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -129,6 +130,15 @@ namespace parser {
             Token boolToken = current();
             consume(Token::KEYWORD);
             return std::make_unique<ast::NumberConstant>(boolToken, ast::NumberType::BOOLEAN);
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseRawString() {
+            if (!canConsume(Token::RAW_STRING)) {
+                return std::nullopt;
+            }
+            Token stringToken = current();
+            consume(Token::RAW_STRING);
+            return std::make_unique<ast::RawStringConstant>(stringToken);
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseString() {
@@ -398,6 +408,8 @@ namespace parser {
                 result = std::move(number.value());
             } else if (auto string = parseString()) {
                 result = std::move(string.value());
+            } else if (auto rawString = parseRawString()) {
+                result = std::move(rawString.value());
             } else if (auto character = parseChar()) {
                 result = std::move(character.value());
             } else if (auto boolean = parseBoolean()) {
@@ -892,33 +904,40 @@ namespace parser {
                     return std::nullopt;
                 }
                 consume(Token::IDENTIFIER);
-                consume(Token::SEMICOLON);
-                if (!canConsume(Token::NUMBER)) {
-                    m_messages.push_back(ParserMessasge{
-                        .token = current(),
-                        .message = "expected number after ';' in array type declaration!"
-                    });
-                    return std::nullopt;
-                }
-                const auto &sizeToken = current();
-                consume(Token::NUMBER);
-                consume(Token::RIGHT_SQUAR);
-                size_t size = 0;
-                try {
-                    size = std::stoul(sizeToken.lexical());
-                } catch (const std::exception &e) {
-                    m_messages.push_back(ParserMessasge{
-                        .token = sizeToken,
-                        .message = "invalid array size '" + sizeToken.lexical() + "'!"
-                    });
-                    return std::nullopt;
-                }
+                if (tryConsume(Token::SEMICOLON)) {
+                    if (!canConsume(Token::NUMBER)) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected number after ';' in array type declaration!"
+                        });
+                        return std::nullopt;
+                    }
+                    const auto &sizeToken = current();
+                    consume(Token::NUMBER);
+                    consume(Token::RIGHT_SQUAR);
+                    size_t size = 0;
+                    try {
+                        size = std::stoul(sizeToken.lexical());
+                    } catch (const std::exception &e) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = sizeToken,
+                            .message = "invalid array size '" + sizeToken.lexical() + "'!"
+                        });
+                        return std::nullopt;
+                    }
 
-                return std::make_unique<ast::ArrayRawType>(typeToken, namespaceElements, typeModifier,
+                    return std::make_unique<ast::ArrayRawType>(typeToken, namespaceElements, typeModifier,
+                                                               std::make_unique<ast::RawType>(
+                                                                   typeToken, namespaceElements,
+                                                                   ast::TypeModifier::NONE,
+                                                                   std::nullopt),
+                                                               size);
+                }
+                consume(Token::RIGHT_SQUAR);
+                return std::make_unique<ast::SliceRawType>(typeToken, namespaceElements, typeModifier,
                                                            std::make_unique<ast::RawType>(
                                                                typeToken, namespaceElements, ast::TypeModifier::NONE,
-                                                               std::nullopt),
-                                                           size);
+                                                               std::nullopt));
             }
             return std::nullopt;
         }

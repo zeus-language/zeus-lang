@@ -64,6 +64,22 @@ namespace ast {
         }
     };
 
+    struct SliceRawType final : RawType {
+        std::unique_ptr<RawType> baseType;
+
+        SliceRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
+                     std::unique_ptr<RawType> base_type)
+            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
+              baseType(std::move(base_type)) {
+        }
+
+        ~SliceRawType() override = default;
+
+        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
+            return std::make_unique<SliceRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
+        }
+    };
+
     struct ArrayRawType final : RawType {
         std::unique_ptr<RawType> baseType;
         size_t size;

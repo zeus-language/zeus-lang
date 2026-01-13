@@ -57,6 +57,7 @@
 #include "ast/MethodCallNode.h"
 #include "ast/NumberConstant.h"
 #include "ast/RangeExpression.h"
+#include "ast/RawStringConstant.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
@@ -285,7 +286,9 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState);
 
-    llvm::Value *codegen(const ast::StringConstant *node, const LLVMBackendState &llvmState);
+    llvm::Value *codegen(const ast::StringConstant *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(const ast::RawStringConstant *node, const LLVMBackendState &llvmState);
 
     llvm::Value *codegen(const ast::VariableDeclaration *node, LLVMBackendState &llvmState);
 
@@ -343,6 +346,9 @@ namespace llvm_backend {
         }
         if (const auto string = dynamic_cast<ast::StringConstant *>(node)) {
             return llvm_backend::codegen(string, llvmState);
+        }
+        if (const auto rawstring = dynamic_cast<ast::RawStringConstant *>(node)) {
+            return llvm_backend::codegen(rawstring, llvmState);
         }
         if (const auto varDecl = dynamic_cast<ast::VariableDeclaration *>(node)) {
             return llvm_backend::codegen(varDecl, llvmState);
@@ -1349,7 +1355,7 @@ namespace llvm_backend {
         llvmState.addNamedAllocation(node->expressionToken().lexical(), alloca, node->expressionType().value());
 
         if (const auto initialValue = node->initialValue()) {
-            if (const auto stringConstant = dynamic_cast<ast::StringConstant *>(initialValue.value())) {
+            if (const auto stringConstant = dynamic_cast<ast::RawStringConstant *>(initialValue.value())) {
                 const auto strValue = codegen(stringConstant, llvmState);
 
                 llvmState.Builder->CreateMemCpy(alloca,
@@ -1426,8 +1432,23 @@ namespace llvm_backend {
         return nullptr;
     }
 
-    llvm::Value *codegen(const ast::StringConstant *node, const LLVMBackendState &llvmState) {
+    llvm::Value *codegen(const ast::RawStringConstant *node, const LLVMBackendState &llvmState) {
         return getOrCreateGlobalString(llvmState, node->value(), "");
+    }
+
+    llvm::Value *codegen(const ast::StringConstant *node, LLVMBackendState &llvmState) {
+        auto strValue = getOrCreateGlobalString(llvmState, node->value(), "");
+        const auto sliceLLVMType = resolveLlvmType(node->expressionType().value(), llvmState);
+        auto alloca = llvmState.Builder->CreateAlloca(sliceLLVMType, nullptr,
+                                                      "string_slice_alloca");
+        const auto dataPtr = llvmState.Builder->CreateStructGEP(sliceLLVMType, alloca, 1, "data_ptr");
+        const auto lengthPtr = llvmState.Builder->CreateStructGEP(sliceLLVMType, alloca, 0, "length_ptr");
+
+        llvmState.Builder->CreateStore(strValue, dataPtr);
+        llvmState.Builder->CreateStore(llvm::ConstantInt::get(
+                                           llvm::Type::getInt64Ty(*llvmState.TheContext),
+                                           node->value().size()), lengthPtr);
+        return alloca;
     }
 
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState) {
@@ -1448,6 +1469,7 @@ namespace llvm_backend {
                 referenceType = pointerType->baseType();
             }
             const auto arrayType = resolveLlvmType(referenceType, llvmState);
+
             if (arrayType->isArrayTy()) {
                 const auto length = arrayType->getArrayNumElements();
                 return llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), length);
@@ -1496,13 +1518,27 @@ namespace llvm_backend {
                     args.push_back(getOrCreateGlobalString(llvmState, "%ld\n", "i64_format"));
                 } else if (value->getType()->isFloatingPointTy()) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "double_format"));
-                } else if (value->getType()->isPointerTy() || value->getType()->isArrayTy()) {
+                } else if (value->getType()->isPointerTy() || value->getType()->isArrayTy()
+                ) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
                 } else {
                     assert(false && "Unsupported argument type for println");
                     return nullptr;
                 }
-                if (value->getType()->isFloatingPointTy()) {
+                auto argType = arg->expressionType();
+                std::string typeName;
+                if (argType) {
+                    typeName = argType.value()->rawTypeName();
+                }
+                if (value->getType()->isPointerTy() && typeName == "slice") {
+                    auto exprType = resolveLlvmType(arg->expressionType().value(), llvmState);
+                    const auto dataPtr = llvmState.Builder->CreateStructGEP(exprType, value, 1, "slice_data_ptr");
+                    auto loadedData = llvmState.Builder->CreateLoad(
+                        llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(*llvmState.TheContext)),
+                        dataPtr,
+                        "load_slice_data_ptr");
+                    args.push_back(loadedData);
+                } else if (value->getType()->isFloatingPointTy()) {
                     args.push_back(
                         llvmState.Builder->CreateFPCast(value, llvmState.Builder->getDoubleTy(), "float_to_double"));
                 } else {

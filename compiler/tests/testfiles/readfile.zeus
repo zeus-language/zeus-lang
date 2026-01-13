@@ -4,19 +4,19 @@ use std::io;
 
 fn main(argc : i32,argv : **u8 ) : i32 {
     if(argc < 2) {
-        println("Usage: readfile <filename>" as *u8);
+        println(r"Usage: readfile <filename>" as *u8);
         return 1;
     }
 
     let file_name : *u8 = argv[1];
-    let file : *FILE = fopen(file_name, "r" as *u8);
+    let file : *FILE = fopen(file_name, r"r" as *u8);
     if file == 0 as *FILE {
-        printf("Failed to open file: %s\n" as *u8, file_name);
+        printf(r"Failed to open file: %s\n" as *u8, file_name);
         return 1;
     }
     let mut buffer : [u8; 256] = [0 as u8; 256];
     while fgets(buffer as *u8, 256, file) != 0 as *u8 {
-        printf("%s",buffer);
+        printf(r"%s",buffer);
     }
     fclose(file);
     return 0;

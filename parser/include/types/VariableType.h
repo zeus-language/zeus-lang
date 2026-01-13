@@ -104,6 +104,7 @@ namespace types {
         [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
     };
 
+
     class ArrayType final : public VariableType {
     private:
         size_t m_size;

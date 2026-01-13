@@ -29,6 +29,7 @@
 #include "ast/ReferenceAccess.h"
 #include "ast/ReturnStatement.h"
 #include "ast/StringConstant.h"
+#include "ast/RawStringConstant.h"
 #include "ast/StructDeclaration.h"
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
@@ -97,6 +98,18 @@ namespace types {
                 return types::TypeRegistry::getReferenceType(type.value());
             }
             return type;
+        } else if (auto sliceType = dynamic_cast<ast::SliceRawType *>(rawType)) {
+            const auto baseType = resolveFromRawType(sliceType->baseType.get(), currentScope);
+            if (!baseType) return std::nullopt;
+            auto type = types::TypeRegistry::getSliceType(baseType.value());
+            if (rawType->typeModifier == ast::TypeModifier::POINTER) {
+                if (!type) return std::nullopt;
+                return types::TypeRegistry::getPointerType(type.value());
+            } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
+                if (!type) return std::nullopt;
+                return types::TypeRegistry::getReferenceType(type.value());
+            }
+            return type;
         } else if (auto pointerType = dynamic_cast<ast::PointerRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(pointerType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
@@ -145,9 +158,7 @@ namespace types {
 
     typedef std::variant<ast::NumberValue, std::string> Constant;
 
-    std::optional<Constant> evalConstantExpression(
-        ast::ASTNode *node,
-        Context &context) {
+    std::optional<Constant> evalConstantExpression(ast::ASTNode *node, Context &context) {
         if (auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
             switch (numberConst->numberType()) {
                 case ast::NumberType::INTEGER:
@@ -163,6 +174,8 @@ namespace types {
             }
         } else if (auto stringConst = dynamic_cast<ast::StringConstant *>(node)) {
             return stringConst->value();
+        } else if (auto rawStringConst = dynamic_cast<ast::RawStringConstant *>(node)) {
+            return rawStringConst->value();
         }
         return std::nullopt;
     }
@@ -286,7 +299,14 @@ namespace types {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
         node->setExpressionType(
-            types::TypeRegistry::getArrayType(u8Type, node->value().size() + 1).value());
+            types::TypeRegistry::getSliceType(u8Type).value());
+    }
+
+    void type_check(ast::RawStringConstant *node, const Context &context) {
+        const auto u8Type = context.currentScope->getTypeByName("u8").value();
+
+        node->setExpressionType(
+            types::TypeRegistry::getArrayType(u8Type, node->value().size()).value());
     }
 
     void type_check(ast::NumberConstant *node, const Context &context) {
@@ -341,6 +361,9 @@ namespace types {
             return type_check(number, context);
         }
         if (const auto string = dynamic_cast<ast::StringConstant *>(node)) {
+            return type_check(string, context);
+        }
+        if (const auto string = dynamic_cast<ast::RawStringConstant *>(node)) {
             return type_check(string, context);
         }
         if (const auto binExpr = dynamic_cast<ast::BinaryExpression *>(node)) {

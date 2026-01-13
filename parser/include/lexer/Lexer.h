@@ -36,6 +36,7 @@ struct Token {
         IDENTIFIER,
         NUMBER,
         STRING,
+        RAW_STRING,
         KEYWORD,
         END_OF_FILE,
         CHAR,

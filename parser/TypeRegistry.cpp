@@ -2,6 +2,10 @@
 
 #include <algorithm>
 
+#include "ast/FunctionDefinition.h"
+#include "ast/VariableDeclaration.h"
+#include "lexer/Lexer.h"
+
 types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("i32", 4, true));
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
@@ -17,6 +21,27 @@ types::TypeRegistry::TypeRegistry() {
 
 std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::registeredTypes() {
     return m_types;
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSliceType(
+    const std::shared_ptr<VariableType> &value) {
+    std::vector<StructField> fields = {
+        {
+            .type = std::make_shared<types::IntegerType>("u64", 8, false),
+            .name = "length"
+        },
+        {
+            .type = std::make_shared<types::PointerType>("*" + value->name(), value),
+            .name = "data"
+        }
+    };
+    std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods = {
+
+    };
+    std::optional<std::shared_ptr<VariableType> > genericParam;
+    auto slice = std::make_shared<types::StructType>("slice", fields, std::move(methods),
+                                                     std::nullopt);
+    return std::make_optional(slice);
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
