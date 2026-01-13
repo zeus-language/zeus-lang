@@ -1473,9 +1473,11 @@ namespace types {
                                                   arg.name.lexical(), arg.type.value_or(nullptr), arg.isConstant
                                               });
         }
+        bool hasReturnStatement = false;
         for (auto &stmt: node->statements()) {
             type_check_base(stmt.get(), context);
             if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
+                hasReturnStatement = true;
                 if (node->returnType()) {
                     if (returnStatement->returnValue()) {
                         if (!returnStatement->returnValue().value()->expressionType()) {
@@ -1520,8 +1522,23 @@ namespace types {
         }
 
         context.currentScope = context.currentScope->parentScope();
+        if (node->functionName() == "main" and (!node->returnType() or node->returnType().value()->fullTypeName() !=
+                                                "i32")) {
+            // main function must return i32
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "The 'main' function must have a return type of 'i32'."
+            });
+        }
 
-
+        if (node->returnType() and node->returnType().value()->fullTypeName() != "void" and !hasReturnStatement) {
+            context.messages.push_back({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Function '" + node->functionName() + "' must have a return statement."
+            });
+        }
         // Further type checking logic would go here...
     }
 

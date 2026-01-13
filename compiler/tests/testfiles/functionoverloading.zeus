@@ -7,7 +7,7 @@ fn add(x : double, y : double) : double {
     return x + y;
 }
 
-fn main() : void {
+fn main() : i32 {
     let int_result : i32 = add(5, 10);
     let float_result : double = add(5.5 as double, 10.2 as double);
 
@@ -15,4 +15,5 @@ fn main() : void {
     println(int_result);
     println("Float addition result:");
     println(float_result);
+    return 0;
 }
