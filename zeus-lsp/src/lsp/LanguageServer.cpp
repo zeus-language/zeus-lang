@@ -413,14 +413,14 @@ void LanguageServer::handleRequest() {
         while (running) {
             try {
                 messageHandler.processIncomingMessages();
-            } catch (const lsp::Error &e) {
+            } catch (const lsp::MessageError &e) {
                 std::cerr << "LSP Exception: " << e.what() << "\n";
                 std::cerr << "LSP Exception code: " << e.code() << "\n";
                 if (e.data())
                     std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
             }
         }
-    } catch (const lsp::Error &e) {
+    } catch (const lsp::MessageError &e) {
         std::cerr << "LSP Exception: " << e.what() << "\n";
         std::cerr << "LSP Exception code: " << e.code() << "\n";
         if (e.data())
