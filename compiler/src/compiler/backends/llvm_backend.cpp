@@ -103,6 +103,7 @@ namespace llvm_backend {
         std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
+        llvm::Triple target;
 
         std::vector<std::string> linkerFlags;
 
@@ -166,6 +167,9 @@ namespace llvm_backend {
         }
 
         void addExternalLibrary(const std::string &value) {
+            if (target.getOS() == llvm::Triple::Win32 and value == "m") {
+                return;
+            }
             linkerFlags.emplace_back(value);
         }
     };
@@ -1906,7 +1910,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
 
     llvm::TargetOptions opt;
     auto TheTargetMachine = Target->createTargetMachine(TargetTriple, CPU, Features, opt, llvm::Reloc::PIC_);
-    llvm::Triple target(TargetTriple);
+    context.target = llvm::Triple(TargetTriple);
     context.TheModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     createPrintfCall(*context.TheContext, *context.TheModule);
@@ -1989,14 +1993,14 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
 
 
-    if (options.buildMode == compiler::BuildMode::Debug && target.getOS() != llvm::Triple::Win32) {
+    if (options.buildMode == compiler::BuildMode::Debug && context.target.getOS() != llvm::Triple::Win32) {
         flags.emplace_back("-fsanitize=address");
         flags.emplace_back("-fno-omit-frame-pointer");
     }
 
     std::string executableName = moduleName;
 
-    if (target.getOS() == llvm::Triple::Win32) {
+    if (context.target.getOS() == llvm::Triple::Win32) {
         executableName += ".exe";
         //flags.erase(std::ranges::find(flags, "-lc"));
     }
