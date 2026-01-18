@@ -407,4 +407,8 @@ namespace lexer {
         tokens.emplace_back(Token::END_OF_FILE, source_location);
         return tokens;
     }
+
+    std::vector<std::string> keywords() {
+        return possible_tokens;
+    }
 }

@@ -26,7 +26,7 @@ class LanguageServer {
         const lsp::requests::TextDocument_Definition::Params &params);
 
     lsp::requests::TextDocument_Completion::Result findCompletions(
-        const lsp::requests::TextDocument_Completion::Params &params);
+        const lsp::requests::TextDocument_Completion::Params &params) const;
 
 public:
     explicit LanguageServer(lsp::LspOptions options);

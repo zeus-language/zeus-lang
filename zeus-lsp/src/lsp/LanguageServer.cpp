@@ -453,7 +453,7 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, c
 }
 
 lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
-    const lsp::requests::TextDocument_Completion::Params &params) {
+    const lsp::requests::TextDocument_Completion::Params &params) const {
     auto result = lsp::requests::TextDocument_Completion::Result();
 
     auto uri = params.textDocument.uri.toString();
@@ -570,6 +570,15 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     for (auto &importModule: parseResult.module->modules) {
         for (auto &function: importModule->functions) {
             addCompletionItemForFunction(function.get(), foundToken.value().lexical(), completionList);
+        }
+    }
+    for (auto keyword: lexer::keywords()) {
+        auto containsName = keyword.find(foundToken.value().lexical());
+        if (containsName != std::string::npos) {
+            lsp::CompletionItem item;
+            item.label = keyword;
+            item.kind = lsp::CompletionItemKind::Keyword;
+            completionList.items.push_back(std::move(item));
         }
     }
 
