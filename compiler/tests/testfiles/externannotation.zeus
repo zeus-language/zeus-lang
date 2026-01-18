@@ -4,7 +4,7 @@
 extern fn sqrt(x: float) : float;
 
 fn main() : i32 {
-    let x: float = 16.0;
+    let x: float = 16.0f;
     let y: float = sqrt(x);
     println(y);
     return 0;

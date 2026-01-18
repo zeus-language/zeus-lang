@@ -27,7 +27,7 @@ fn main()  : i32{
     println(test_var);
     test_var = TEST_CONST + (10 * x) + MY_CONST;
     println(test_var);
-    let sqrt_x : float = sqrtf(16.0);
+    let sqrt_x : float = sqrtf(16.0f);
     println(sqrt_x);
     return 0;
 }

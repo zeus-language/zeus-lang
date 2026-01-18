@@ -35,6 +35,7 @@ struct Token {
     enum Type {
         IDENTIFIER,
         NUMBER,
+        FLOAT_NUMBER,
         STRING,
         RAW_STRING,
         KEYWORD,

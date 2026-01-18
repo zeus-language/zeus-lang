@@ -398,3 +398,30 @@ TEST(LexerTest, LexNumberOffsets) {
     ASSERT_NE(numberToken20, tokens.end());
     VerifyTokenPosition(*numberToken20, source, 41, 1, 42, 2, "20");
 }
+
+
+TEST(LexerTest, LexFloat) {
+    std::string source = "let pi = 3.14159f;";
+    auto tokens = lexer::lex_file("test.zs", source);
+
+    ASSERT_FALSE(tokens.empty());
+    // let, pi, =, 3.14159, ; + EOF
+    EXPECT_EQ(tokens.size(), 6);
+
+    EXPECT_EQ(tokens[0].type, Token::Type::KEYWORD);
+    VerifyTokenPosition(tokens[0], source, 0, 3, "let");
+
+    EXPECT_EQ(tokens[1].type, Token::Type::IDENTIFIER);
+    VerifyTokenPosition(tokens[1], source, 4, 2, "pi");
+
+    EXPECT_EQ(tokens[2].type, Token::Type::EQUAL);
+    VerifyTokenPosition(tokens[2], source, 7, 1, "=");
+
+    EXPECT_EQ(tokens[3].type, Token::Type::FLOAT_NUMBER);
+    VerifyTokenPosition(tokens[3], source, 9, 8, "3.14159f");
+
+    EXPECT_EQ(tokens[4].type, Token::Type::SEMICOLON);
+    VerifyTokenPosition(tokens[4], source, 17, 1, ";");
+
+    EXPECT_EQ(tokens[5].type, Token::Type::END_OF_FILE);
+}

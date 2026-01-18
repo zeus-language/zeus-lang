@@ -13,6 +13,8 @@ namespace ast {
             case NumberType::INTEGER:
                 return static_cast<int64_t>(std::stoull(lexical));
             case NumberType::FLOAT:
+                return std::stof(lexical);
+            case NumberType::DOUBLE:
                 return std::stod(lexical);
             case NumberType::BOOLEAN:
                 return static_cast<bool>(lexical == "true");

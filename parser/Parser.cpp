@@ -107,11 +107,20 @@ namespace parser {
             Token numberToken = current();
             consume(Token::NUMBER);
             if (numberToken.lexical().find('.') != std::string::npos) {
-                return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::FLOAT);
+                return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::DOUBLE);
             } else {
                 return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::INTEGER);
             }
             return std::nullopt;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseFloatNumber() {
+            if (!canConsume(Token::FLOAT_NUMBER)) {
+                return std::nullopt;
+            }
+            Token numberToken = current();
+            consume(Token::FLOAT_NUMBER);
+            return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::FLOAT);
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseChar() {
@@ -406,6 +415,8 @@ namespace parser {
 
             if (auto number = parseNumber()) {
                 result = std::move(number.value());
+            } else if (auto floatNumber = parseFloatNumber()) {
+                result = std::move(floatNumber.value());
             } else if (auto string = parseString()) {
                 result = std::move(string.value());
             } else if (auto rawString = parseRawString()) {
@@ -429,6 +440,7 @@ namespace parser {
             } else if (auto arrayInit = parseArrayInitializer(allowInit)) {
                 result = std::move(arrayInit.value());
             }
+
             if (result) {
                 if (canParseMemberAccess()) {
                     result = std::move(parseMemberAccess(std::move(result)).value());
@@ -444,7 +456,6 @@ namespace parser {
                     result = std::move(parseRange(std::move(result)).value());
                 }
             }
-
             return result;
         }
 
@@ -746,10 +757,28 @@ namespace parser {
             if (!lhs)
                 return std::nullopt;
 
+            std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
             if (auto rhs = parseLogicalExpression(parseBaseExpression(allowInit, std::move(lhs))))
-                return rhs;
+                result = std::move(rhs);
+            else
+                result = std::move(lhs);
 
-            return lhs;
+            if (result) {
+                if (canParseMemberAccess()) {
+                    result = std::move(parseMemberAccess(std::move(result)).value());
+                }
+                if (canParseTypeCast()) {
+                    result = std::move(tryParseTypeCast(std::move(result)).value());
+                }
+
+                if (canParseArrayAccess()) {
+                    result = std::move(parseArrayAccess(std::move(result)).value());
+                }
+                if (canParseRange()) {
+                    result = std::move(parseRange(std::move(result)).value());
+                }
+            }
+            return result;
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseVariableAssignment() {

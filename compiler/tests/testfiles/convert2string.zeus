@@ -1,0 +1,35 @@
+use std::str;
+use std::io;
+
+fn main() : i32 {
+    let num: i32 = -12345;
+    let str_num: string = int_to_str(num);
+    println2("The string representation of {}", &str_num);
+    let pos_num: i32 = 67890;
+    let str_pos_num: string = int_to_str(pos_num);
+    println2("The string representation of {}", &str_pos_num);
+    // float to string
+    let float_num: float = -123.456f;
+    let str_float_num: string = float_to_str(float_num);
+    println2("The string representation of {}", &str_float_num);
+    let pos_float_num: float = 789.012f;
+    let str_pos_float_num: string = float_to_str(pos_float_num);
+    println2("The string representation of {}", &str_pos_float_num);
+
+    // double to string
+    let double_num: double = -123456.789012;
+    let str_double_num: string = double_to_str(double_num);
+    println2("The string representation of {}", &str_double_num);
+    let pos_double_num: double = 987654.321098;
+    let str_pos_double_num: string = double_to_str(pos_double_num);
+    println2("The string representation of {}", &str_pos_double_num);
+    destroy(&str_num);
+    destroy(&str_pos_num);
+    destroy(&str_float_num);
+    destroy(&str_pos_float_num);
+    destroy(&str_double_num);
+    destroy(&str_pos_double_num);
+    return 0;
+
+
+}

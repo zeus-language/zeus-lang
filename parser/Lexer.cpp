@@ -125,7 +125,8 @@ namespace lexer {
     constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
 
 
-    bool find_number(const std::string &content, const size_t start, size_t *endPosition) {
+    bool find_number(const std::string &content, const size_t start, size_t *endPosition,
+                     Token::Type *numberTokenType) {
         *endPosition = start;
         int index = 0;
         char current = content[start];
@@ -142,6 +143,10 @@ namespace lexer {
             current = content[*endPosition];
             index++;
         };
+        if (current == 'f' || current == 'F') {
+            *numberTokenType = Token::FLOAT_NUMBER;
+            *endPosition += 1;
+        }
         // if (current < '0' || current > '9')
         //     *endPosition -= 1;
         return true;
@@ -249,8 +254,8 @@ namespace lexer {
                 start = endPosition;
                 col += offset;
             }
-
-            found = find_number(source_code, start, &endPosition);
+            Token::Type numberTokenType = Token::NUMBER;
+            found = find_number(source_code, start, &endPosition, &numberTokenType);
             if (found) {
                 const size_t offset = endPosition - start;
 
@@ -259,8 +264,9 @@ namespace lexer {
                     .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset, .row = row,
                     .col = col
                 };
-                tokens.emplace_back(Token::NUMBER, source_location);
+                tokens.emplace_back(numberTokenType, source_location);
                 start = endPosition;
+
                 col += offset;
             }
             found = lex_annotation(source_code, start, &endPosition);

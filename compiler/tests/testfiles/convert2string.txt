@@ -1,0 +1,6 @@
+The string representation of -12345
+The string representation of 67890
+The string representation of -123.-456001281
+The string representation of 789.12023925
+The string representation of -123456.-789011999
+The string representation of 987654.321098000

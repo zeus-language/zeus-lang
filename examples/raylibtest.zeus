@@ -22,8 +22,8 @@ fn main() : i32 {
     InitWindow(width, height, "Raylib Test with Zeus" as *u8);
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
-    let mut ballPosition : Vector2 = Vector2 { x: 200.0, y: 300.0 };
-    let ballRadius : float = 45.0;
+    let mut ballPosition : Vector2 = Vector2 { x: 200.0f, y: 300.0f };
+    let ballRadius : float = 45.0f;
     let white : i32 = 16777215;
     let black : i32 = -16777216;
     let red : i32 = -16776961;

@@ -1419,7 +1419,9 @@ namespace llvm_backend {
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(node->numBits(), std::get<int64_t>(node->value()), true));
             case ast::NumberType::FLOAT:
-                return llvm::ConstantFP::get(llvmState.Builder->getFloatTy(), std::get<double>(node->value()));
+                return llvm::ConstantFP::get(llvmState.Builder->getFloatTy(), std::get<float>(node->value()));
+            case ast::NumberType::DOUBLE:
+                return llvm::ConstantFP::get(llvmState.Builder->getDoubleTy(), std::get<double>(node->value()));
             case ast::NumberType::BOOLEAN:
                 if (std::get<bool>(node->value())) {
                     return llvm::ConstantInt::getTrue(*llvmState.TheContext);

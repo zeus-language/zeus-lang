@@ -10,11 +10,11 @@ fn add(a: Vec2, b: Vec2) : Vec2 {
     return Vec2 { x: a.x + b.x, y: a.y + b.y };
 }
 fn main() : i32 {
-    let v1: Vec2 = Vec2 { x: 1.0, y: 2.0 };
+    let v1: Vec2 = Vec2 { x: 1.0f, y: 2.0f };
     println("----V1----");
     println(v1.x);
     println(v1.y);
-    let v2: Vec2 = Vec2 { x: 3.0, y: 4.0 };
+    let v2: Vec2 = Vec2 { x: 3.0f, y: 4.0f };
     println("----V2----");
     println(v2.x);
     println(v2.y);

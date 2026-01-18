@@ -322,6 +322,9 @@ namespace types {
             case ast::NumberType::FLOAT:
                 node->setExpressionType(context.currentScope->getTypeByName("float").value());
                 break;
+            case ast::NumberType::DOUBLE:
+                node->setExpressionType(context.currentScope->getTypeByName("double").value());
+                break;
             case ast::NumberType::CHAR:
                 node->setExpressionType(context.currentScope->getTypeByName("u8").value());
                 break;
@@ -472,6 +475,8 @@ namespace types {
                     instanceType = ptrType->baseType();
                 }
             }
+        } else if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType)) {
+            instanceType = refType->baseType();
         }
 
 
@@ -486,6 +491,7 @@ namespace types {
                     node->expressionToken(),
                     "Type '" + instanceType->name() + "' does not have a method named '" + methodName + "'."
                 });
+                context.currentScope = context.currentScope->parentScope();
                 return;
             }
 
@@ -505,7 +511,7 @@ namespace types {
                         allParamsMatch = false;
                         break;
                     }
-                    if (node->args()[i - 1]->expressionType() == nullptr ||
+                    if (node->args()[i - 1]->expressionType() == nullptr || !node->args()[i - 1]->expressionType() ||
                         node->args()[i - 1]->expressionType().value()->name() !=
                         method->args()[i].type.value()->name()) {
                         allParamsMatch = false;
@@ -529,6 +535,7 @@ namespace types {
                     node->expressionToken(),
                     "Array type does not have a method named '" + methodName + "'."
                 });
+                context.currentScope = context.currentScope->parentScope();
                 return;
             }
         } else if (auto enumType = std::dynamic_pointer_cast<types::EnumType>(instanceType)) {
@@ -539,6 +546,7 @@ namespace types {
                 node->expressionToken(),
                 "Type '" + instanceType->name() + "' does not support method calls."
             });
+            context.currentScope = context.currentScope->parentScope();
             return;
         }
 
@@ -553,6 +561,7 @@ namespace types {
         }
         if (matchedMethod->expressionType())
             node->setExpressionType(matchedMethod->expressionType().value());
+        context.currentScope = context.currentScope->parentScope();
     }
 
     void type_check(ast::EnumAccess *node, Context &context) {
@@ -643,6 +652,11 @@ namespace types {
     void type_check(ast::ReferenceAccess *node, Context &context) {
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType()) {
+            if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(
+                node->accessNode()->expressionType().value())) {
+                node->setExpressionType(node->accessNode()->expressionType().value());
+                return;
+            }
             node->setExpressionType(
                 types::TypeRegistry::getReferenceType(node->accessNode()->expressionType().value()).value());
         } else {

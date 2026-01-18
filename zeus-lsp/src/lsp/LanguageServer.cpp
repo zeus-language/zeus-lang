@@ -126,6 +126,7 @@ std::optional<int> mapTokenType(Token::Type type) {
         case Token::Type::CHAR:
             return 16;
         case Token::Type::NUMBER:
+        case Token::Type::FLOAT_NUMBER:
             return 17;
         case Token::Type::LINE_COMMENT:
         case Token::Type::BLOCK_COMMENT:

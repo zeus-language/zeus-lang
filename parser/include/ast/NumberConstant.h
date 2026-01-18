@@ -15,12 +15,13 @@ namespace ast {
     enum class NumberType {
         INTEGER,
         FLOAT,
+        DOUBLE,
         CHAR,
         BOOLEAN,
         NULLPTR
     };
 
-    typedef std::variant<int64_t, double, bool> NumberValue;
+    typedef std::variant<int64_t, double, float, bool> NumberValue;
 
     NumberValue parseNumber(const std::string &lexical, NumberType type);
 

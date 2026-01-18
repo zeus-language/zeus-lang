@@ -9,7 +9,7 @@ fn add(x : double, y : double) : double {
 
 fn main() : i32 {
     let int_result : i32 = add(5, 10);
-    let float_result : double = add(5.5 as double, 10.2 as double);
+    let float_result : double = add(5.5, 10.2 );
 
     println("Integer addition result:");
     println(int_result);

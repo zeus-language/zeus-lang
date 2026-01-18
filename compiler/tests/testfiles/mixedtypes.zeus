@@ -2,8 +2,8 @@
 fn main() : i32 {
     let a: i32 = 10;
     let b: i32 = 20;
-    let c: float = 5.5;
-    let d: float = 2.2;
+    let c: float = 5.5f;
+    let d: float = 2.2f;
 
     // Integer arithmetic
     let sum_int: i32 = a + b;

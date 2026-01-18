@@ -14,8 +14,8 @@ struct Vec2{
 }
 
 fn main() : i32 {
-    let v1: Vec2 = Vec2 { x: 2.0, y: 3.0 };
-    let v2: Vec2 = Vec2 { x: 4.0, y: 5.0 };
+    let v1: Vec2 = Vec2 { x: 2.0f, y: 3.0f };
+    let v2: Vec2 = Vec2 { x: 4.0f, y: 5.0f };
 
     let v3: Vec2 = v1.multiply(v2);
 

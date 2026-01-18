@@ -16,6 +16,33 @@ struct string {
     fn capacity(self : &string) : u32 {
         return self.capacity as u32;
     }
+    fn increase_capacity(self : mut &string, new_length : i32) : void {
+        if new_length + 1 > self.capacity {
+            // Need to reallocate
+            let mut new_capacity : i32 = self.capacity * 2;
+            self.data  = core::libc::realloc(self.data as *u8, new_capacity as u64);
+            self.capacity = new_capacity;
+        }
+    }
+
+    fn append(self : mut &string, ch : u8) : void {
+        let new_length : i32 = self.length + 1;
+        self.increase_capacity(new_length);
+        // Append the new character
+        self.data[self.length] = ch;
+        self.length = new_length;
+        self.data[self.length] = 0 as u8; // Null-terminate
+    }
+
+    fn append(self : mut &string, other : &string) : void {
+        let new_length : i32 = self.length + other.length;
+        self.increase_capacity(new_length);
+        // Append the new data
+        let target : *u8 = self.data + self.length as *u8;
+        core::libc::memcpy(target, other.data, other.length as u64);
+        self.length = new_length;
+        self.data[self.length] = 0 as u8; // Null-terminate
+    }
 }
 
 fn from_c_str(cstr: *u8) : string {
@@ -169,33 +196,72 @@ fn copy(self : &string) : string {
     copy_str.capacity = self.capacity;
     return copy_str;
 }
-//// Converts a float to string with 2 decimal places
-//fn float_to_str(value : float) : string {
-//    let mut int_part : i32 = value as i32;
-//    let mut frac_part : i32 = ((value - int_part as float) * 100.0) as i32;
-//    if frac_part < 0 {
-//        frac_part = -frac_part;
-//    }
-//    return int_to_str(int_part) + "." + (if frac_part < 10 { "0" } else { "" }) + int_to_str(frac_part);
-//}
-//fn int_to_str(value : i32) : string {
-//    if value == 0 {
-//        return "0";
-//    }
-//    let mut is_negative : bool = false;
-//    let mut num : i32 = value;
-//    if num < 0 {
-//        is_negative = true;
-//        num = -num;
-//    }
-//    let mut digits : string = "";
-//    while num > 0 {
-//        let digit : i32 = num % 10;
-//        digits = char(digit + '0' as i32) + digits;
-//        num = num / 10;
-//    }
-//    if is_negative {
-//        digits = "-" + digits;
-//    }
-//    return digits;
-//}
+// Converts an integer to string
+fn char(value : i32) : u8 {
+    return value as u8+ '0';
+}
+
+fn abs(value : double) : double {
+    if value < 0.0 as double {
+        return 0.0 as double - value;
+    }
+    return value;
+}
+
+// Converts a float to string with N decimal places
+fn float_to_str(value : float) : string {
+    return double_to_str(value as double);
+}
+
+fn double_to_str(value : double) : string {
+    let mut whole : i32 = value as i32;
+    let mut frac_part : double = abs(value  - (whole as double));
+    let mut result : string = int_to_str(whole);
+    result.append( '.' as u8 );
+
+    //printf(r"frac_part: %f\n" as *u8, frac_part);
+    frac_part = frac_part * 10.0;
+    let tmp : double = (value - whole as double) * 1000000000.0;
+    let frac : u64 = tmp as u64;
+    let mut frac_str : string = int_to_str(frac as i32);
+    result.append(&frac_str);
+
+    destroy(&frac_str);
+
+
+    return result;
+}
+
+fn int_to_str(value : i32) : string {
+    if value == 0 {
+        return "0";
+    }
+    let mut is_negative : bool = false;
+    let mut num : i32 = value;
+    if num < 0 {
+        is_negative = true;
+        //num = -num;
+        num = 0 - num;
+    }
+    let mut digits : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
+    while num > 0 {
+        let digit : i32 = num % 10;
+        digits.append( char(digit) );
+
+        num = num / 10;
+    }
+    if is_negative {
+        digits.append( '-' as u8 );
+    }
+    // Reverse the digits
+    let mut start : i32 = 0;
+    let mut end : i32 = digits.length - 1;
+    while start < end {
+        let temp : u8 = digits.data[start];
+        digits.data[start] = digits.data[end];
+        digits.data[end] = temp;
+        start = start + 1;
+        end = end - 1;
+    }
+    return digits;
+}
