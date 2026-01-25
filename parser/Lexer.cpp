@@ -8,7 +8,7 @@
 namespace lexer {
     static std::vector<std::string> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue", "use",
-        "or", "and", "as", "struct", "extern", "match", "enum", "null", "type"
+        "or", "and", "as", "struct", "extern", "match", "enum", "null", "type","not"
     };
 
 
@@ -206,7 +206,7 @@ namespace lexer {
             }
             if (source_code[start] == '\'') {
                 SourceLocation source_location = {
-                    .filename = file_path, .source = contentPtr, .byte_offset = start + 1, .num_bytes = 1, .row = row,
+                    .filename = file_path, .source = contentPtr, .byte_offset = start , .num_bytes = 3, .row = row,
                     .col = col
                 };
                 tokens.emplace_back(Token::CHAR, source_location);

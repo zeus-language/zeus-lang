@@ -21,6 +21,31 @@ namespace ast {
             case NumberType::NULLPTR:
                 return static_cast<int64_t>(0);
             case NumberType::CHAR:
+                if (lexical.at(0) == '\'' && lexical.back() == '\'') {
+                    // remove quotes
+                    auto content = lexical.substr(1, lexical.size() - 2);
+                    if (content.front() == '\\') {
+                        switch (content[1]) {
+                            case 'n':
+                                return static_cast<int64_t>('\n');
+                            case 't':
+                                return static_cast<int64_t>('\t');
+                            case 'r':
+                                return static_cast<int64_t>('\r');
+                            case '\\':
+                                return static_cast<int64_t>('\\');
+                            case '\'':
+                                return static_cast<int64_t>('\'');
+                            case '\"':
+                                return static_cast<int64_t>('\"');
+                            default:
+                                assert(false && "unknown escape sequence");
+                                return 0;
+                        }
+                    } else {
+                        return static_cast<int64_t>(content.front());
+                    }
+                }
                 if (lexical.front() == '\\') {
                     switch (lexical[1]) {
                         case 'n':

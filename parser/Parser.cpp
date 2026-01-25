@@ -13,6 +13,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ContinueStatement.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -241,13 +242,13 @@ namespace parser {
                     .token = current(),
                     .message = "expected type name after 'as' for type cast",
                 });
-                return std::nullopt;
+                return std::move(value);
             }
 
             return std::make_unique<ast::TypeCast>(asToken, std::move(rawType.value()), std::move(value.value()));
         }
 
-        bool isStructInitializationAhead() const {
+        [[nodiscard]] bool isStructInitializationAhead() const {
             int lookaheadIndex = 0;
             if (!canConsume(Token::IDENTIFIER)) {
                 return false;
@@ -1045,6 +1046,16 @@ namespace parser {
             return std::make_unique<ast::BreakStatement>(breakToken);
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseContinue() {
+            if (!canConsumeKeyWord("continue")) {
+                return std::nullopt;
+            }
+            Token continueToken = current();
+            consumeKeyWord("continue");
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::ContinueStatement>(continueToken);
+        }
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseForLoop() {
             if (!canConsumeKeyWord("for")) {
                 return std::nullopt;
@@ -1185,6 +1196,8 @@ namespace parser {
                     nodes.push_back(std::move(forLoop.value()));
                 } else if (auto breakStmt = parseBreak()) {
                     nodes.push_back(std::move(breakStmt.value()));
+                } else if (auto continueStmt = parseContinue()) {
+                    nodes.push_back(std::move(continueStmt.value()));
                 } else if (auto matchStatement = parseMatchStatement()) {
                     nodes.push_back(std::move(matchStatement.value()));
                 } else {

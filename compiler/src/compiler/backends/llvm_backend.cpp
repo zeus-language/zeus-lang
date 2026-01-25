@@ -45,6 +45,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ContinueStatement.h"
 #include "ast/EnumAccess.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
@@ -120,6 +121,27 @@ namespace llvm_backend {
             return nullptr;
         }
 
+        llvm::Value *findNamedAllocation(const std::string &name) {
+            if (NamedAllocations.contains(name)) {
+                return NamedAllocations[name].allocaInst;
+            }
+            return nullptr;
+        }
+
+        llvm::Value *findNamedValue(const std::string &name) {
+            if (NamedValues.contains(name)) {
+                return NamedValues[name];
+            }
+            return nullptr;
+        }
+
+        bool hasNamedAllocation(const std::string &name) {
+            return NamedAllocations.contains(name);
+        }
+ bool hasNamedValue(const std::string &name) {
+            return NamedValues.contains(name);
+        }
+
         std::shared_ptr<types::VariableType> findVariableType(const std::string &name) {
             if (NamedAllocations.contains(name)) {
                 return NamedAllocations[name].type;
@@ -134,6 +156,7 @@ namespace llvm_backend {
         void addNamedValue(const std::string &name, llvm::Value *value) {
             NamedValues[name] = value;
         }
+
 
         void removeNamedValue(const std::string &name) {
             NamedValues.erase(name);
@@ -314,6 +337,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::BreakStatement *, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(const ast::ContinueStatement *, LLVMBackendState &llvmState);
+
     llvm::Value *codegen(const ast::ArrayInitializer *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(const ast::ArrayRepeatInitializer *node, LLVMBackendState &llvmState);
@@ -383,6 +408,9 @@ namespace llvm_backend {
         }
         if (const auto breakStmt = dynamic_cast<ast::BreakStatement *>(node)) {
             return llvm_backend::codegen(breakStmt, llvmState);
+        }
+        if (const auto continueStmt = dynamic_cast<ast::ContinueStatement *>(node)) {
+            return llvm_backend::codegen(continueStmt, llvmState);
         }
         if (const auto arrayInit = dynamic_cast<ast::ArrayInitializer *>(node)) {
             return llvm_backend::codegen(arrayInit, llvmState);
@@ -843,6 +871,13 @@ namespace llvm_backend {
         return llvmState.Builder->CreateBr(llvmState.currentBreakBlock.afterLoop);
     }
 
+    llvm::Value *codegen(const ast::ContinueStatement *, LLVMBackendState &llvmState) {
+        llvmState.currentBreakBlock.BlockUsed = true;
+        assert(llvmState.currentBreakBlock.currentLoop != nullptr &&
+            "Continue statement used outside of a loop");
+        return llvmState.Builder->CreateBr(llvmState.currentBreakBlock.currentLoop);
+    }
+
     llvm::Value *codegen_iterator_for(const ast::ForLoop *node, LLVMBackendState &llvmState) {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
@@ -957,14 +992,8 @@ namespace llvm_backend {
 
         llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
         llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.body", TheFunction);
+        llvm::BasicBlock *LoopEndBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.end", TheFunction);
         llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.cleanup", TheFunction);
-
-        // Insert an explicit fall through from the current block to the LoopBB.
-        llvmState.Builder->CreateBr(LoopBB);
-
-        // Start insertion in LoopBB.
-        llvmState.Builder->SetInsertPoint(LoopBB);
-
         // Create the PHI node to hold the loop variable.
         const auto varType = node->expressionType();
         if (!varType) {
@@ -976,22 +1005,38 @@ namespace llvm_backend {
             assert(false && "Could not resolve LLVM type of iterator variable in for loop");
             return nullptr;
         }
-
-        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2, node->iteratorToken().lexical());
-        llvmState.addNamedValue(node->iteratorToken().lexical(), Variable);
         auto range = dynamic_cast<ast::RangeExpression *>(node->range());
-        // Initialize the PHI node with the start value.
+
         auto startValue = codegen_base(range->start(), llvmState);
+
+
         if (!startValue) {
             assert(false && "Failed to generate start value for the for loop");
             return nullptr;
         }
+
         if (startValue->getType() != llvmVarType) {
             startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
         }
+
+        // Insert an explicit fall through from the current block to the LoopBB.
+        llvmState.Builder->CreateBr(LoopBB);
+
+        // Start insertion in LoopBB.
+        llvmState.Builder->SetInsertPoint(LoopBB);
+
+
+        const auto iterator = node->iteratorToken().lexical();
+
+        // Initialize the PHI node with the start value.
+        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2, iterator);
+
+        llvmState.addNamedValue(iterator, Variable);
+
         Variable->addIncoming(startValue, PreheaderBB);
         const auto oldCurrentLoop = llvmState.currentBreakBlock.currentLoop;
         const auto oldAfterLoop = llvmState.currentBreakBlock.afterLoop;
+        llvmState.currentBreakBlock.currentLoop = LoopEndBB;
         llvmState.currentBreakBlock.afterLoop = AfterBB;
         llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
@@ -1004,6 +1049,9 @@ namespace llvm_backend {
         llvmState.currentBreakBlock.afterLoop = oldAfterLoop;
 
         // Step: increment the loop variable.
+        llvmState.Builder->CreateBr(LoopEndBB);
+        llvmState.Builder->SetInsertPoint(LoopEndBB);
+
         const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
         // Compute the end condition.
@@ -1021,13 +1069,18 @@ namespace llvm_backend {
         } else {
             endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
         }
-        llvm::BasicBlock *loopEndBB = llvmState.Builder->GetInsertBlock();
 
         // Create the "after loop" block and insert it.
         llvmState.Builder->CreateCondBr(endCond, LoopBB, AfterBB);
         llvmState.Builder->SetInsertPoint(AfterBB);
         // Add the incoming value for the PHI node from the backedge.
-        Variable->addIncoming(nextVar, loopEndBB);
+        Variable->addIncoming(nextVar, LoopEndBB);
+
+        if (llvmState.hasNamedAllocation(iterator)) {
+            llvmState.Builder->CreateStore(llvmState.findNamedValue(iterator), llvmState.findNamedAllocation(iterator));
+        }
+        llvmState.removeNamedValue(iterator);
+
         return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*llvmState.TheContext));
     }
 
@@ -1518,8 +1571,11 @@ namespace llvm_backend {
             assert(node->args().size() == 1 && "println expects exactly one argument");
             for (const auto &arg: node->args()) {
                 auto value = codegen_base(arg.get(), llvmState);
+                assert(value != nullptr && "Failed to generate argument for println");
                 if (value->getType()->isIntegerTy(32)) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%d\n", "i32_format"));
+                } else if (value->getType()->isIntegerTy(8)) {
+                    args.push_back(getOrCreateGlobalString(llvmState, "%c\n", "char_format"));
                 } else if (value->getType()->isIntegerTy(64)) {
                     args.push_back(getOrCreateGlobalString(llvmState, "%ld\n", "i64_format"));
                 } else if (value->getType()->isFloatingPointTy()) {

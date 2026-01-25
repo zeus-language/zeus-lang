@@ -1,0 +1,5 @@
+Integer:
+123
+Double:
+45.670000
+Boolean: true

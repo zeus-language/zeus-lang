@@ -219,7 +219,6 @@ fn double_to_str(value : double) : string {
     let mut result : string = int_to_str(whole);
     result.append( '.' as u8 );
 
-    //printf(r"frac_part: %f\n" as *u8, frac_part);
     frac_part = frac_part * 10.0;
     let tmp : double = (value - whole as double) * 1000000000.0;
     let frac : u64 = tmp as u64;
@@ -227,6 +226,7 @@ fn double_to_str(value : double) : string {
     result.append(&frac_str);
 
     destroy(&frac_str);
+
 
 
     return result;
@@ -264,4 +264,84 @@ fn int_to_str(value : i32) : string {
         end = end - 1;
     }
     return digits;
+}
+
+fn str_to_int(s : [u8]) : i32 {
+    let mut result : i32 = 0;
+    let mut is_negative : bool = false;
+    let mut start_index : u64 = 0 as u64;
+
+    if s.length == 0 as u64 {
+        return 0; // Handle empty string
+    }
+
+    if s.data[0] == '-' as u8 {
+        is_negative = true;
+        start_index = 1 as u64;
+    }
+
+    for ii in start_index .. s.length {
+        let ch : u8 = s.data[ii];
+        if ch < '0' as u8 or ch > '9' as u8 {
+            break; // Stop parsing on non-digit character
+        }
+        let digit : i32 = (ch - '0' as u8) as i32;
+        result = result * 10 + digit;
+    }
+
+
+    if is_negative {
+        result = 0 - result;
+    }
+
+    return result;
+}
+
+fn str_to_bool(s : [u8]) : bool {
+    if s.length == 4 as u64 {
+        if s.data[0] == 't' as u8 and s.data[1] == 'r' as u8 and s.data[2] == 'u' as u8 and s.data[3] == 'e' as u8 {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn str_to_double(s : [u8]) : double {
+    let mut result : double = 0.0 as double;
+    let mut is_negative : bool = false;
+    let mut start_index : u64 = 0 as u64;
+    let mut decimal_found : bool = false;
+    let mut decimal_place : double = 0.1 as double;
+
+    if s.length == 0 as u64 {
+        return 0.0 as double; // Handle empty string
+    }
+
+    if s.data[0] == '-' as u8 {
+        is_negative = true;
+        start_index = 1 as u64;
+    }
+
+    for i2 in start_index .. s.length {
+        let ch : u8 = s.data[i2];
+        if ch == '.' as u8 {
+            decimal_found = true;
+            continue;
+        }
+        if ch < '0' as u8 or ch > '9' as u8 {
+            break; // Stop parsing on non-digit character
+        }
+        let digit : i32 = (ch - '0' as u8) as i32;
+
+        if not decimal_found {
+            result = result * 10.0 as double + (digit as double);
+        } else {
+            result = result + (digit as double) * decimal_place;
+            decimal_place = decimal_place * 0.1 as double;
+        }
+    }
+    if is_negative {
+        result = 0.0 as double - result;
+    }
+    return result;
 }

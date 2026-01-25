@@ -12,6 +12,7 @@
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
+#include "ast/ContinueStatement.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -295,6 +296,8 @@ namespace types {
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
+    void type_check(ast::ContinueStatement *node, Context &context) {
+    }
     void type_check(ast::StringConstant *node, const Context &context) {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
@@ -389,6 +392,9 @@ namespace types {
         }
         if (const auto breakStmt = dynamic_cast<ast::BreakStatement *>(node)) {
             return type_check(breakStmt, context);
+        }
+        if (const auto continueStmt = dynamic_cast<ast::ContinueStatement *>(node)) {
+            return type_check(continueStmt, context);
         }
         if (const auto arrayInit = dynamic_cast<ast::ArrayInitializer *>(node)) {
             return type_check(arrayInit, context);
@@ -850,9 +856,11 @@ namespace types {
     }
 
     void type_check(ast::LogicalExpression *node, Context &context) {
-        type_check_base(node->lhs(), context);
-        type_check_base(node->rhs(), context);
-        if (node->lhs()->expressionType() && node->rhs()->expressionType()) {
+        if (node->lhs())
+            type_check_base(node->lhs(), context);
+        if (node->rhs())
+            type_check_base(node->rhs(), context);
+        if (node->lhs() && node->lhs()->expressionType() && node->rhs() && node->rhs()->expressionType()) {
             if (node->lhs()->expressionType().value()->name() != "bool" ||
                 node->rhs()->expressionType().value()->name() != "bool") {
                 context.messages.push_back({
@@ -865,7 +873,11 @@ namespace types {
                 return;
             }
             node->setExpressionType(context.currentScope->getTypeByName("bool").value());
-        } else {
+        }else if (node->rhs()->expressionType() && node->logical_operator() == ast::LogicalOperator::NOT) {
+            node->setExpressionType(context.currentScope->getTypeByName("bool").value());
+
+        }
+        else {
             context.messages.push_back({
                 parser::OutputType::ERROR,
                 node->expressionToken(),

@@ -1,7 +1,7 @@
 
 fn main() : i32 {
     let mut sum : i32 = 0;
-    let  count : i32;
+    let mut count : i32;
     for count in 1 ..=100 {
         sum = sum + count;
         if count >= 38 {
