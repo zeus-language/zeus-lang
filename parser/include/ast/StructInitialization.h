@@ -43,5 +43,20 @@ namespace ast {
         [[nodiscard]] std::optional<Token> genericParam() const {
             return m_genericParam;
         }
+        std::unique_ptr<ASTNode> clone() override {
+            std::vector<StructInitField> fieldsClone;
+            for (const auto &field: m_fields) {
+                fieldsClone.push_back(StructInitField{
+                    .name = field.name,
+                    .value = field.value->clone(),
+                });
+            }
+            auto cloneNode = std::make_unique<StructInitialization>(expressionToken(),
+                                                                   m_genericParam,
+                                                                   std::move(fieldsClone));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 }

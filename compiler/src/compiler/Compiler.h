@@ -3,6 +3,7 @@
 
 #include <ast/ASTNode.h>
 #include "CompilerOptions.h"
+#include "parser/module.h"
 
 
 namespace compiler {
@@ -12,7 +13,7 @@ namespace compiler {
                  const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
                  const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes);
 
-    void parse_and_compile(const compiler::CompilerOptions &options, const std::filesystem::path &inputPath,
+    void parse_and_compile(const compiler::CompilerOptions &options,modules::ModuleCache& moduleCache, const std::filesystem::path &inputPath,
                            std::ostream &errorStream,
                            std::ostream &outputStream);
 }

@@ -11,6 +11,8 @@
 
 #include "CompilerOptions.h"
 #include "lsp/messages.h"
+#include "parser/module.h"
+#include "parser/Parser.h"
 
 struct LspDocument {
     std::string uri;
@@ -21,12 +23,12 @@ struct LspDocument {
 class LanguageServer {
     lsp::LspOptions m_options;
     std::map<std::string, LspDocument> m_openDocuments;
+    modules::ModuleCache m_moduleCache;
 
     lsp::requests::TextDocument_Definition::Result findDefinition(
         const lsp::requests::TextDocument_Definition::Params &params);
-
-    lsp::requests::TextDocument_Completion::Result findCompletions(
-        const lsp::requests::TextDocument_Completion::Params &params) const;
+  [[nodiscard]] lsp::requests::TextDocument_Completion::Result findCompletions(
+        const lsp::requests::TextDocument_Completion::Params &params) ;
 
 public:
     explicit LanguageServer(lsp::LspOptions options);

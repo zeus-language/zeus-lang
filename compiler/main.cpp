@@ -70,8 +70,8 @@ int main(int args, char **argv) {
     std::cerr << "the first argument is not a valid input file\n";
     return 1;
   }
-
-  compiler::parse_and_compile(options, file_path, std::cerr, std::cout);
+  modules::ModuleCache moduleCache(true);
+  compiler::parse_and_compile(options,moduleCache, file_path, std::cerr, std::cout);
 
 
   return 0;

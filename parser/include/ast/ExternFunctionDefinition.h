@@ -22,5 +22,8 @@ namespace ast {
         ExternFunctionDefinition &operator=(ExternFunctionDefinition &&) = delete;
 
         ExternFunctionDefinition &operator=(const ExternFunctionDefinition &) = delete;
+
+        std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
+
     };
 }

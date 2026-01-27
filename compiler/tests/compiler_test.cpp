@@ -11,18 +11,24 @@
 using namespace std::literals;
 
 class CompilerTest : public testing::TestWithParam<std::string> {
+protected:
+    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
 };
 
 class CompilerIOTest : public testing::TestWithParam<std::string> {
+protected:
+    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
 };
 
 class ProjectEulerTest : public testing::TestWithParam<std::string> {
+protected:
+    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -30,12 +36,16 @@ public:
 
 
 class CompilerTestError : public testing::TestWithParam<std::string> {
+protected:
+    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
 };
 
 class WriteToStdErrTest : public testing::TestWithParam<std::string> {
+protected:
+    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -64,7 +74,7 @@ TEST_P(CompilerTest, TestNoError) {
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
-    compiler::parse_and_compile(options, input_path, erstream, ostream);
+    compiler::parse_and_compile(options,moduleCache, input_path, erstream, ostream);
 
     std::ifstream file;
     std::istringstream is;
@@ -113,7 +123,8 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     options.runArguments.push_back(output_path.string());
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
-    compiler::parse_and_compile(options, input_path, erstream, ostream);
+
+    compiler::parse_and_compile(options,moduleCache, input_path, erstream, ostream);
 
 
     std::ifstream file;
@@ -158,7 +169,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
 
     options.runProgram = true;
     options.outputDirectory = std::filesystem::current_path();
-    compiler::parse_and_compile(options, input_path, erstream, ostream);
+    compiler::parse_and_compile(options,moduleCache, input_path, erstream, ostream);
 
     std::ifstream file;
     std::istringstream is;
@@ -202,7 +213,7 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
     options.colorOutput = false;
-    compiler::parse_and_compile(options, input_path, erstream, ostream);
+    compiler::parse_and_compile(options,moduleCache, input_path, erstream, ostream);
 
     std::ifstream file;
     std::istringstream is;

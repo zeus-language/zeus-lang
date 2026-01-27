@@ -981,7 +981,7 @@ namespace parser {
             if (tryConsumeKeyWord("mut")) {
                 constant = false;
             }
-            Token nameToken = current();
+            Token &nameToken = current();
             consume(Token::Type::IDENTIFIER);
 
             consume(Token::Type::COLON);
@@ -1861,6 +1861,58 @@ namespace parser {
         return std::nullopt;
     }
 
+    std::vector<std::shared_ptr<Module> > Module::findModulesByPathStart(const std::vector<Token> &pathTokens) const {
+        std::vector<std::shared_ptr<Module> > result;
+        for (const auto &mod: modules) {
+            bool matches = true;
+            if (pathTokens.size() == 1 && mod->aliasName.has_value()) {
+                if (mod->aliasName.value() == pathTokens[0].lexical()) {
+                    result.push_back(mod);
+                    continue;
+                }
+            }
+            const auto& modulePath = mod->modulePath();
+            if (modulePath.size() < pathTokens.size()) {
+                continue;
+            }
+            for (size_t i = 0; i < pathTokens.size(); ++i) {
+                if (modulePath[i].lexical() != pathTokens[i].lexical()) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                result.push_back(mod);
+            }
+        }
+        return result;
+    }
+
+    Module::Module(const Module &other) {
+        m_modulePath = other.m_modulePath;
+        aliasName = other.aliasName;
+        modName = other.modName;
+        // Deep copy of nodes
+        for (const auto &node: other.nodes) {
+            nodes.push_back(std::unique_ptr<ast::ASTNode>(node->clone()));
+        }
+        // Deep copy of externTypes
+        for (const auto &extType: other.externTypes) {
+            externTypes.push_back(extType->clone());
+        }
+        // Deep copy of functions
+        for (const auto &func: other.functions) {
+            functions.push_back(func->cloneFunction());
+        }
+        // Deep copy of useModuleNodes
+        for (const auto &useNode: other.useModuleNodes) {
+            useModuleNodes.push_back(useNode->clone());
+        }
+        // Deep copy of sub-modules
+        for (const auto &mod: other.modules) {
+            modules.push_back(std::make_shared<Module>(*mod));
+        }
+    }
     ParseResult parse_tokens(const std::vector<Token> &tokens) {
         Parser parser(tokens);
         return parser.parse();

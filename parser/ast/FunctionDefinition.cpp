@@ -26,11 +26,38 @@ namespace ast {
         return std::nullopt;
     }
 
+    std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
+        auto returnTypeClone = returnType().has_value()
+                                   ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                   : std::nullopt;
+        std::vector<std::unique_ptr<ASTNode> > statementsClones;
+        for (auto &stmt: m_statements) {
+            statementsClones.push_back(stmt->clone());
+        }
+        std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
+        for (auto &annotation: rawAnnotations()) {
+            annotationsClones.push_back(annotation->cloneAnnotation());
+        }
+        auto cloneNode = std::make_unique<FunctionDefinition>(expressionToken(),
+                                                              args(),
+                                                              std::move(returnTypeClone),
+                                                              std::move(statementsClones),
+                                                              genericParam,
+                                                              std::move(annotationsClones));
+        if (expressionType())
+            cloneNode->setExpressionType(expressionType().value());
+        return cloneNode;
+    }
+
     std::string FunctionDefinitionBase::functionName() const {
         return m_functionName;
     }
 
-    std::vector<FunctionArgument> &FunctionDefinitionBase::args() {
+    const std::vector<FunctionArgument> &FunctionDefinitionBase::args() const{
+        return m_args;
+    }
+
+    std::vector<FunctionArgument> & FunctionDefinitionBase::args() {
         return m_args;
     }
 
@@ -61,10 +88,12 @@ namespace ast {
     }
 
 
-    std::string FunctionDefinitionBase::functionSignature() const {
+    std::string FunctionDefinitionBase::functionSignature(bool withNamespace) const {
         std::string signature;
-        for (auto &ns: m_namespacePrefix) {
-            signature += ns.lexical() + "::";
+        if (withNamespace) {
+            for (auto &ns: m_namespacePrefix) {
+                signature += ns.lexical() + "::";
+            }
         }
 
         signature += functionName() + "(";

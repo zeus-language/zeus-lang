@@ -13,11 +13,12 @@ add_library(${PROJECT_NAME} STATIC
         ast/RawStringConstant.cpp
         ast/NumberConstant.cpp
         ast/FunctionDefinition.cpp
+        ast/ExternFunctionDefinition.cpp
         ast/VariableDeclaration.cpp
         ast/VariableAssignment.cpp
         include/parser/module.h
         module.cpp
-        include/ast/ExternFunctionDefinition.h
+
         include/ast/RangeExpression.h
         include/ast/EnumDeclaration.h
         include/ast/EnumAccess.h

@@ -62,7 +62,9 @@ namespace compiler {
         return nodes;
     }
 
-    void parse_and_compile(const compiler::CompilerOptions &options, const std::filesystem::path &inputPath,
+    void parse_and_compile(const compiler::CompilerOptions &options
+        ,modules::ModuleCache& moduleCache
+        , const std::filesystem::path &inputPath,
                            std::ostream &errorStream,
                            std::ostream &outputStream) {
         const auto content = read_file(inputPath);
@@ -70,7 +72,7 @@ namespace compiler {
 
         auto result = parser::parse_tokens(tokens);
 
-        modules::include_modules(options.stdlibDirectories, result);
+        modules::include_modules(options.stdlibDirectories,moduleCache, result);
         for (const auto &message: result.messages) {
             message.msg(errorStream, options.colorOutput);
         }

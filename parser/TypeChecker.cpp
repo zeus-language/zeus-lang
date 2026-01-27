@@ -5,6 +5,7 @@
 #include <map>
 #include <ranges>
 
+#include "dbg_assert.h"
 #include "ast/ArrayAccess.h"
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
@@ -445,7 +446,7 @@ namespace types {
         if (const auto arrayRepeatInit = dynamic_cast<ast::ArrayRepeatInitializer *>(node)) {
             return type_check(arrayRepeatInit, context);
         }
-        assert(node != nullptr && "Node is null");
+        DBG_ASSERT(node != nullptr , "Node is null");
 
         context.messages.push_back({
             parser::OutputType::ERROR,
@@ -801,7 +802,7 @@ namespace types {
                 return;
             }
         }
-        assert(node->structType() && "Struct type is null in field access");
+        DBG_ASSERT(node->structType() , "Struct type is null in field access");
     }
 
     void type_check_field(const ast::StructInitField &field, Context &context) {

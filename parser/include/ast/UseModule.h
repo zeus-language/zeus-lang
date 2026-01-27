@@ -30,5 +30,11 @@ namespace ast {
         [[nodiscard]] std::optional<std::string> aliasName() const {
             return (m_alias.has_value()) ? std::make_optional(m_alias.value().lexical()) : std::nullopt;
         }
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<UseModule>(m_modulePath, m_alias);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return cloneNode;
+        }
     };
 }

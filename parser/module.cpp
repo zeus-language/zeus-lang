@@ -3,6 +3,7 @@
 #include <fstream>
 #include <optional>
 
+#include "dbg_assert.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/UseModule.h"
@@ -25,10 +26,10 @@ namespace modules {
         return buffer;
     }
 
-    void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories, parser::ParseResult &result,
+    void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories,ModuleCache& moduleCache, parser::ParseResult &result,
                        ast::UseModule *useModule) {
         std::string modulePath;
-        assert(result.module && "Resulting module must not be null");
+        DBG_ASSERT(result.module ,"Resulting module must not be null");
         for (const auto &ns: useModule->modulePath()) {
             modulePath += ns.lexical() + "/";
         }
@@ -39,8 +40,29 @@ namespace modules {
         bool moduleLoadedSuccessfully = false;
         for (const auto &basePath: stdlibDirectories) {
             auto fullPath = basePath / modulePath;
-            if (std::filesystem::exists(fullPath) and (
-                    !result.module->containsSubModule(modulePath))) {
+            if (!std::filesystem::exists(fullPath)) {
+                continue;
+            }
+            if (moduleCache.containsModule(fullPath)) {
+                auto module = moduleCache.getModule(fullPath);
+                std::cerr<< "Using cached module for path: " << fullPath.string() << "\n";
+                module->setModulePath(useModule->modulePath());
+                module->aliasName = useModule->aliasName();
+                for (auto &function: module->functions) {
+                    function->setModulePath(useModule->modulePath());
+                    // if (funcDef->isPrivate()) {
+                    //     result.messages.push_back(parser::ParserMessasge{
+                    //         .outputType = parser::OutputType::ERROR,
+                    //         .token = funcDef->expressionToken(),
+                    //         .message = "Cannot use private function '" + funcDef->functionName() +
+                    //                    "' from module '" + fullPath.string() + "'!"
+                    //     });
+                    // }
+                }
+                result.module->modules.push_back(module);
+                moduleLoadedSuccessfully = true;
+
+            } else  if (!result.module->containsSubModule(modulePath)) {
                 auto moduleContent = read_file(fullPath);
                 if (!moduleContent) {
                     result.messages.push_back(parser::ParserMessasge{
@@ -53,7 +75,7 @@ namespace modules {
                 moduleLoadedSuccessfully = true;
                 auto moduleTokens = lexer::lex_file(fullPath.string(), moduleContent.value());
                 auto moduleResult = parser::parse_tokens(moduleTokens);
-                moduleResult.module->modulePath = useModule->modulePath();
+                moduleResult.module->setModulePath( useModule->modulePath());
                 moduleResult.module->aliasName = useModule->aliasName();
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
@@ -65,7 +87,7 @@ namespace modules {
                 std::vector<ast::ASTNode *> nodesToDelete;
                 for (auto &node: moduleResult.module->useModuleNodes) {
                     if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
-                        useModuleFile(stdlibDirectories, moduleResult, subUseModule);
+                        useModuleFile(stdlibDirectories,moduleCache, moduleResult, subUseModule);
                     }
                 }
                 for (auto &function: moduleResult.module->functions) {
@@ -78,6 +100,10 @@ namespace modules {
                     //                    "' from module '" + fullPath.string() + "'!"
                     //     });
                     // }
+                }
+                if (!moduleResult.hasError()) {
+                    std::cerr<< "Caching module for path: " << fullPath.string() << "\n";
+                    moduleCache.addModule(fullPath, moduleResult.module);
                 }
             }
 
@@ -95,14 +121,54 @@ namespace modules {
         }
     }
 
+    std::shared_ptr<parser::Module> ModuleCache::getModule(const std::string &path) const {
+            if (entries.contains(path)) {
+                const auto entry = entries.at(path);
+                // clone the module
+                return std::make_shared<parser::Module>(*entry);
+            }
+            return nullptr;
+    }
+
+    void ModuleCache::addModule(const std::string &path, const std::shared_ptr<parser::Module> &module) {
+        entries[path] = std::make_shared<parser::Module>(*module);
+    }
+    std::vector<std::shared_ptr<parser::Module>> ModuleCache::findModulesByPathStart(
+        const std::vector<Token> &pathTokens) const {
+        std::vector<std::shared_ptr<parser::Module>> result;
+        for (const auto &[path, mod]: entries) {
+            bool matches = true;
+            if (pathTokens.size() == 1 && mod->aliasName.has_value()) {
+                if (mod->aliasName.value() == pathTokens[0].lexical()) {
+                    result.push_back(mod);
+                    continue;
+                }
+            }
+            const auto& modulePath = mod->modulePath();
+            if (modulePath.size() < pathTokens.size()) {
+                continue;
+            }
+            for (size_t i = 0; i < pathTokens.size(); i++) {
+                if (modulePath[i].lexical() != pathTokens[i].lexical()) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                result.push_back(mod);
+            }
+        }
+        return result;
+    }
+
     void include_modules(
-        const std::vector<std::filesystem::path> &stdlibDirectories,
+        const std::vector<std::filesystem::path> &stdlibDirectories,ModuleCache& moduleCache,
         parser::ParseResult &result) {
         for (auto &token: result.module->useModuleNodes) {
             if (const auto useModule = dynamic_cast<ast::UseModule *>(token.get())) {
                 parser::ParseResult moduleResult;
 
-                useModuleFile(stdlibDirectories, result, useModule);
+                useModuleFile(stdlibDirectories,moduleCache, result, useModule);
             }
         }
     }

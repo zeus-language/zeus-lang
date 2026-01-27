@@ -20,6 +20,9 @@ namespace ast {
         FunctionArgument(Token name, std::unique_ptr<RawType> type, const bool isConstant)
             : name(std::move(name)), rawType(std::move(type)), isConstant(isConstant) {
         }
+        FunctionArgument(const FunctionArgument &other)
+            : name(other.name), rawType(other.rawType->clone()), isConstant(other.isConstant), type(other.type) {
+        }
     };
 
     class FunctionDefinitionBase : public AnnotatedNode {
@@ -61,6 +64,7 @@ namespace ast {
             return &m_args[index];
         }
 
+        [[nodiscard]] const std::vector<FunctionArgument> &args()const ;
         std::vector<FunctionArgument> &args();
 
         [[nodiscard]] std::shared_ptr<types::VariableType> asFunctionType() const;
@@ -80,7 +84,9 @@ namespace ast {
             m_rawAnnotations(std::move(annotations)) {
         }
 
-        [[nodiscard]] std::string functionSignature() const;
+        [[nodiscard]] std::string functionSignature(bool withNamespace = true) const;
+
+        virtual std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() = 0;
     };
 
     class FunctionDefinition final : public FunctionDefinitionBase {
@@ -113,6 +119,7 @@ namespace ast {
         [[nodiscard]] std::optional<Token> getGenericParam() const {
             return genericParam;
         }
+        std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
     };
 } // ast
 

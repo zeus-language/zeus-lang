@@ -39,5 +39,27 @@ namespace ast {
         std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > &methods() { return m_methods; }
 
         [[nodiscard]] std::optional<Token> genericParam() const { return m_genericParam; }
+        std::unique_ptr<ASTNode> clone() override;
     };
+
+    inline std::unique_ptr<ASTNode> StructDeclaration::clone() {
+        std::vector<StructField> fieldsClone;
+        for (const auto &field: m_fields) {
+            fieldsClone.push_back(StructField{
+                .name = field.name,
+                .type = field.type->clone()
+            });
+        }
+        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methodsClone;
+        for (const auto &method: m_methods) {
+            methodsClone.push_back(method->cloneFunction());
+        }
+        auto cloneNode = std::make_unique<StructDeclaration>(expressionToken(),
+                                                            std::move(fieldsClone),
+                                                            std::move(methodsClone),
+                                                            m_genericParam);
+        if (expressionType())
+            cloneNode->setExpressionType(expressionType().value());
+        return cloneNode;
+    }
 }

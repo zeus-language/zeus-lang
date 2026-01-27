@@ -60,18 +60,33 @@ namespace parser {
     struct Module;
 
     struct Module {
+    private:
+        std::vector<Token> m_modulePath;
+        std::string modName;
+
+    public:
         std::vector<std::shared_ptr<Module> > modules;
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
         std::vector<std::unique_ptr<ast::RawType> > externTypes;
         std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > functions;
 
         std::vector<std::unique_ptr<ast::ASTNode> > useModuleNodes;
-        std::vector<Token> modulePath;
+
         std::optional<std::string> aliasName;
+        void setModulePath(const std::vector<Token> &pathTokens) {
+            m_modulePath = pathTokens;
+            modName = "";
+            for (auto &ns: m_modulePath) {
+                modName += ns.lexical() + "::";
+            }
+        }
+        const std::vector<Token>& modulePath() const {
+            return m_modulePath;
+        }
 
         [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
             for (const auto &mod: modules) {
-                if (!mod->modulePath.empty() && mod->modulePath.back().lexical() == moduleName) {
+                if (!mod->m_modulePath.empty() && mod->m_modulePath.back().lexical() == moduleName) {
                     return true;
                 }
             }
@@ -79,10 +94,6 @@ namespace parser {
         }
 
         [[nodiscard]] std::string modulePathName() const {
-            std::string modName;
-            for (auto &ns: modulePath) {
-                modName += ns.lexical() + "::";
-            }
             return modName;
         }
 
@@ -91,6 +102,11 @@ namespace parser {
             const std::string &name) const;
 
         std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > getNodeByToken(const Token &token) const;
+
+         [[nodiscard]] std::vector<std::shared_ptr<Module>> findModulesByPathStart(const std::vector<Token> &pathTokens) const;
+        Module() = default;
+        // Copy constructor
+        Module(const Module &other) ;
     };
 
 
