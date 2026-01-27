@@ -103,7 +103,7 @@ namespace modules {
                 }
                 if (!moduleResult.hasError()) {
                     std::cerr<< "Caching module for path: " << fullPath.string() << "\n";
-                    moduleCache.addModule(fullPath, moduleResult.module);
+                    moduleCache.addModule(fullPath.string(), moduleResult.module);
                 }
             }
 
