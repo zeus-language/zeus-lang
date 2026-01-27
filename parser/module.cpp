@@ -43,8 +43,8 @@ namespace modules {
             if (!std::filesystem::exists(fullPath)) {
                 continue;
             }
-            if (moduleCache.containsModule(fullPath)) {
-                auto module = moduleCache.getModule(fullPath);
+            if (moduleCache.containsModule(fullPath.string())) {
+                auto module = moduleCache.getModule(fullPath.string());
                 std::cerr<< "Using cached module for path: " << fullPath.string() << "\n";
                 module->setModulePath(useModule->modulePath());
                 module->aliasName = useModule->aliasName();
@@ -103,7 +103,7 @@ namespace modules {
                 }
                 if (!moduleResult.hasError()) {
                     std::cerr<< "Caching module for path: " << fullPath.string() << "\n";
-                    moduleCache.addModule(fullPath, moduleResult.module);
+                    moduleCache.addModule(fullPath.string(), moduleResult.module);
                 }
             }
 
