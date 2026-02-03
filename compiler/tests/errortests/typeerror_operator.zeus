@@ -1,0 +1,10 @@
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn main() : i32 {
+    let p : Point =  Point{ x: 10, y: 20 };
+    let result : Point = p + 5; // Error: cannot add Point and i32
+    return 0;
+}
