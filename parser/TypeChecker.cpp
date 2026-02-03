@@ -1164,6 +1164,84 @@ namespace types {
         type_check_base(node->lhs(), context);
         type_check_base(node->rhs(), context);
 
+        bool isStructualOperand = false;
+        std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
+        std::optional<std::shared_ptr<types::StructType> > rhsStructType = std::nullopt;
+
+        if (node->lhs()->expressionType()) {
+            if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->lhs()->expressionType().value())) {
+                isStructualOperand = true;
+                lhsStructType = structType;
+                auto lhsToken = node->lhs()->expressionToken();
+                node->setLhs(std::make_unique<ast::ReferenceAccess>(
+                    lhsToken,
+                    std::move(node->movelhs())
+                ));
+                type_check_base(node->lhs(), context);
+
+            }
+        }
+        if (node->rhs()->expressionType()) {
+            if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->rhs()->expressionType().value())) {
+                isStructualOperand = true;
+                rhsStructType = structType;
+            }
+        }
+        if (isStructualOperand) {
+            // loopup operator overload in lhs struct type
+            if (lhsStructType) {
+                const auto &methods = lhsStructType.value()->methods();
+                auto operatorMethodIt = std::ranges::find_if(methods, [&](const auto &method) {
+                    return method->functionName() == node->operatorFunctionName() &&
+                           method->args().size() == 2 &&
+                           method->args()[0].type &&
+                           method->args()[0].type.value()->name() ==
+                           node->lhs()->expressionType().value()->name() &&
+                           method->args()[1].type &&
+                           method->args()[1].type.value()->name() ==
+                           node->rhs()->expressionType().value()->name();
+                });
+                // filter by parameter types
+
+                if (operatorMethodIt != methods.end()) {
+                    type_check_base(operatorMethodIt->get(), context);
+                    if (operatorMethodIt->get()->expressionType()) {
+                        node->setOperatorFunction(operatorMethodIt->get());
+                        node->setExpressionType(operatorMethodIt->get()->expressionType().value());
+                        return;
+                    }
+                }else {
+                    const auto &functions = context.findFunctionsByName("",node->operatorFunctionName() );
+                    auto operatorFunctionIt = std::ranges::find_if(functions, [&](const auto &method) {
+                        return method->args().size() == 2 &&
+                               method->args()[0].type &&
+                               method->args()[0].type.value()->name() ==
+                               node->lhs()->expressionType().value()->name() &&
+                               method->args()[1].type &&
+                               method->args()[1].type.value()->name() ==
+                               node->rhs()->expressionType().value()->name();
+                    });
+
+                    if (operatorFunctionIt != functions.end()) {
+                        type_check_base(*operatorFunctionIt, context);
+                        if ((*operatorFunctionIt)->expressionType()) {
+                            node->setOperatorFunction(*operatorFunctionIt);
+                            node->setExpressionType((*operatorFunctionIt)->expressionType().value());
+                            return;
+                        }
+                    }else {
+                        context.messages.push_back({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Operator '" + node->operatorFunctionName() + "' is not overloaded for struct type '" +
+                            lhsStructType.value()->name() + "'."
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+
         if (node->lhs()->expressionType() && node->rhs()->expressionType()) {
             if (node->lhs()->expressionType().value()->name() != node->rhs()->expressionType().value()->name()) {
                 context.messages.push_back({

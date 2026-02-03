@@ -584,32 +584,38 @@ namespace parser {
                                                std::move(rhs.value())));
                 }
                 if (tryConsume(Token::MINUS)) {
-                    auto rhs = tryParseToken();
+                    auto rhs = tryParseToken(allowInit);
                     if (canConsume(Token::MUL) or canConsume(Token::DIV) or canConsume(Token::LEFT_CURLY)) {
-                        rhs = parseBaseExpression(false, std::move(rhs), false);
+                        rhs = parseBaseExpression(allowInit, std::move(rhs), false);
                     }
-
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '-' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_unique<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::SUB,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
                 if (tryConsume(Token::MUL)) {
-                    auto rhs = tryParseToken();
+                    auto rhs = tryParseToken(allowInit);
                     return parseExpression(false,
                                            std::make_unique<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::MUL,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
                 if (tryConsume(Token::DIV)) {
-                    auto rhs = tryParseToken();
+                    auto rhs = tryParseToken(allowInit);
                     return parseExpression(false,
                                            std::make_unique<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::DIV,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
                 if (tryConsume(Token::PERCENT)) {
-                    auto rhs = tryParseToken();
+                    auto rhs = tryParseToken(allowInit);
                     return parseExpression(false,
                                            std::make_unique<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::MOD,
@@ -1871,7 +1877,7 @@ namespace parser {
                     continue;
                 }
             }
-            const auto& modulePath = mod->modulePath();
+            const auto &modulePath = mod->modulePath();
             if (modulePath.size() < pathTokens.size()) {
                 continue;
             }
@@ -1913,6 +1919,7 @@ namespace parser {
             modules.push_back(std::make_shared<Module>(*mod));
         }
     }
+
     ParseResult parse_tokens(const std::vector<Token> &tokens) {
         Parser parser(tokens);
         return parser.parse();

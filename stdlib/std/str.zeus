@@ -20,6 +20,7 @@ struct string {
         if new_length + 1 > self.capacity {
             // Need to reallocate
             let mut new_capacity : i32 = self.capacity * 2;
+            printf("Increasing capacity from %d to %d\n" as *u8, self.capacity, new_capacity);
             self.data  = core::libc::realloc(self.data as *u8, new_capacity as u64);
             self.capacity = new_capacity;
         }
@@ -33,7 +34,6 @@ struct string {
         self.length = new_length;
         self.data[self.length] = 0 as u8; // Null-terminate
     }
-
     fn append(self : mut &string, other : &string) : void {
         let new_length : i32 = self.length + other.length;
         self.increase_capacity(new_length);
@@ -42,6 +42,28 @@ struct string {
         core::libc::memcpy(target, other.data, other.length as u64);
         self.length = new_length;
         self.data[self.length] = 0 as u8; // Null-terminate
+    }
+
+    fn append(self : mut &string, number : i32) : void {
+        let num_str : string = int_to_str(number);
+        self.append(&num_str);
+        destroy(&num_str);
+    }
+    fn append(self : mut &string, other : [u8]) : void {
+        let new_length : i32 = self.length + other.length as i32;
+        self.increase_capacity(new_length);
+        // Append the new data
+        let target : *u8 = self.data + self.length as *u8;
+        core::libc::memcpy(target, other.data, other.length as u64);
+        self.length = new_length;
+        self.data[self.length] = 0 as u8; // Null-terminate
+    }
+
+    fn as_slice(self : &string) : [u8] {
+        let mut slice : [u8];
+        slice.data = self.data;
+        slice.length = self.length as u64;
+        return slice;
     }
 }
 

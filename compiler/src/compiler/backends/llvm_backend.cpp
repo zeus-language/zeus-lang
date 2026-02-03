@@ -1275,7 +1275,42 @@ namespace llvm_backend {
         return condition;
     }
 
+    void setCallArgInfo(ast::ASTNode* node,llvm::CallInst* call, size_t argNum, LLVMBackendState &llvmState) {
+        const auto argType = node->expressionType();
+
+        if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
+            const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
+
+            call->addParamAttr(static_cast<unsigned>(argNum), llvm::Attribute::NoUndef);
+            call->addParamAttr(static_cast<unsigned>(argNum),
+                               llvm::Attribute::getWithByValType(*llvmState.TheContext, llvmArgType));
+        }
+    }
+
+    llvm::Value *codegenStructBinaryExpressionCall(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
+        const auto lhs = codegen_base(node->lhs(), llvmState);
+        const auto rhs = codegen_base(node->rhs(), llvmState);
+
+        const auto opFunction = node->operatorFunction();
+        assert(opFunction && "Struct binary expression operator function not found");
+        auto function = llvmState.TheModule->getFunction(opFunction.value()->functionName());
+        if (!function) {
+            function = llvmState.TheModule->getFunction(opFunction.value()->functionSignature());
+        }
+        assert(function && "Struct binary expression operator function not found in module");
+        std::vector<llvm::Value *> args;
+        args.push_back(lhs);
+        args.push_back(rhs);
+        auto call =  llvmState.Builder->CreateCall(function, args, "struct_binop");
+        setCallArgInfo(node->lhs(), call, 0, llvmState);
+        setCallArgInfo(node->rhs(), call, 1, llvmState);
+        return call;
+    }
+
     llvm::Value *codegen(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
+        if (node->operatorFunction()) {
+            return codegenStructBinaryExpressionCall(node, llvmState);
+        }
         const auto lhs = codegen_base(node->lhs(), llvmState);
         const auto rhs = codegen_base(node->rhs(), llvmState);
 

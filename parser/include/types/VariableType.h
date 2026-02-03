@@ -145,6 +145,8 @@ namespace types {
             return m_methods;
         }
 
+        [[nodiscard]] const ast::FunctionDefinitionBase* getMethodByName(const std::string &methodName) const;
+
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {
                 if (field.name == fieldName)

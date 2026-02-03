@@ -45,7 +45,6 @@ namespace modules {
             }
             if (moduleCache.containsModule(fullPath.string())) {
                 auto module = moduleCache.getModule(fullPath.string());
-                std::cerr<< "Using cached module for path: " << fullPath.string() << "\n";
                 module->setModulePath(useModule->modulePath());
                 module->aliasName = useModule->aliasName();
                 for (auto &function: module->functions) {
@@ -102,7 +101,6 @@ namespace modules {
                     // }
                 }
                 if (!moduleResult.hasError()) {
-                    std::cerr<< "Caching module for path: " << fullPath.string() << "\n";
                     moduleCache.addModule(fullPath.string(), moduleResult.module);
                 }
             }

@@ -1,0 +1,43 @@
+use core::libc;
+struct Point  {
+    x: i32,
+    y: i32,
+    fn __add__(self: &Point, other: Point) : Point {
+        return Point{ x: self.x + other.x, y: self.y + other.y };
+    }
+
+    fn __add__(self: &Point, other: i32) : Point {
+        return Point{ x: self.x + other, y: self.y + other };
+    }
+
+    fn __sub__(self: &Point, other: Point) : Point {
+        return Point{ x: self.x - other.x, y: self.y - other.y };
+    }
+
+    fn __sub__(self: &Point, other: i32) : Point {
+        return Point{ x: self.x - other, y: self.y - other };
+    }
+
+}
+
+
+fn main() : i32 {
+    let p : Point =  Point{ x: 10, y: 20 };
+    let mut resultPlus : Point = p + Point{ x: 5, y: 5 };
+    let mut resultMinus : Point = p - 4;
+    //let resultPlus : Point = p + 5;
+    //let resultMinus : Point = p - 3;
+printf(r"P: (%d, %d)\n", p.x, p.y);
+    printf(r"Result Plus: (%d, %d)\n", resultPlus.x, resultPlus.y);
+    printf(r"Result Minus: (%d, %d)\n", resultMinus.x, resultMinus.y);
+    println(resultPlus.x);
+    println(resultPlus.y);
+    println(resultMinus.x);
+    println(resultMinus.y);
+
+    //destroy(&str3);
+    //destroy(&str4);
+   // destroy(&str5);
+    //destroy(&str6);
+    return 0;
+}

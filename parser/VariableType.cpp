@@ -27,6 +27,15 @@ types::StructType::StructType(std::string name, const std::vector<StructField> &
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
 }
 
+const ast::FunctionDefinitionBase * types::StructType::getMethodByName(const std::string &methodName) const {
+    for (const auto &method: m_methods) {
+        if (method->functionName() == methodName) {
+            return method.get();
+        }
+    }
+    return nullptr;
+}
+
 std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
     const std::shared_ptr<VariableType> &genericParam) {
     auto fields = this->m_fields;
