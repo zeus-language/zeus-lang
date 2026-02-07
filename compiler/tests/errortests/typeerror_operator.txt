@@ -1,6 +1,6 @@
-errortests/typeerror_operator.zeus:8:28: error: Type mismatch in binary expression: left is of type 'Point', right is of type 'i32'.
+FILENAME:8:28: error: Operator '__add__' is not overloaded for struct type 'Point'.
     let result : Point = p + 5; // Error: cannot add Point and i32
                            ^
-errortests/typeerror_operator.zeus:8:28: error: Could not determine type of initial value for variable 'result'.
+FILENAME:8:28: error: Could not determine type of initial value for variable 'result'.
     let result : Point = p + 5; // Error: cannot add Point and i32
                            ^

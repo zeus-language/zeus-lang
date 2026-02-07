@@ -2,42 +2,31 @@ use core::libc;
 struct Point  {
     x: i32,
     y: i32,
-    fn __add__(self: &Point, other: Point) : Point {
-        return Point{ x: self.x + other.x, y: self.y + other.y };
-    }
+    z: i32,
 
     fn __add__(self: &Point, other: i32) : Point {
-        return Point{ x: self.x + other, y: self.y + other };
-    }
-
-    fn __sub__(self: &Point, other: Point) : Point {
-        return Point{ x: self.x - other.x, y: self.y - other.y };
+        let mut p : Point;
+        p.x = self.x + other;
+        p.y = self.y + other;
+        p.z = self.z + other;
+        return p;
     }
 
     fn __sub__(self: &Point, other: i32) : Point {
-        return Point{ x: self.x - other, y: self.y - other };
+        return Point{ x: self.x - other, y: self.y - other , z: self.z - other };
     }
 
 }
 
 
 fn main() : i32 {
-    let p : Point =  Point{ x: 10, y: 20 };
-    let mut resultPlus : Point = p + Point{ x: 5, y: 5 };
-    let mut resultMinus : Point = p - 4;
-    //let resultPlus : Point = p + 5;
-    //let resultMinus : Point = p - 3;
-printf(r"P: (%d, %d)\n", p.x, p.y);
-    printf(r"Result Plus: (%d, %d)\n", resultPlus.x, resultPlus.y);
-    printf(r"Result Minus: (%d, %d)\n", resultMinus.x, resultMinus.y);
-    println(resultPlus.x);
-    println(resultPlus.y);
-    println(resultMinus.x);
-    println(resultMinus.y);
+    let p : Point =  Point{ x: 10, y: 20, z: 30 };
+    let resultPlus : Point = Point{ x: 10, y: 20,z: 10 } + 5;
+    let resultMinus : Point = Point{ x: 10, y: 20 ,z: 10} - 4;
 
-    //destroy(&str3);
-    //destroy(&str4);
-   // destroy(&str5);
-    //destroy(&str6);
+    printf(r"P: (%d, %d)\n", p.x, p.y);
+    printf(r"Result Plus: (%d, %d, %d)\n", resultPlus.x, resultPlus.y, resultPlus.z);
+    printf(r"Result Minus: (%d, %d, %d)\n", resultMinus.x, resultMinus.y, resultMinus.z);
+
     return 0;
 }

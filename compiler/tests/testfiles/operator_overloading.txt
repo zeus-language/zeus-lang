@@ -1,0 +1,3 @@
+P: (10, 20)
+Result Plus: (15, 25, 15)
+Result Minus: (6, 16, 6)

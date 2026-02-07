@@ -20,7 +20,6 @@ struct string {
         if new_length + 1 > self.capacity {
             // Need to reallocate
             let mut new_capacity : i32 = self.capacity * 2;
-            printf("Increasing capacity from %d to %d\n" as *u8, self.capacity, new_capacity);
             self.data  = core::libc::realloc(self.data as *u8, new_capacity as u64);
             self.capacity = new_capacity;
         }

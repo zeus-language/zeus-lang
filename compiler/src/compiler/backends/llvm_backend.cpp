@@ -138,7 +138,8 @@ namespace llvm_backend {
         bool hasNamedAllocation(const std::string &name) {
             return NamedAllocations.contains(name);
         }
- bool hasNamedValue(const std::string &name) {
+
+        bool hasNamedValue(const std::string &name) {
             return NamedValues.contains(name);
         }
 
@@ -1275,7 +1276,7 @@ namespace llvm_backend {
         return condition;
     }
 
-    void setCallArgInfo(ast::ASTNode* node,llvm::CallInst* call, size_t argNum, LLVMBackendState &llvmState) {
+    void setCallArgInfo(ast::ASTNode *node, llvm::CallInst *call, size_t argNum, LLVMBackendState &llvmState) {
         const auto argType = node->expressionType();
 
         if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
@@ -1299,12 +1300,26 @@ namespace llvm_backend {
         }
         assert(function && "Struct binary expression operator function not found in module");
         std::vector<llvm::Value *> args;
+        const auto returnTypeKind = node->expressionType().has_value() ? node->expressionType().value()->typeKind() : types::TypeKind::VOID;
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        llvm::Value *returnAlloca = nullptr;
+        if (isStructReturn) {
+            const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
+            returnAlloca = llvmState.Builder->CreateAlloca(llvmReturnType, nullptr, "struct_return_alloca");
+            args.push_back(returnAlloca);
+        }
         args.push_back(lhs);
         args.push_back(rhs);
-        auto call =  llvmState.Builder->CreateCall(function, args, "struct_binop");
-        setCallArgInfo(node->lhs(), call, 0, llvmState);
-        setCallArgInfo(node->rhs(), call, 1, llvmState);
-        return call;
+        auto call = llvmState.Builder->CreateCall(function, args);
+        call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext, resolveLlvmType(node->expressionType().value(), llvmState)));
+        call->addParamAttr(0, llvm::Attribute::Writable);
+        call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+        call->addParamAttr(0, llvm::Attribute::NoAlias);
+        setCallArgInfo(node->lhs(), call, 1, llvmState);
+        setCallArgInfo(node->rhs(), call, 2, llvmState);
+        if (!function->getReturnType()->isVoidTy())
+            return call;
+        return returnAlloca;
     }
 
     llvm::Value *codegen(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
@@ -1531,9 +1546,10 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(const ast::StringConstant *node, LLVMBackendState &llvmState) {
-        auto strValue = getOrCreateGlobalString(llvmState, node->value(), "");
+        const auto stringValue = node->value();
+        const auto strValue = getOrCreateGlobalString(llvmState, stringValue, "");
         const auto sliceLLVMType = resolveLlvmType(node->expressionType().value(), llvmState);
-        auto alloca = llvmState.Builder->CreateAlloca(sliceLLVMType, nullptr,
+        const auto alloca = llvmState.Builder->CreateAlloca(sliceLLVMType, nullptr,
                                                       "string_slice_alloca");
         const auto dataPtr = llvmState.Builder->CreateStructGEP(sliceLLVMType, alloca, 1, "data_ptr");
         const auto lengthPtr = llvmState.Builder->CreateStructGEP(sliceLLVMType, alloca, 0, "length_ptr");
@@ -1541,7 +1557,7 @@ namespace llvm_backend {
         llvmState.Builder->CreateStore(strValue, dataPtr);
         llvmState.Builder->CreateStore(llvm::ConstantInt::get(
                                            llvm::Type::getInt64Ty(*llvmState.TheContext),
-                                           node->value().size()), lengthPtr);
+                                           stringValue.size()), lengthPtr);
         return alloca;
     }
 
@@ -1570,6 +1586,14 @@ namespace llvm_backend {
             }
         }
         std::vector<llvm::Value *> args;
+        const auto returnTypeKind = node->expressionType().value()->typeKind();
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        llvm::Value *returnAlloca = nullptr;
+        if (isStructReturn) {
+            const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
+            returnAlloca = llvmState.Builder->CreateAlloca(llvmReturnType, nullptr, "struct_return_alloca");
+            args.push_back(returnAlloca);
+        }
         args.push_back(objectValue);
         for (const auto &arg: node->args()) {
             if (const auto value = codegen_base(arg.get(), llvmState)) {
@@ -1589,9 +1613,16 @@ namespace llvm_backend {
             return nullptr; // Error handling
         }
         const auto call = llvmState.Builder->CreateCall(functionCall, args);
+        if (isStructReturn) {
+            call->addParamAttr(llvm::AttributeList::FirstArgIndex, llvm::Attribute::StructRet);
+            call->addParamAttr(0, llvm::Attribute::Writable);
+            call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            call->addParamAttr(0, llvm::Attribute::NoAlias);
+        }
+
         if (!functionCall->getReturnType()->isVoidTy())
             return call;
-        return nullptr;
+        return returnAlloca;
     }
 
 
@@ -1701,7 +1732,15 @@ namespace llvm_backend {
             return nullptr; // Error handling
         }
         std::vector<llvm::Value *> args;
-        size_t i = 0;
+
+        const auto returnTypeKind = node->expressionType().value()->typeKind();
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        llvm::Value *returnValuePtr = nullptr;
+        if (isStructReturn) {
+            returnValuePtr = llvmState.Builder->CreateAlloca(
+                resolveLlvmType(node->expressionType().value(), llvmState), nullptr, "struct_return_alloca");
+            args.push_back(returnValuePtr);
+        }
         for (const auto &arg: node->args()) {
             if (auto value = codegen_base(arg.get(), llvmState)) {
                 args.push_back(value);
@@ -1709,13 +1748,27 @@ namespace llvm_backend {
                 assert(false && "Failed to generate argument for function call");
                 return nullptr; // Error handling
             }
-            i++;
         }
         const auto call = llvmState.Builder->CreateCall(functionCall, args);
         if (node->functionName() == "malloc" || node->functionName() == "calloc")
             call->addRetAttr(llvm::Attribute::NoAlias);
+        size_t argIndexOffset = 0;
+        if (isStructReturn) {
+            call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                                        resolveLlvmType(
+                                                                            node->expressionType().value(),
+                                                                            llvmState)));
+            call->addParamAttr(0, llvm::Attribute::Writable);
+            call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            call->addParamAttr(0, llvm::Attribute::NoAlias);
+            argIndexOffset = 1;
+        }
         for (size_t argNum = 0; argNum < node->args().size(); ++argNum) {
-            const auto argType = node->args()[argNum]->expressionType();
+            if (isStructReturn && argNum == 0) {
+                continue; // Skip the hidden struct return pointer argument
+            }
+            const size_t actualArgNum = argNum - argIndexOffset;
+            const auto argType = node->args()[actualArgNum]->expressionType();
 
             if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
                 const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
@@ -1729,13 +1782,31 @@ namespace llvm_backend {
 
         if (!functionCall->getReturnType()->isVoidTy())
             return call;
-        return nullptr;
+        return returnValuePtr;
     }
 
     llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
         llvmState.currentBreakBlock.BlockUsed = true;
         if (const auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
+            auto parentFunction = llvmState.Builder->GetInsertBlock()->getParent();
+            assert(parentFunction && "Return statement not inside a function");
+            if (parentFunction->getReturnType()->isVoidTy()) {
+                auto returnArg = parentFunction->getArg(0);
+                const auto llvmArgType = returnArg->getParamStructRetType();
+                const auto memcpyCall = llvm::Intrinsic::getDeclaration(
+                    llvmState.TheModule.get(), llvm::Intrinsic::memcpy,
+                    {llvmState.Builder->getPtrTy(), llvmState.Builder->getPtrTy(), llvmState.Builder->getInt64Ty()});
+                std::vector<llvm::Value *> memcopyArgs;
+                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                const uint64_t structSize = DL.getTypeAllocSize(llvmArgType);
+                memcopyArgs.push_back(llvmState.Builder->CreateBitCast(returnArg, llvmState.Builder->getPtrTy()));
+                memcopyArgs.push_back(llvmState.Builder->CreateBitCast(retValue, llvmState.Builder->getPtrTy()));
+                memcopyArgs.push_back(llvmState.Builder->getInt64(structSize));
+                memcopyArgs.push_back(llvmState.Builder->getFalse());
+                llvmState.Builder->CreateCall(memcpyCall, memcopyArgs);
+                return llvmState.Builder->CreateRetVoid();
+            }
             return llvmState.Builder->CreateRet(retValue);
         } else {
             return llvmState.Builder->CreateRetVoid();
@@ -1798,10 +1869,14 @@ namespace llvm_backend {
 
     void codegen_functionstub(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const auto resultType = (returnTypeKind == types::TypeKind::STRUCT)
-                                    ? llvm::PointerType::getUnqual(*llvmState.TheContext)
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        const auto resultType = isStructReturn
+                                    ? llvm::Type::getVoidTy(*llvmState.TheContext)
                                     : resolveLlvmType(node->expressionType().value(), llvmState);
         std::vector<llvm::Type *> params;
+        if (isStructReturn) {
+            params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+        }
         for (const auto &param: node->args()) {
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
@@ -1828,6 +1903,14 @@ namespace llvm_backend {
         llvm::AttrBuilder b(*llvmState.TheContext);
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
+        if (isStructReturn) {
+            functionDefinition->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                 resolveLlvmType(node->expressionType().value(),
+                                                                 llvmState)));
+            functionDefinition->addParamAttr(0, llvm::Attribute::Writable);
+            functionDefinition->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            functionDefinition->addParamAttr(0, llvm::Attribute::NoAlias);
+        }
     }
 
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
@@ -1853,8 +1936,26 @@ namespace llvm_backend {
 
         llvmState.Builder->SetInsertPoint(functionBaseBlock);
         std::vector<std::string> argNames;
+
+
+        const auto returnTypeKind = node->expressionType().value()->typeKind();
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+
+        if (isStructReturn) {
+            functionDefinition->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                 resolveLlvmType(node->expressionType().value(),
+                                                                 llvmState)));
+            functionDefinition->addParamAttr(0, llvm::Attribute::Writable);
+            functionDefinition->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            functionDefinition->addParamAttr(0, llvm::Attribute::NoAlias);
+        }
+        const size_t offset = (isStructReturn) ? 1 : 0;
         for (auto &arg: functionDefinition->args()) {
-            auto &param = node->args()[arg.getArgNo()];
+            if (isStructReturn && arg.getArgNo() == 0) {
+                arg.setName("ret");
+                continue;
+            }
+            auto &param = node->args()[arg.getArgNo() - offset];
             arg.setName(param.name.lexical());
             // Create an alloca for this variable.
             const auto varType = resolveLlvmType(param.type.value(), llvmState);
@@ -1941,7 +2042,7 @@ namespace llvm_backend {
             // Eliminate Common SubExpressions.
             context.TheFPM->addPass(llvm::GVNPass());
             // Simplify the control flow graph (deleting unreachable blocks, etc).
-            context.TheFPM->addPass(llvm::SimplifyCFGPass());
+            //context.TheFPM->addPass(llvm::SimplifyCFGPass());
 
             context.TheFPM->addPass(llvm::SCCPPass());
 
@@ -2057,7 +2158,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     if (options.buildMode == compiler::BuildMode::Release) {
         pass.add(llvm::createAlwaysInlinerLegacyPass());
         pass.add(llvm::createInstructionCombiningPass());
-        TheTargetMachine->setOptLevel(llvm::CodeGenOptLevel::Aggressive);
+        TheTargetMachine->setOptLevel(llvm::CodeGenOptLevel::Default);
     } else {
         TheTargetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
     }
