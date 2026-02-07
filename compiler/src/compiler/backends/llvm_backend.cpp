@@ -1614,7 +1614,10 @@ namespace llvm_backend {
         }
         const auto call = llvmState.Builder->CreateCall(functionCall, args);
         if (isStructReturn) {
-            call->addParamAttr(llvm::AttributeList::FirstArgIndex, llvm::Attribute::StructRet);
+            call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                                        resolveLlvmType(
+                                                                            node->expressionType().value(),
+                                                                            llvmState)));
             call->addParamAttr(0, llvm::Attribute::Writable);
             call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
             call->addParamAttr(0, llvm::Attribute::NoAlias);
