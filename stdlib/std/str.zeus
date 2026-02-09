@@ -64,6 +64,18 @@ struct string {
         slice.length = self.length as u64;
         return slice;
     }
+
+    fn __eq__(self : &string, other : string) : bool {
+        if self.length != other.length {
+            return false;
+        }
+        for i in 0 .. self.length {
+            if self.data[i] != other.data[i] {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 fn from_c_str(cstr: *u8) : string {

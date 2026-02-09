@@ -8,34 +8,28 @@
 #include <optional>
 
 #include "ASTNode.h"
+#include "OperatorNode.h"
 #include "lexer/Lexer.h"
 
 namespace ast {
     enum class BinaryOperator { ADD, SUB, MUL, DIV, MOD, POW };
 
-    class BinaryExpression final : public ASTNode {
+    class BinaryExpression final : public OperatorNode {
     private:
         BinaryOperator m_operator;
-        std::unique_ptr<ASTNode> m_lhs;
-        std::unique_ptr<ASTNode> m_rhs;
-        std::optional<ast::FunctionDefinitionBase*> m_operatorFunction = std::nullopt;
+
 
     public:
         explicit BinaryExpression(Token name, BinaryOperator op, std::unique_ptr<ASTNode> lhs,
-                                  std::unique_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
-                                                                  m_lhs(std::move(lhs)), m_rhs(std::move(rhs)) {
+                                  std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),std::move(lhs),std::move(rhs) ), m_operator(op){
         }
 
         ~BinaryExpression() override = default;
 
         [[nodiscard]] BinaryOperator binoperator() const { return m_operator; }
-        [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
-        [[nodiscard]] std::unique_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
-        [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
-        void setLhs(std::unique_ptr<ASTNode> lhs) { m_lhs = std::move(lhs); }
-        void setRhs(std::unique_ptr<ASTNode> rhs) { m_rhs = std::move(rhs);}
 
-        [[nodiscard]]  std::string operatorFunctionName() const {
+
+        [[nodiscard]]  std::string operatorFunctionName() const override {
             switch (m_operator) {
                 case BinaryOperator::ADD:
                     return "__add__";
@@ -53,7 +47,7 @@ namespace ast {
             return "";
         }
 
-        BinaryExpression(BinaryExpression &&) = default;
+        BinaryExpression(BinaryExpression &&) = delete;
 
         BinaryExpression(const BinaryExpression &) = delete;
 
@@ -77,13 +71,7 @@ namespace ast {
             }
             return std::nullopt;
         }
-        void setOperatorFunction( ast::FunctionDefinitionBase* funcDef) {
-            m_operatorFunction = std::make_optional<ast::FunctionDefinitionBase*>(funcDef);
-        }
 
-        [[nodiscard]] std::optional<ast::FunctionDefinitionBase*> operatorFunction() const {
-            return m_operatorFunction;
-        }
 
         std::unique_ptr<ASTNode> clone() override {
             auto cloneNode = std::make_unique<BinaryExpression>(expressionToken(),

@@ -1,0 +1,31 @@
+use std::str;
+
+fn main() : i32 {
+    let a : string = from_slice("Hello, World!");
+    let b : string = from_slice("Hello, World!");
+    let c : string = from_slice("Hello, Zeus!");
+    let d : string = from_slice("Hello, world!");
+    // Compare strings
+    if a == b {
+        println("a and b are equal.");
+    } else {
+        println("a and b are not equal.");
+    }
+
+    if a == c {
+        println("a and c are equal.");
+    } else {
+        println("a and c are not equal.");
+    }
+
+    if a == d {
+        println("a and d are equal.");
+    } else {
+        println("a and d are not equal.");
+    }
+    destroy(&a);
+    destroy(&b);
+    destroy(&c);
+    destroy(&d);
+    return 0;
+}

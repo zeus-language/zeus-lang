@@ -298,7 +298,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
                              "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
-                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading"));
+                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading","comparestring"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

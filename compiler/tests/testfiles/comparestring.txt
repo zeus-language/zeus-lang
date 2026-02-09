@@ -1,0 +1,3 @@
+a and b are equal.
+a and c are not equal.
+a and d are not equal.

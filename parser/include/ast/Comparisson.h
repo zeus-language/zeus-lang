@@ -5,31 +5,46 @@
 #include <optional>
 
 #include "ASTNode.h"
+#include "OperatorNode.h"
 #include "lexer/Lexer.h"
 
 namespace ast {
     enum class CMPOperator { GREATER, LESS, GREATER_EQUAL, LESS_EQUAL, EQUALS, NOT_EQUALS };
 
-    class Comparisson final : public ASTNode {
+    class Comparisson final : public OperatorNode {
     private:
         CMPOperator m_operator;
-        std::unique_ptr<ASTNode> m_lhs;
-        std::unique_ptr<ASTNode> m_rhs;
-
     public:
         explicit Comparisson(Token name, CMPOperator op, std::unique_ptr<ASTNode> lhs,
-                             std::unique_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
-                                                             m_lhs(std::move(lhs)), m_rhs(std::move(rhs)) {
+                             std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),std::move(lhs),std::move(rhs)
+                                 ), m_operator(op)
+                                                              {
         }
 
         ~Comparisson() override = default;
 
         [[nodiscard]] CMPOperator cmpoperator() const { return m_operator; }
-        [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
-        [[nodiscard]] std::unique_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
-        [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
 
-        Comparisson(Comparisson &&) = default;
+
+        [[nodiscard]]  std::string operatorFunctionName() const override {
+            switch (m_operator) {
+                case CMPOperator::GREATER:
+                    return "__gt__";
+                case CMPOperator::LESS:
+                    return "__lt__";
+                case CMPOperator::GREATER_EQUAL:
+                    return "__ge__";
+                case CMPOperator::LESS_EQUAL:
+                    return "__le__";
+                case CMPOperator::EQUALS:
+                    return "__eq__";
+                case CMPOperator::NOT_EQUALS:
+                    return "__ne__";
+            }
+            return "";
+        }
+
+        Comparisson(Comparisson &&) = delete;
 
         Comparisson(const Comparisson &) = delete;
 

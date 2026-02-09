@@ -1091,13 +1091,66 @@ namespace llvm_backend {
         return codegen_iterator_for(node, llvmState);
     }
 
+    void setCallArgInfo(ast::ASTNode *node, llvm::CallInst *call, size_t argNum, LLVMBackendState &llvmState) {
+        const auto argType = node->expressionType();
+
+        if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
+            const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
+
+            call->addParamAttr(static_cast<unsigned>(argNum), llvm::Attribute::NoUndef);
+            call->addParamAttr(static_cast<unsigned>(argNum),
+                               llvm::Attribute::getWithByValType(*llvmState.TheContext, llvmArgType));
+        }
+    }
+
+    llvm::Value *codegenStructOperatorNodeCall(const ast::OperatorNode *node, LLVMBackendState &llvmState) {
+        const auto lhs = codegen_base(node->lhs(), llvmState);
+        const auto rhs = codegen_base(node->rhs(), llvmState);
+
+        const auto opFunction = node->operatorFunction();
+        assert(opFunction && "Struct binary expression operator function not found");
+        auto function = llvmState.TheModule->getFunction(opFunction.value()->functionName());
+        if (!function) {
+            function = llvmState.TheModule->getFunction(opFunction.value()->functionSignature());
+        }
+        assert(function && "Struct binary expression operator function not found in module");
+        std::vector<llvm::Value *> args;
+        const auto returnTypeKind = node->expressionType().has_value() ? node->expressionType().value()->typeKind() : types::TypeKind::VOID;
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        llvm::Value *returnAlloca = nullptr;
+        if (isStructReturn) {
+            const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
+            returnAlloca = llvmState.Builder->CreateAlloca(llvmReturnType, nullptr, "struct_return_alloca");
+            args.push_back(returnAlloca);
+        }
+        args.push_back(lhs);
+        args.push_back(rhs);
+        auto call = llvmState.Builder->CreateCall(function, args);
+        if (isStructReturn) {
+            call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext, resolveLlvmType(node->expressionType().value(), llvmState)));
+            call->addParamAttr(0, llvm::Attribute::Writable);
+            call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            call->addParamAttr(0, llvm::Attribute::NoAlias);
+
+            setCallArgInfo(node->lhs(), call, 1, llvmState);
+            setCallArgInfo(node->rhs(), call, 2, llvmState);
+        }else {
+            setCallArgInfo(node->lhs(), call, 0, llvmState);
+            setCallArgInfo(node->rhs(), call, 1, llvmState);
+        }
+        if (!function->getReturnType()->isVoidTy())
+            return call;
+        return returnAlloca;
+    }
 
     llvm::Value *codegen(const ast::Comparisson *node, LLVMBackendState &llvmState) {
         auto lhs = codegen_base(node->lhs(), llvmState);
         assert(lhs && "lhs of the comparison is null");
         auto rhs = codegen_base(node->rhs(), llvmState);
         assert(rhs && "rhs of the comparison is null");
-
+        if (node->operatorFunction()) {
+            return codegenStructOperatorNodeCall(node, llvmState);
+        }
         llvm::CmpInst::Predicate pred = llvm::CmpInst::ICMP_EQ;
         if (lhs->getType()->isDoubleTy() || lhs->getType()->isFloatTy()) {
             pred = llvm::CmpInst::FCMP_OEQ;
@@ -1276,55 +1329,9 @@ namespace llvm_backend {
         return condition;
     }
 
-    void setCallArgInfo(ast::ASTNode *node, llvm::CallInst *call, size_t argNum, LLVMBackendState &llvmState) {
-        const auto argType = node->expressionType();
-
-        if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
-            const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
-
-            call->addParamAttr(static_cast<unsigned>(argNum), llvm::Attribute::NoUndef);
-            call->addParamAttr(static_cast<unsigned>(argNum),
-                               llvm::Attribute::getWithByValType(*llvmState.TheContext, llvmArgType));
-        }
-    }
-
-    llvm::Value *codegenStructBinaryExpressionCall(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
-        const auto lhs = codegen_base(node->lhs(), llvmState);
-        const auto rhs = codegen_base(node->rhs(), llvmState);
-
-        const auto opFunction = node->operatorFunction();
-        assert(opFunction && "Struct binary expression operator function not found");
-        auto function = llvmState.TheModule->getFunction(opFunction.value()->functionName());
-        if (!function) {
-            function = llvmState.TheModule->getFunction(opFunction.value()->functionSignature());
-        }
-        assert(function && "Struct binary expression operator function not found in module");
-        std::vector<llvm::Value *> args;
-        const auto returnTypeKind = node->expressionType().has_value() ? node->expressionType().value()->typeKind() : types::TypeKind::VOID;
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
-        llvm::Value *returnAlloca = nullptr;
-        if (isStructReturn) {
-            const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
-            returnAlloca = llvmState.Builder->CreateAlloca(llvmReturnType, nullptr, "struct_return_alloca");
-            args.push_back(returnAlloca);
-        }
-        args.push_back(lhs);
-        args.push_back(rhs);
-        auto call = llvmState.Builder->CreateCall(function, args);
-        call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext, resolveLlvmType(node->expressionType().value(), llvmState)));
-        call->addParamAttr(0, llvm::Attribute::Writable);
-        call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
-        call->addParamAttr(0, llvm::Attribute::NoAlias);
-        setCallArgInfo(node->lhs(), call, 1, llvmState);
-        setCallArgInfo(node->rhs(), call, 2, llvmState);
-        if (!function->getReturnType()->isVoidTy())
-            return call;
-        return returnAlloca;
-    }
-
     llvm::Value *codegen(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
         if (node->operatorFunction()) {
-            return codegenStructBinaryExpressionCall(node, llvmState);
+            return codegenStructOperatorNodeCall(node, llvmState);
         }
         const auto lhs = codegen_base(node->lhs(), llvmState);
         const auto rhs = codegen_base(node->rhs(), llvmState);
