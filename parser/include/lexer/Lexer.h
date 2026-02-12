@@ -70,6 +70,9 @@ struct Token {
         LINE_COMMENT,
         BLOCK_COMMENT,
         ANNOTATION,
+        INTERPOLATION_START,
+        INTERPOLATION_END,
+        INTERPOLATED_STRING,
     } type;
 
     SourceLocation source_location;

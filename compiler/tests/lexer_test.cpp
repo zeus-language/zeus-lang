@@ -425,3 +425,25 @@ TEST(LexerTest, LexFloat) {
 
     EXPECT_EQ(tokens[5].type, Token::Type::END_OF_FILE);
 }
+
+TEST(LexerStringTest, InterpolateString) {
+    std::string source = R"(let greeting = "Hello, ${name}!";)";
+    auto tokens = lexer::lex_file("test.zs", source);
+    //let greeting = "Hello, ${name}!\";
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 10); // let, greeting, =, "Hello, ", ${, name, }, "!", ; + EOF
+    EXPECT_EQ(tokens[0].type, Token::Type::KEYWORD);
+    VerifyTokenPosition(tokens[0], source, 0, 3, "let");
+    EXPECT_EQ(tokens[1].type, Token::Type::IDENTIFIER);
+    VerifyTokenPosition(tokens[1], source, 4, 8, "greeting");
+    EXPECT_EQ(tokens[3].type, Token::Type::INTERPOLATED_STRING);
+    VerifyTokenPosition(tokens[3], source, 15, 8, "\"Hello, ");
+    EXPECT_EQ(tokens[4].type, Token::Type::INTERPOLATION_START);
+    VerifyTokenPosition(tokens[4], source, 23, 2, "${");
+    EXPECT_EQ(tokens[5].type, Token::Type::IDENTIFIER);
+    VerifyTokenPosition(tokens[5], source, 25, 4, "name");
+    EXPECT_EQ(tokens[6].type, Token::Type::INTERPOLATION_END);
+    VerifyTokenPosition(tokens[6], source, 29, 1, "}");
+    EXPECT_EQ(tokens[7].type, Token::Type::INTERPOLATED_STRING);
+    VerifyTokenPosition(tokens[7], source, 30, 2, "!\"");
+}
