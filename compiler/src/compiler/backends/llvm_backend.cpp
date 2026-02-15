@@ -379,6 +379,8 @@ namespace llvm_backend {
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState);
 
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
+        if (!llvmState.DBuilder)
+            return;
          auto *Builder = llvmState.Builder.get();
          auto *TheCU = llvmState.KSDbgInfo.TheCU;
         if (!ast)
@@ -1964,21 +1966,22 @@ namespace llvm_backend {
     }
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         std::vector<llvm::Type *> params;
-        const auto& sourceLocation =  node->expressionToken().source_location;
-        if (!llvmState.KSDbgInfo.compileUnits.contains(sourceLocation.filename))
+        if (llvmState.DBuilder)
         {
-            auto  file = std::filesystem::path(sourceLocation.filename);
-            llvmState.KSDbgInfo.TheCU = llvmState.DBuilder->createCompileUnit(
-                llvm::dwarf::DW_LANG_C, llvmState.DBuilder->createFile(file.filename().string(), file.parent_path().string()),
-                "Zeus Compiler", false, "", 0);
+            const auto& sourceLocation =  node->expressionToken().source_location;
+            if (!llvmState.KSDbgInfo.compileUnits.contains(sourceLocation.filename))
+            {
+                auto  file = std::filesystem::path(sourceLocation.filename);
+                llvmState.KSDbgInfo.TheCU = llvmState.DBuilder->createCompileUnit(
+                    llvm::dwarf::DW_LANG_C, llvmState.DBuilder->createFile(file.filename().string(), file.parent_path().string()),
+                    "Zeus Compiler", false, "", 0);
                 llvmState.KSDbgInfo.compileUnits[sourceLocation.filename] = llvmState.KSDbgInfo.TheCU;
-        }else
-        {
-            llvmState.KSDbgInfo.TheCU = llvmState.KSDbgInfo.compileUnits[sourceLocation.filename];
-        }
+            }else
+            {
+                llvmState.KSDbgInfo.TheCU = llvmState.KSDbgInfo.compileUnits[sourceLocation.filename];
+            }
 
-        llvm::DIFile *Unit = llvmState.DBuilder->createFile(llvmState.KSDbgInfo.TheCU->getFilename(),
-                                    llvmState.KSDbgInfo.TheCU->getDirectory());
+        }
 
 
         for (const auto &param: node->args()) {
@@ -2057,17 +2060,23 @@ namespace llvm_backend {
                 arg.addAttr(llvm::Attribute::NoUndef);
             }
         }
-        llvm::DIScope *FContext = Unit;
-        unsigned LineNo = 0;
-        unsigned ScopeLine = 0;
-        llvm::DISubprogram *SP = llvmState.DBuilder->createFunction(
-            FContext, mangledName, llvm::StringRef(), Unit, LineNo,
-            CreateFunctionType(llvmState,functionDefinition->arg_size()),
-            ScopeLine,
-            llvm::DINode::FlagPrototyped,
-            llvm::DISubprogram::SPFlagDefinition);
-        functionDefinition->setSubprogram(SP);
-        llvmState.KSDbgInfo.LexicalBlocks.push_back(SP);
+        if (llvmState.DBuilder)
+        {
+
+            llvm::DIFile *Unit = llvmState.DBuilder->createFile(llvmState.KSDbgInfo.TheCU->getFilename(),
+                                        llvmState.KSDbgInfo.TheCU->getDirectory());
+            llvm::DIScope *FContext = Unit;
+            unsigned LineNo = 0;
+            unsigned ScopeLine = 0;
+            llvm::DISubprogram *SP = llvmState.DBuilder->createFunction(
+                FContext, mangledName, llvm::StringRef(), Unit, LineNo,
+                CreateFunctionType(llvmState,functionDefinition->arg_size()),
+                ScopeLine,
+                llvm::DINode::FlagPrototyped,
+                llvm::DISubprogram::SPFlagDefinition);
+            functionDefinition->setSubprogram(SP);
+            llvmState.KSDbgInfo.LexicalBlocks.push_back(SP);
+        }
 
         for (auto &stmt: node->statements()) {
             llvm_backend::codegen_base(stmt.get(), llvmState);
@@ -2092,7 +2101,8 @@ namespace llvm_backend {
         }
         llvmState.clearNamedAllocations();
         llvmState.clearNamedValues();
-        llvmState.KSDbgInfo.LexicalBlocks.pop_back();
+        if (llvmState.DBuilder)
+            llvmState.KSDbgInfo.LexicalBlocks.pop_back();
 
     }
 
@@ -2111,7 +2121,13 @@ namespace llvm_backend {
                                                                          /*DebugLogging*/ true);
 
         context.TheSI->registerCallbacks(*context.ThePIC, context.TheMAM.get());
-        context.DBuilder = std::make_unique<llvm::DIBuilder>(*context.TheModule);
+        if (options.ggdb)
+        {
+            context.DBuilder = std::make_unique<llvm::DIBuilder>(*context.TheModule);
+        }else
+        {
+            context.DBuilder = nullptr;
+        }
 
         // Add transform passes.
         if (options.buildMode == compiler::BuildMode::Release) {
@@ -2253,7 +2269,8 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
     pass.run(*context.TheModule);
     dest.flush();
-    context.DBuilder->finalize();
+    if (context.DBuilder)
+        context.DBuilder->finalize();
     dest.close();
 
 
