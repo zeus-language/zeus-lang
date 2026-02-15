@@ -19,6 +19,7 @@ namespace compiler {
         bool printAST = false;
         bool lsp = false;
         bool colorOutput = true;
+        bool ggdb = false;
         std::vector<std::string> runArguments;
     };
 

@@ -69,6 +69,8 @@
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
 #include "ast/WhileLoop.h"
+#include "llvm/IR/DIBuilder.h"
+
 
 
 namespace llvm_backend {
@@ -83,6 +85,8 @@ namespace llvm_backend {
         std::shared_ptr<types::VariableType> type;
     };
 
+
+
     struct LLVMBackendState {
     private:
         std::vector<ast::FunctionDefinitionBase *> function_definition;
@@ -90,6 +94,7 @@ namespace llvm_backend {
         std::unordered_map<std::string, llvm::Value *> NamedValues;
 
     public:
+        std::unique_ptr<llvm::DIBuilder> DBuilder;
         std::unique_ptr<llvm::LLVMContext> TheContext;
         std::unique_ptr<llvm::Module> TheModule;
         std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > Builder;
@@ -196,6 +201,15 @@ namespace llvm_backend {
             }
             linkerFlags.emplace_back(value);
         }
+
+        struct DebugInfo {
+            std::unordered_map<std::string,llvm::DICompileUnit *> compileUnits;
+            llvm::DICompileUnit *TheCU;
+            std::vector<llvm::DIScope *> LexicalBlocks;
+
+        } KSDbgInfo;
+
+
     };
 
 
@@ -364,7 +378,26 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState);
 
+    void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
+        if (!llvmState.DBuilder)
+            return;
+         auto *Builder = llvmState.Builder.get();
+         auto *TheCU = llvmState.KSDbgInfo.TheCU;
+        if (!ast)
+            return Builder->SetCurrentDebugLocation(llvm::DebugLoc());
+        const auto& sourceLocation = ast->expressionToken().source_location;
+        llvm::DIScope *Scope;
+        if (llvmState.KSDbgInfo. LexicalBlocks.empty())
+            Scope = TheCU;
+        else
+            Scope = llvmState.KSDbgInfo.LexicalBlocks.back();
+        Builder->SetCurrentDebugLocation(
+            llvm::DILocation::get(Scope->getContext(), sourceLocation.row, sourceLocation.col, Scope));
+    }
+
+
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
+        emitLocation(node, llvmState);
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
         }
@@ -1512,7 +1545,10 @@ namespace llvm_backend {
                     llvm::cast<llvm::PointerType>(varType));
                 llvmState.Builder->CreateStore(defaultValue, alloca);
             } else if (varType->isStructTy()) {
-                // do nothing may be later initialize it with zero
+                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                const size_t size = DL.getTypeAllocSize(varType);
+                llvmState.Builder->CreateMemSetInline(alloca,llvm::MaybeAlign(), llvm::ConstantInt::get(llvm::Type::getInt8Ty(*llvmState.TheContext), 0),
+                                                     llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), size));
             } else {
                 assert(false && "Unsupported variable type for default initialization");
                 return nullptr;
@@ -1922,9 +1958,32 @@ namespace llvm_backend {
             functionDefinition->addParamAttr(0, llvm::Attribute::NoAlias);
         }
     }
+    static llvm::DISubroutineType *CreateFunctionType( LLVMBackendState &llvmState,unsigned NumArgs) {
+        llvm::SmallVector<llvm::Metadata *, 8> EltTys;
+        // TODO
 
+        return llvmState.DBuilder->createSubroutineType(llvmState.DBuilder->getOrCreateTypeArray(EltTys));
+    }
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         std::vector<llvm::Type *> params;
+        if (llvmState.DBuilder)
+        {
+            const auto& sourceLocation =  node->expressionToken().source_location;
+            if (!llvmState.KSDbgInfo.compileUnits.contains(sourceLocation.filename))
+            {
+                auto  file = std::filesystem::path(sourceLocation.filename);
+                llvmState.KSDbgInfo.TheCU = llvmState.DBuilder->createCompileUnit(
+                    llvm::dwarf::DW_LANG_C, llvmState.DBuilder->createFile(file.filename().string(), file.parent_path().string()),
+                    "Zeus Compiler", false, "", 0);
+                llvmState.KSDbgInfo.compileUnits[sourceLocation.filename] = llvmState.KSDbgInfo.TheCU;
+            }else
+            {
+                llvmState.KSDbgInfo.TheCU = llvmState.KSDbgInfo.compileUnits[sourceLocation.filename];
+            }
+
+        }
+
+
         for (const auto &param: node->args()) {
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
@@ -2001,6 +2060,23 @@ namespace llvm_backend {
                 arg.addAttr(llvm::Attribute::NoUndef);
             }
         }
+        if (llvmState.DBuilder)
+        {
+
+            llvm::DIFile *Unit = llvmState.DBuilder->createFile(llvmState.KSDbgInfo.TheCU->getFilename(),
+                                        llvmState.KSDbgInfo.TheCU->getDirectory());
+            llvm::DIScope *FContext = Unit;
+            unsigned LineNo = 0;
+            unsigned ScopeLine = 0;
+            llvm::DISubprogram *SP = llvmState.DBuilder->createFunction(
+                FContext, mangledName, llvm::StringRef(), Unit, LineNo,
+                CreateFunctionType(llvmState,functionDefinition->arg_size()),
+                ScopeLine,
+                llvm::DINode::FlagPrototyped,
+                llvm::DISubprogram::SPFlagDefinition);
+            functionDefinition->setSubprogram(SP);
+            llvmState.KSDbgInfo.LexicalBlocks.push_back(SP);
+        }
 
         for (auto &stmt: node->statements()) {
             llvm_backend::codegen_base(stmt.get(), llvmState);
@@ -2025,6 +2101,9 @@ namespace llvm_backend {
         }
         llvmState.clearNamedAllocations();
         llvmState.clearNamedValues();
+        if (llvmState.DBuilder)
+            llvmState.KSDbgInfo.LexicalBlocks.pop_back();
+
     }
 
     void init_context(LLVMBackendState &context, const std::string &moduleName,
@@ -2042,6 +2121,13 @@ namespace llvm_backend {
                                                                          /*DebugLogging*/ true);
 
         context.TheSI->registerCallbacks(*context.ThePIC, context.TheMAM.get());
+        if (options.ggdb)
+        {
+            context.DBuilder = std::make_unique<llvm::DIBuilder>(*context.TheModule);
+        }else
+        {
+            context.DBuilder = nullptr;
+        }
 
         // Add transform passes.
         if (options.buildMode == compiler::BuildMode::Release) {
@@ -2183,6 +2269,8 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
     pass.run(*context.TheModule);
     dest.flush();
+    if (context.DBuilder)
+        context.DBuilder->finalize();
     dest.close();
 
 

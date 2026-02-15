@@ -563,7 +563,7 @@ namespace types {
             context.messages.push_back({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
-                "No matching overload found for method '" + methodName + "' with the given argument types."
+                "No matching overload found for method '" + methodName + "' with the given argument types for the signature '"+node->functionSignature()+"'."
             });
             return;
         }

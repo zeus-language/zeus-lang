@@ -32,6 +32,9 @@ struct SourceLocation {
 };
 
 struct Token {
+private:
+    std::string m_lexical;
+public:
     enum Type {
         IDENTIFIER,
         NUMBER,
@@ -70,19 +73,28 @@ struct Token {
         LINE_COMMENT,
         BLOCK_COMMENT,
         ANNOTATION,
+        INTERPOLATION_START,
+        INTERPOLATION_END,
+        INTERPOLATED_STRING,
     } type;
 
     SourceLocation source_location;
+
+    Token(std::string lexical, const Type type, SourceLocation source_location) :m_lexical(std::move(lexical)), type(type), source_location(std::move(source_location)) {
+    }
 
     Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
     }
 
     [[nodiscard]] std::string lexical() const {
+        if (!m_lexical.empty()) {
+            return m_lexical;
+        }
         return source_location.text();
     }
 
     bool operator==(const Token &other) const {
-        return source_location == other.source_location;
+        return source_location == other.source_location && m_lexical == other.m_lexical && type == other.type;
     }
 };
 

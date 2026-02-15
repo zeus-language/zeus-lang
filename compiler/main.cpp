@@ -24,17 +24,19 @@ std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
 using namespace std::literals;
 
 void printHelp(const std::string &program) {
-  std::cout << "Usage: " + program + " [options] file...\n";
-  std::cout << "Options:\n";
-  std::cout << "  --run\t\t\tRuns the compiled program\n";
-  std::cout << "  --debug\t\tCreates a debug build\n";
-  std::cout << "  --release\t\tCreates a release build\n";
-  std::cout << "  --rtl\t\t\tsets the path for the rtl (run time library)\n";
-  std::cout << "  --output\t\tsets the output / build directory\n";
-  std::cout << "  --llvm-ir\t\tOutputs the LLVM-IR to the standard error output\n";
-  std::cout << "  --help\t\tOutputs the program help\n";
-  std::cout << "  --version\t\tPrints the current version of the compiler\n";
-  std::cout << "  --lsp\t\t\tStarts the compiler in the language server mode\n";
+    std::cout << "Usage: " + program + " [options] file...\n";
+    std::cout << "Options:\n";
+    std::cout << "  --run\t\t\tRuns the compiled program\n";
+    std::cout << "  --debug\t\tCreates a debug build\n";
+    std::cout << "  --release\t\tCreates a release build\n";
+    std::cout << "  --release\t\tCreates a release build\n";
+    std::cout << "  --stdlib\t\t\tsets the path for the standard library\n";
+    std::cout << "  --ggdb\t\t\tgenerates gdb compatible debug symbols\n";
+    std::cout << "  --output\t\tsets the output / build directory\n";
+    std::cout << "  --llvm-ir\t\tOutputs the LLVM-IR to the standard error output\n";
+    std::cout << "  --help\t\tOutputs the program help\n";
+    std::cout << "  --version\t\tPrints the current version of the compiler\n";
+    std::cout << "  --lsp\t\t\tStarts the compiler in the language server mode\n";
 }
 
 int main(int args, char **argv) {

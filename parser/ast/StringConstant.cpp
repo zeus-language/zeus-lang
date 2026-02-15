@@ -10,11 +10,12 @@ namespace ast {
     }
 
     std::string StringConstant::value() const {
-        const auto val = expressionToken().lexical().substr(1, expressionToken().lexical().size() - 2);
+        auto lexical = expressionToken().lexical();
+
         std::string result;
-        for (size_t i = 0; i < val.size(); ++i) {
-            if (val[i] == '\\') {
-                switch (val[i + 1]) {
+        for (size_t i = 0; i < lexical.size(); ++i) {
+            if (lexical[i] == '\\') {
+                switch (lexical[i + 1]) {
                     case 'n':
                         result += '\n';
                         break;
@@ -37,8 +38,8 @@ namespace ast {
                         break;
                 }
                 i++;
-            } else {
-                result += val[i];
+            } else if (lexical[i] != '"') {
+                result += lexical[i];
             }
         }
         return result;
