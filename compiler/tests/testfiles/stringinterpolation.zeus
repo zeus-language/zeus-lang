@@ -1,0 +1,13 @@
+use std::str;
+use core::libc;
+
+fn main() : i32{
+    let name : [u8] = "World";
+    let age  : i32 = 30;
+    let mut greeting : string = "Hello, ${name}! You are ${age} years old.";
+    println(greeting.as_c_str());
+
+    //destroy(&greeting);
+    //destroy(&greeting);
+    return 0;
+}

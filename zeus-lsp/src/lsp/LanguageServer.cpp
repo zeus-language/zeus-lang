@@ -121,6 +121,9 @@ std::optional<int> mapTokenType(const Token::Type type) {
             return 13;
         case Token::Type::STRING:
         case Token::Type::RAW_STRING:
+        case Token::Type::INTERPOLATED_STRING:
+        case Token::Type::INTERPOLATION_START:
+        case Token::Type::INTERPOLATION_END:
         case Token::Type::CHAR:
             return 16;
         case Token::Type::NUMBER:
