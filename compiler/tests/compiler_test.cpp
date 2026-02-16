@@ -304,7 +304,7 @@ INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
 
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string"));
+                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

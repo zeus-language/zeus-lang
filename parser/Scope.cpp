@@ -35,12 +35,12 @@ void types::Scope::addVariable(const std::string &name, const Variable &var) {
     currentVariables[name] = var;
 }
 
-std::optional<types::Variable> types::Scope::findVariable(const std::string &name) const {
+std::optional<types::Variable> types::Scope::findVariable(const std::string &name,bool includeParent) const {
     if (const auto it = currentVariables.find(name); it != currentVariables.end()) {
         return it->second;
     }
 
-    if (m_parentScope != nullptr) {
+    if (m_parentScope != nullptr && includeParent) {
         return m_parentScope->findVariable(name);
     }
 

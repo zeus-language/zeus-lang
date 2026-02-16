@@ -1461,6 +1461,19 @@ namespace types {
     void type_check(const ast::ReturnStatement *node, Context &context) {
         if (node->returnValue()) {
             type_check_base(node->returnValue().value(), context);
+            if (auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
+            {
+                auto field = reference->fieldName().lexical();
+                auto var = context.currentScope->findVariable(field,false);
+                if (!reference->constant() && var)
+                {
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->returnValue().value()->expressionToken(),
+                        "Cannot return a reference for a mutable local variable."
+                    });
+                }
+            }
         }
     }
 

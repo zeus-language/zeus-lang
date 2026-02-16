@@ -31,7 +31,7 @@ namespace ast {
 
         ReturnStatement &operator=(const ReturnStatement &) = delete;
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             if (m_returnValue.has_value()) {
                 return m_returnValue.value()->getNodeByToken(token);
             }

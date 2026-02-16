@@ -37,7 +37,7 @@ namespace types {
 
         void addVariable(const std::string &name, const Variable &var);
 
-        [[nodiscard]] std::optional<Variable> findVariable(const std::string &name) const;
+        [[nodiscard]] std::optional<Variable> findVariable(const std::string &name,bool includeParent = true) const;
 
         std::shared_ptr<Scope> parentScope() { return m_parentScope; }
 
