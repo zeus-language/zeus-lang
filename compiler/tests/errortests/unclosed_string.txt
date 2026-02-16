@@ -1,13 +1,13 @@
 FILENAME:3:20: error: The string literal is not closed. Expected closing '"' character.
     let a : [u8] = "This is an unclosed string;
-                   ^-------------------------------------------
-FILENAME:3:64: error: expected token 'SEMICOLON' but found END_OF_FILE!
+                   ^---------------------------
+FILENAME:5:2: error: expected token 'SEMICOLON' but found END_OF_FILE!
 }
  ^
-FILENAME:3:64: error: unexpected token found END_OF_FILE!
+FILENAME:5:2: error: unexpected token found END_OF_FILE!
 }
  ^
-FILENAME:3:64: error: expected token 'CLOSE_BRACE' but found END_OF_FILE!
+FILENAME:5:2: error: expected token 'CLOSE_BRACE' but found END_OF_FILE!
 }
  ^
 FILENAME:2:4: error: Function 'main' must have a return statement.

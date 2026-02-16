@@ -89,12 +89,11 @@ namespace parser
 
         ostream << token.source_location.sourceline() << "\n";
         const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-        size_t endOffset = token.source_location.num_bytes;
+        const size_t endOffset = std::min(token.source_location.num_bytes, token.source_location.lineEnd() - token.source_location.byte_offset);
 
         ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
                         static_cast<int>(endOffset)) <<
-                std::setfill('-') <<
-                "\n";
+                std::setfill('-') << "\n";
     }
 
     class Parser

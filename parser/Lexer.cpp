@@ -64,6 +64,14 @@ namespace lexer
             };
             tokens.emplace_back(type, source_location);
             col += offset;
+            for (size_t i = start; i < endPosition; i++)
+            {
+                if (contentPtr->at(i) == '\n')
+                {
+                    row++;
+                    col= 1;
+                }
+            }
         }
         bool find_raw_string(const std::string &content,  size_t *endPosition)
         {
@@ -506,7 +514,7 @@ namespace lexer
             }
             SourceLocation source_location = {
                     .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1, .row = row,
-                    .col = col
+                    .col = col + 1
             };
             tokens.emplace_back(Token::END_OF_FILE, source_location);
             return tokens;
