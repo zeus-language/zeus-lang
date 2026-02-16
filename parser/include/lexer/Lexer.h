@@ -19,9 +19,17 @@ struct SourceLocation {
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
     [[nodiscard]] size_t lineStart() const { return source->rfind('\n', byte_offset) + 1; }
+    [[nodiscard]] size_t lineEnd() const
+    {
+#ifdef _WIN32
+        return source->find('\r', byte_offset);
+#else
+        return source->find('\n', byte_offset);
+#endif
+    }
 
     [[nodiscard]] std::string sourceline() const {
-        const size_t endPos = source->find('\n', byte_offset);
+        const size_t endPos = lineEnd();
         const size_t startPos = lineStart();
         return source->substr(startPos, endPos - startPos);
     }
@@ -40,7 +48,9 @@ public:
         NUMBER,
         FLOAT_NUMBER,
         STRING,
+        UNCLOSED_STRING,
         RAW_STRING,
+        UNCLOSED_RAW_STRING,
         KEYWORD,
         END_OF_FILE,
         CHAR,

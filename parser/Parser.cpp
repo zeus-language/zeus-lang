@@ -89,12 +89,11 @@ namespace parser
 
         ostream << token.source_location.sourceline() << "\n";
         const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-        size_t endOffset = token.source_location.num_bytes;
+        const size_t endOffset = std::min(token.source_location.num_bytes, token.source_location.lineEnd() - token.source_location.byte_offset);
 
         ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
                         static_cast<int>(endOffset)) <<
-                std::setfill('-') <<
-                "\n";
+                std::setfill('-') << "\n";
     }
 
     class Parser
@@ -165,22 +164,43 @@ namespace parser
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseRawString()
         {
+            Token stringToken = current();
+            if (tryConsume(Token::UNCLOSED_RAW_STRING))
+            {
+
+                m_messages.push_back(ParserMessasge{
+                        .outputType = OutputType::ERROR,
+                        .token = stringToken,
+                        .message = "The raw string literal is not closed. Expected closing '\"' character.",
+                });
+                return std::nullopt;
+            }
             if (!canConsume(Token::RAW_STRING))
             {
                 return std::nullopt;
             }
-            Token stringToken = current();
             consume(Token::RAW_STRING);
             return std::make_unique<ast::RawStringConstant>(stringToken);
         }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseString()
         {
+            Token stringToken = current();
+            if (tryConsume(Token::UNCLOSED_STRING))
+            {
+
+                m_messages.push_back(ParserMessasge{
+                        .outputType = OutputType::ERROR,
+                        .token = stringToken,
+                        .message = "The string literal is not closed. Expected closing '\"' character.",
+                });
+                return std::nullopt;
+            }
+
             if (!canConsume(Token::STRING))
             {
                 return std::nullopt;
             }
-            Token stringToken = current();
             consume(Token::STRING);
             return std::make_unique<ast::StringConstant>(stringToken);
         }

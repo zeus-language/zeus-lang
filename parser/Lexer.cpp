@@ -53,8 +53,27 @@ namespace lexer
         size_t col = 1;
         size_t start = 0;
         std::string file_path;
-
-        bool find_raw_string(const std::string &content, size_t start, size_t *endPosition)
+        void addTokenToResult(size_t tempStart, size_t endPosition, Token::Type type)
+        {
+            const size_t offset = endPosition - tempStart;
+            const auto string_length = (offset);
+            SourceLocation source_location = {
+                .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
+                .row = row,
+                .col = col
+            };
+            tokens.emplace_back(type, source_location);
+            col += offset;
+            for (size_t i = start; i < endPosition; i++)
+            {
+                if (contentPtr->at(i) == '\n')
+                {
+                    row++;
+                    col= 1;
+                }
+            }
+        }
+        bool find_raw_string(const std::string &content,  size_t *endPosition)
         {
             char current = content[start];
             if (current != 'r' || content[start + 1] != '"')
@@ -69,27 +88,23 @@ namespace lexer
 
                     break;
                 }
+                if (*endPosition >= content.size())
+                {
+                    addTokenToResult(start, *endPosition, Token::UNCLOSED_RAW_STRING);
+                    start = *endPosition - 1;
+                    return true;
+                }
+
 
                 *endPosition += 1;
                 current = content[*endPosition];
             }
+            addTokenToResult(start, *endPosition, Token::RAW_STRING);
+            start = *endPosition - 1;
             return true;
         }
 
-        void addTokenToResult(size_t tempStart, size_t endPosition, Token::Type type)
-        {
-            size_t offset = endPosition - tempStart;
-            auto string_length = (offset);
-            SourceLocation source_location = {
-                    .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
-                    .row = row,
-                    .col = col
-            };
-            tokens.emplace_back(type, source_location);
 
-
-            col += offset;
-        }
 
         bool find_string(const std::string &content, size_t *endPosition)
         {
@@ -106,6 +121,12 @@ namespace lexer
                 {
                     *endPosition += 1;
                     break;
+                }
+                if (*endPosition >= content.size())
+                {
+                    addTokenToResult(tempStart, *endPosition, Token::UNCLOSED_STRING);
+                    start = *endPosition - 1;
+                    return true;
                 }
                 size_t oldEndPosition = *endPosition;
                 if (current == '$' &&  content[*endPosition+1] == '{' && *endPosition + 1 < content.size())
@@ -261,21 +282,9 @@ namespace lexer
             for (start = 0; start < source_code.length(); start++)
             {
                 size_t endPosition = start;
-                bool found = find_raw_string(source_code, start, &endPosition);
+                bool found = find_raw_string(source_code,  &endPosition);
                 if (found)
                 {
-                    size_t offset = endPosition - start;
-                    auto string_length = (offset);
-                    SourceLocation source_location = {
-                            .filename = file_path, .source = contentPtr, .byte_offset = start,
-                            .num_bytes = string_length,
-                            .row = row,
-                            .col = col
-                    };
-                    tokens.emplace_back(Token::RAW_STRING, source_location);
-
-                    start = endPosition - 1;
-                    col += offset;
                     continue;
                 }
                 found = find_string(source_code, &endPosition);
@@ -505,7 +514,7 @@ namespace lexer
             }
             SourceLocation source_location = {
                     .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1, .row = row,
-                    .col = col
+                    .col = col + 1
             };
             tokens.emplace_back(Token::END_OF_FILE, source_location);
             return tokens;

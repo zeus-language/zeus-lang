@@ -25,7 +25,7 @@ namespace compiler {
         std::ifstream file;
         std::istringstream is;
 
-        file.open(inputPath, std::ios::in);
+        file.open(inputPath, std::ios::binary);
         if (!file.is_open()) {
             return std::nullopt;
         }
