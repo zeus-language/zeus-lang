@@ -1,0 +1,16 @@
+struct TestStruct {
+    value : i32,
+    other_value : i32,
+    stuff : *u8,
+}
+fn test() : &TestStruct {
+    let mut value : TestStruct = TestStruct { value: 10, other_value: 20 };
+    value.stuff = 0 as *u8;
+    return &value;
+}
+
+fn main() :i32{
+    let result : &TestStruct = test();
+    println(result.value);
+    return 0;
+}

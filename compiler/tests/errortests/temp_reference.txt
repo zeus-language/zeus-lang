@@ -1,0 +1,3 @@
+FILENAME:9:13: error: Cannot return a reference for a mutable local variable.
+    return &value;
+            ^----
