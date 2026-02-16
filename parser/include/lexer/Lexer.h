@@ -19,7 +19,14 @@ struct SourceLocation {
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
     [[nodiscard]] size_t lineStart() const { return source->rfind('\n', byte_offset) + 1; }
-    [[nodiscard]] size_t lineEnd() const { return source->find('\n', byte_offset); }
+    [[nodiscard]] size_t lineEnd() const
+    {
+#ifdef _WIN32
+        return source->find('\r', byte_offset);
+#else
+        return source->find('\n', byte_offset);
+#endif
+    }
 
     [[nodiscard]] std::string sourceline() const {
         const size_t endPos = lineEnd();
