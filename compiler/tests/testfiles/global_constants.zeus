@@ -1,0 +1,13 @@
+use std::io;
+use std::str;
+const NUMBER_CONST: i32 = 42;
+const STRING_CONST: [u8] = "Hello, World!";
+fn main() : i32 {
+    let mut output : string = "Number constant: ${NUMBER_CONST}";
+    println(output.as_c_str());
+    let mut output2 :string = "String constant: ${STRING_CONST}";
+    println(output2.as_c_str());
+    destroy(&output);
+    destroy(&output2);
+    return 0;
+}
