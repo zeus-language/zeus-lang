@@ -1,7 +1,7 @@
 use std::io;
 use std::str;
-const NUMBER_CONST: i32 = 42;
-const STRING_CONST: [u8] = "Hello, World!";
+let NUMBER_CONST: i32 = 42;
+let STRING_CONST: [u8] = "Hello, World!";
 fn main() : i32 {
     let mut output : string = "Number constant: ${NUMBER_CONST}";
     println(output.as_c_str());

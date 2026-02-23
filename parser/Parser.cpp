@@ -1313,47 +1313,7 @@ namespace parser
                                                               std::move(value));
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseConstantDefinition()
-        {
-            if (!canConsumeKeyWord("const"))
-            {
-                return std::nullopt;
-            }
-            consumeKeyWord("const");
-            Token &nameToken = current();
-            consume(Token::Type::IDENTIFIER);
-            consume(Token::COLON);
-            auto type = parseRawType();
-            if (!type)
-            {
-                m_messages.push_back(ParserMessasge{
-                        .token = current(),
-                        .message = "expected type after ':' in constant declaration!"
-                });
-                return std::nullopt;
-            }
 
-            if (!tryConsume(Token::EQUAL))
-            {
-                m_messages.push_back(ParserMessasge{
-                        .token = current(),
-                        .message = "expected '=' after type in constant declaration!"
-                });
-                return std::nullopt;
-            }
-            auto value = parseExpression(true);
-            if (!value)
-            {
-                m_messages.push_back(ParserMessasge{
-                        .token = current(),
-                        .message = "expected expression after '=' in constant declaration!"
-                });
-                return std::nullopt;
-            }
-            consume(Token::SEMICOLON);
-            return std::make_unique<ast::VariableDeclaration>(std::move(nameToken),  std::move(type.value()),true,
-                                                              std::move(value.value()));
-        }
 
         std::optional<std::unique_ptr<ast::ASTNode> > parseIfCondition()
         {
@@ -2215,9 +2175,9 @@ namespace parser
                 {
                     module->functions.push_back(std::move(functionDef.value()));
                 }
-                else if (auto constantDefinition = parseConstantDefinition())
+                else if (auto varDecl = parseVariableDeclaration())
                 {
-                    module->nodes.push_back(std::move(constantDefinition.value()));
+                    module->nodes.push_back(std::move(varDecl.value()));
                 }
                 else if (auto externType = parseExternType())
                 {

@@ -231,7 +231,7 @@ namespace llvm_backend
         struct DebugInfo
         {
             std::unordered_map<std::string, llvm::DICompileUnit *> compileUnits;
-            llvm::DICompileUnit *TheCU;
+            llvm::DICompileUnit *TheCU = nullptr;
             std::vector<llvm::DIScope *> LexicalBlocks;
 
         } KSDbgInfo;
@@ -435,8 +435,9 @@ namespace llvm_backend
             Scope = TheCU;
         else
             Scope = llvmState.KSDbgInfo.LexicalBlocks.back();
-        Builder->SetCurrentDebugLocation(
-                llvm::DILocation::get(Scope->getContext(), sourceLocation.row, sourceLocation.col, Scope));
+        if (Scope)
+            Builder->SetCurrentDebugLocation(
+                    llvm::DILocation::get(Scope->getContext(), sourceLocation.row, sourceLocation.col, Scope));
     }
 
 
@@ -1679,10 +1680,10 @@ namespace llvm_backend
         }
         if (const auto globalVar = llvmState.TheModule->getGlobalVariable(node->expressionToken().lexical()))
         {
-                if (globalVar->getValueType()->isArrayTy() or globalVar->getValueType()->isStructTy())
-                    return globalVar;
-                return llvmState.Builder->CreateLoad(globalVar->getValueType(), globalVar,
-                                                     node->expressionToken().lexical());
+            if (globalVar->getValueType()->isArrayTy() or globalVar->getValueType()->isStructTy())
+                return globalVar;
+            return llvmState.Builder->CreateLoad(globalVar->getValueType(), globalVar,
+                                                 node->expressionToken().lexical());
 
         }
         assert(false && "Variable not found");
@@ -1691,7 +1692,11 @@ namespace llvm_backend
 
     llvm::Value *codegen(const ast::VariableAssignment *node, LLVMBackendState &llvmState)
     {
-        const auto alloca = llvmState.findVariable(node->expressionToken().lexical(), false);
+        auto alloca = llvmState.findVariable(node->expressionToken().lexical(), false);
+        if (!alloca)
+        {
+            alloca = llvmState.TheModule->getGlobalVariable(node->expressionToken().lexical());
+        }
         if (!alloca)
         {
             assert(false && "Variable not declared before assignment");
@@ -1881,11 +1886,11 @@ namespace llvm_backend
             auto initializer = llvm::ConstantStruct::get(
                     llvm::cast<llvm::StructType>(sliceLLVMType),
                     llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), stringValue.size()),
-                    llvm::ConstantExpr::getBitCast( strValue, llvm::PointerType::getUnqual(*llvmState.TheContext)));
+                    llvm::ConstantExpr::getBitCast(strValue, llvm::PointerType::getUnqual(*llvmState.TheContext)));
             return new llvm::GlobalVariable(
                     *llvmState.TheModule,
                     sliceLLVMType,
-                    true,
+                    false,
                     llvm::GlobalValue::ExternalLinkage,
                     initializer,
                     "string_slice_global");
@@ -2732,8 +2737,11 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     context.TheModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     createPrintfCall(*context.TheContext, *context.TheModule);
+
     for (auto &node: nodes)
     {
+
+
         codegen_global(node.get(), context);
     }
     for (auto &type: registeredTypes)

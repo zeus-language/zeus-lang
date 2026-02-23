@@ -59,3 +59,8 @@ std::vector<std::shared_ptr<types::VariableType> > types::Scope::registeredTypes
     }
     return types;
 }
+
+bool types::Scope::isGlobalScope() const
+{
+    return m_parentScope == nullptr;
+}

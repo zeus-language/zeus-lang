@@ -59,12 +59,24 @@ struct string {
         self.append(&num_str);
         destroy(&num_str);
     }
+
+     fn append(self : mut &string, number : float) : void {
+        let mut num_str1 : string = float_to_str(number);
+        self.append(&num_str1);
+        destroy(&num_str1);
+    }
+
+    fn append(self : mut &string, number : double) : void {
+        let mut num_str2 : string = double_to_str(number);
+        self.append(&num_str2);
+        destroy(&num_str2);
+    }
     fn append(self : mut &string, other : [u8]) : void {
         let new_length : i32 = self.length + other.length as i32 ;
         self.increase_capacity(new_length);
         // Append the new data
-        let target : *u8 = self.data + self.length as *u8;
-        core::libc::memcpy(target, other.data, other.length as u64);
+        let _target : *u8 = self.data + self.length as *u8;
+        core::libc::memcpy(_target, other.data, other.length as u64);
         self.length = new_length;
         self.data[self.length] = 0 as u8; // Null-terminate
     }
@@ -260,25 +272,31 @@ fn float_to_str(value : float) : string {
 fn double_to_str(value : double) : string {
     let mut whole : i32 = value as i32;
     let mut frac_part : double = abs(value  - (whole as double));
-    let mut result : string = int_to_str(whole);
-    result.append( '.' as u8 );
+    let mut resultx : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
+    let mut whole_str : string = int_to_str(whole);
+    resultx.append(whole_str.as_slice());
+    resultx.append( '.' as u8 );
 
     frac_part = frac_part * 10.0;
     let tmp : double = (value - whole as double) * 1000000000.0;
     let frac : u64 = tmp as u64;
     let mut frac_str : string = int_to_str(frac as i32);
-    result.append(&frac_str);
+    resultx.append(&frac_str);
 
     destroy(&frac_str);
+    destroy(&whole_str);
 
 
 
-    return result;
+    return resultx;
 }
 
 fn int_to_str(value : i32) : string {
+    let mut digits : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
+
     if value == 0 {
-        return "0";
+        digits.append('0' as u8);
+        return digits;
     }
     let mut is_negative : bool = false;
     let mut num : i32 = value;
@@ -287,7 +305,6 @@ fn int_to_str(value : i32) : string {
         //num = -num;
         num = 0 - num;
     }
-    let mut digits : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
     while num > 0 {
         let digit : i32 = num % 10;
         digits.append( char(digit) );

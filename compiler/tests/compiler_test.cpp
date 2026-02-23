@@ -298,13 +298,13 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
                              "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
-                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading","comparestring","stringinterpolation","global_constants"));
+                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading","comparestring","stringinterpolation","global_constants","global_var"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference"));
+                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));
