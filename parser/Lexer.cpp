@@ -7,10 +7,9 @@
 
 namespace lexer
 {
-    static std::vector<std::string> possible_tokens = {
+    static const std::vector<std::string> possible_tokens = {
             "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue",
-            "use",
-            "or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not"
+            "use","or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not"
     };
 
 
@@ -53,27 +52,29 @@ namespace lexer
         size_t col = 1;
         size_t start = 0;
         std::string file_path;
-        void addTokenToResult(size_t tempStart, size_t endPosition, Token::Type type)
+
+        void addTokenToResult(const size_t tempStart, const size_t endPosition,const Token::Type type)
         {
             const size_t offset = endPosition - tempStart;
             const auto string_length = (offset);
             SourceLocation source_location = {
-                .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
-                .row = row,
-                .col = col
+                    .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
+                    .row = row,
+                    .col = col
             };
-            tokens.emplace_back(type, source_location);
+            tokens.emplace_back(type, std::move(source_location));
             col += offset;
             for (size_t i = start; i < endPosition; i++)
             {
-                if (contentPtr->at(i) == '\n')
+                if ((*contentPtr)[i] == '\n')
                 {
                     row++;
-                    col= 1;
+                    col = 1;
                 }
             }
         }
-        bool find_raw_string(const std::string &content,  size_t *endPosition)
+
+        bool find_raw_string(const std::string &content, size_t *endPosition)
         {
             char current = content[start];
             if (current != 'r' || content[start + 1] != '"')
@@ -105,7 +106,6 @@ namespace lexer
         }
 
 
-
         bool find_string(const std::string &content, size_t *endPosition)
         {
             char current = content[start];
@@ -128,8 +128,8 @@ namespace lexer
                     start = *endPosition - 1;
                     return true;
                 }
-                size_t oldEndPosition = *endPosition;
-                if (current == '$' &&  content[*endPosition+1] == '{' && *endPosition + 1 < content.size())
+                const size_t oldEndPosition = *endPosition;
+                if (current == '$' && content[*endPosition + 1] == '{' && *endPosition + 1 < content.size())
                 {
                     isInterpolation = true;
                     *endPosition += 1;
@@ -139,9 +139,9 @@ namespace lexer
                         *endPosition += 1;
                         current = content[*endPosition];
                         addTokenToResult(tempStart, oldEndPosition, Token::INTERPOLATED_STRING);
-                        tempStart = oldEndPosition ;
+                        tempStart = oldEndPosition;
                         addTokenToResult(tempStart, *endPosition, Token::INTERPOLATION_START);
-                        tempStart = *endPosition ;
+                        tempStart = *endPosition;
                         continue;
                     }
                 }
@@ -170,7 +170,7 @@ namespace lexer
             return true;
         }
 
-        bool find_token(const std::string &content, const size_t start, size_t *endPosition)
+        bool find_token(const std::string &content, size_t *endPosition) const
         {
             char current = content[start];
             *endPosition = start;
@@ -191,8 +191,11 @@ namespace lexer
         }
 
 
-        bool find_comment(const std::string &content, const size_t start, size_t *endPosition)
+        bool find_comment(const std::string &content, size_t *endPosition) const
         {
+            if (content[start] != '/' )
+                return false;
+
             if (content[start] == '/' && content[start + 1] == '*')
             {
                 char current = content[start];
@@ -226,8 +229,8 @@ namespace lexer
         }
 
 
-        bool find_number(const std::string &content, const size_t start, size_t *endPosition,
-                         Token::Type *numberTokenType)
+        bool find_number(const std::string &content, size_t *endPosition,
+                         Token::Type *numberTokenType) const
         {
             *endPosition = start;
             int index = 0;
@@ -282,7 +285,7 @@ namespace lexer
             for (start = 0; start < source_code.length(); start++)
             {
                 size_t endPosition = start;
-                bool found = find_raw_string(source_code,  &endPosition);
+                bool found = find_raw_string(source_code, &endPosition);
                 if (found)
                 {
                     continue;
@@ -299,13 +302,13 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::CHAR, source_location);
+                    tokens.emplace_back(Token::CHAR, std::move(source_location));
                     col += 3;
                     start += 2;
                     continue;
                 }
 
-                found = find_comment(source_code, start, &endPosition);
+                found = find_comment(source_code, &endPosition);
                 if (found)
                 {
                     // count lines
@@ -321,11 +324,11 @@ namespace lexer
                         };
                         if (source_code[start] == '/' && source_code[start + 1] == '/')
                         {
-                            tokens.emplace_back(Token::LINE_COMMENT, source_location);
+                            tokens.emplace_back(Token::LINE_COMMENT, std::move(source_location));
                         }
                         else
                         {
-                            tokens.emplace_back(Token::BLOCK_COMMENT, source_location);
+                            tokens.emplace_back(Token::BLOCK_COMMENT, std::move(source_location));
                         }
                     }
                     for (size_t i = start; i < endPosition; i++)
@@ -348,12 +351,12 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::KEYWORD, source_location);
+                    tokens.emplace_back(Token::KEYWORD, std::move(source_location));
                     start = endPosition;
                     col += offset;
                 }
                 Token::Type numberTokenType = Token::NUMBER;
-                found = find_number(source_code, start, &endPosition, &numberTokenType);
+                found = find_number(source_code,  &endPosition, &numberTokenType);
                 if (found)
                 {
                     const size_t offset = endPosition - start;
@@ -364,7 +367,7 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(numberTokenType, source_location);
+                    tokens.emplace_back(numberTokenType, std::move(source_location));
                     start = endPosition;
 
                     col += offset;
@@ -378,12 +381,12 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::ANNOTATION, source_location);
+                    tokens.emplace_back(Token::ANNOTATION, std::move(source_location));
                     start = endPosition - 1;
                     col += offset;
                     continue;
                 }
-                found = find_token(source_code, start, &endPosition);
+                found = find_token(source_code, &endPosition);
                 if (found)
                 {
                     const size_t offset = endPosition - start + 1;
@@ -392,7 +395,7 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::IDENTIFIER, source_location);
+                    tokens.emplace_back(Token::IDENTIFIER, std::move(source_location));
                     start = endPosition;
                     col += offset;
                     continue;
@@ -404,7 +407,7 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::RANGE, source_location);
+                    tokens.emplace_back(Token::RANGE, std::move(source_location));
                     start++;
                     col += 2;
                     continue;
@@ -416,7 +419,7 @@ namespace lexer
                             .row = row,
                             .col = col
                     };
-                    tokens.emplace_back(Token::NS_SEPARATOR, source_location);
+                    tokens.emplace_back(Token::NS_SEPARATOR, std::move(source_location));
                     start++;
                     col += 2;
                     continue;
@@ -437,73 +440,73 @@ namespace lexer
                             //start++;
                             continue;
                         case '+':
-                            tokens.emplace_back(Token::PLUS, source_location);
+                            tokens.emplace_back(Token::PLUS, std::move(source_location));
                             break;
                         case '-':
-                            tokens.emplace_back(Token::MINUS, source_location);
+                            tokens.emplace_back(Token::MINUS, std::move(source_location));
                             break;
                         case '*':
-                            tokens.emplace_back(Token::MUL, source_location);
+                            tokens.emplace_back(Token::MUL, std::move(source_location));
                             break;
                         case '%':
-                            tokens.emplace_back(Token::PERCENT, source_location);
+                            tokens.emplace_back(Token::PERCENT, std::move(source_location));
                             break;
                         case '/':
-                            tokens.emplace_back(Token::DIV, source_location);
+                            tokens.emplace_back(Token::DIV, std::move(source_location));
                             break;
                         case '(':
-                            tokens.emplace_back(Token::LEFT_CURLY, source_location);
+                            tokens.emplace_back(Token::LEFT_CURLY, std::move(source_location));
                             break;
                         case ')':
-                            tokens.emplace_back(Token::RIGHT_CURLY, source_location);
+                            tokens.emplace_back(Token::RIGHT_CURLY, std::move(source_location));
                             break;
                         case '[':
-                            tokens.emplace_back(Token::LEFT_SQUAR, source_location);
+                            tokens.emplace_back(Token::LEFT_SQUAR, std::move(source_location));
                             break;
                         case ']':
-                            tokens.emplace_back(Token::RIGHT_SQUAR, source_location);
+                            tokens.emplace_back(Token::RIGHT_SQUAR, std::move(source_location));
                             break;
                         case '=':
-                            tokens.emplace_back(Token::EQUAL, source_location);
+                            tokens.emplace_back(Token::EQUAL, std::move(source_location));
                             break;
                         case '<':
-                            tokens.emplace_back(Token::LESS, source_location);
+                            tokens.emplace_back(Token::LESS, std::move(source_location));
                             break;
                         case '>':
-                            tokens.emplace_back(Token::GREATER, source_location);
+                            tokens.emplace_back(Token::GREATER, std::move(source_location));
                             break;
                         case ',':
-                            tokens.emplace_back(Token::COMMA, source_location);
+                            tokens.emplace_back(Token::COMMA, std::move(source_location));
                             break;
                         case ';':
-                            tokens.emplace_back(Token::SEMICOLON, source_location);
+                            tokens.emplace_back(Token::SEMICOLON, std::move(source_location));
                             break;
                         case ':':
-                            tokens.emplace_back(Token::COLON, source_location);
+                            tokens.emplace_back(Token::COLON, std::move(source_location));
                             break;
                         case '.':
-                            tokens.emplace_back(Token::DOT, source_location);
+                            tokens.emplace_back(Token::DOT, std::move(source_location));
                             break;
                         case '^':
-                            tokens.emplace_back(Token::CARET, source_location);
+                            tokens.emplace_back(Token::CARET, std::move(source_location));
                             break;
                         case '!':
-                            tokens.emplace_back(Token::BANG, source_location);
+                            tokens.emplace_back(Token::BANG, std::move(source_location));
                             break;
                         case '@':
-                            tokens.emplace_back(Token::AT, source_location);
+                            tokens.emplace_back(Token::AT, std::move(source_location));
                             break;
                         case '{':
-                            tokens.emplace_back(Token::OPEN_BRACE, source_location);
+                            tokens.emplace_back(Token::OPEN_BRACE, std::move(source_location));
                             break;
                         case '}':
-                            tokens.emplace_back(Token::CLOSE_BRACE, source_location);
+                            tokens.emplace_back(Token::CLOSE_BRACE, std::move(source_location));
                             break;
                         case '&':
-                            tokens.emplace_back(Token::AND, source_location);
+                            tokens.emplace_back(Token::AND, std::move(source_location));
                             break;
                         case '|':
-                            tokens.emplace_back(Token::PIPE, source_location);
+                            tokens.emplace_back(Token::PIPE, std::move(source_location));
                             break;
                         default:
                             break;
@@ -516,14 +519,14 @@ namespace lexer
                     .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1, .row = row,
                     .col = col + 1
             };
-            tokens.emplace_back(Token::END_OF_FILE, source_location);
-            return tokens;
+            tokens.emplace_back(Token::END_OF_FILE, std::move(source_location));
+            return std::move(tokens);
         }
 
 
     };
 
-    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments)
+    std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code,bool skipComments)
     {
         Lexer lexer;
         return lexer.lex_file(file_path, source_code, skipComments);

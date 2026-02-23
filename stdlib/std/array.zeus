@@ -74,7 +74,7 @@ struct array<T>{
         self.data = null as *T;
         self.length = 0 as i64;
         self.capacity = 0 as i64;
-        self = null as *array<T>;
+        self = null as &array<T>;
     }
 }
 
