@@ -1,0 +1,3 @@
+FILENAME:3:9: error: Type mismatch in variable assignment: variable 'x' is of type 'double', but assigned expression is of type 'float'.
+    x = 2.71828f; // This should cause a type error because 2.71828f is a float literal, not a double literal.
+        ^-------

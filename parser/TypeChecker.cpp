@@ -1621,7 +1621,25 @@ namespace types {
             });
             return;
         }
-        // check whenever the types match
+        if (node->expression()->expressionType() && var->type) {
+            if (node->expression()->expressionType().value()->name() != var->type->name()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expression()->expressionToken(),
+                    "Type mismatch in variable assignment: variable '" + node->expressionToken().lexical() +
+                    "' is of type '" + var->type->name() + "', but assigned expression is of type '" +
+                    node->expression()->expressionType().value()->name() + "'."
+                });
+                return;
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expression()->expressionToken(),
+                "Could not determine types in variable assignment."
+            });
+            return;
+        }
     }
 
     void type_check(ast::FunctionDefinition *node, Context &context) {

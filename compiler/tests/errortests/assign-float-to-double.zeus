@@ -1,0 +1,5 @@
+fn main() :i32 {
+    let mut x: double = 3.14;
+    x = 2.71828f; // This should cause a type error because 2.71828f is a float literal, not a double literal.
+    return 0;
+}
