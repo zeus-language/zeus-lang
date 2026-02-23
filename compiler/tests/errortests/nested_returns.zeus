@@ -1,0 +1,15 @@
+
+fn nested(x : float , y : [u8]) :i32 {
+    if(x > 0.0f) {
+        return x;
+    } else {
+        return y;
+    }
+    return 0;
+}
+
+fn main() :i32 {
+    let x : float = 5.0f;
+    let y : [u8] = "Hello, World!";
+    return nested(x, y);
+}

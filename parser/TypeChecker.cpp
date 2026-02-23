@@ -4,6 +4,7 @@
 #include <cmath>
 #include <map>
 #include <ranges>
+#include <set>
 
 #include "dbg_assert.h"
 #include "ast/ArrayAccess.h"
@@ -43,9 +44,10 @@
 
 namespace types {
     struct Context {
-        std::vector<parser::ParserMessasge> messages;
+        std::set<parser::ParserMessasge> messages;
         std::shared_ptr<parser::Module> module;
         std::shared_ptr<Scope> currentScope = std::make_shared<Scope>();
+        ast::FunctionDefinitionBase* currentFunction = nullptr;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
             const std::string &name) const {
@@ -192,7 +194,7 @@ namespace types {
             if (funcname) {
                 if (auto value = evalConstantExpression(funcname->get(), context)) {
                     if (!std::holds_alternative<std::string>(value.value())) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             rawAnnotation->expressionToken(),
                             "Expected string constant for 'funcname' argument in 'extern' annotation!"
@@ -201,7 +203,7 @@ namespace types {
                     }
                     funcNameValue = std::get<std::string>(value.value());
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         rawAnnotation->expressionToken(),
                         "Failed to evaluate constant expression for 'funcname' argument in 'external' annotation!"
@@ -215,7 +217,7 @@ namespace types {
                         return std::make_shared<types::ExternalAnnotation>(
                             std::get<std::string>(constValue.value()), funcNameValue);
                     } else {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             rawAnnotation->expressionToken(),
                             "Expected string constant for 'libname' argument in 'external' annotation!"
@@ -223,7 +225,7 @@ namespace types {
                         return nullptr;
                     }
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         rawAnnotation->expressionToken(),
                         "Failed to evaluate constant expression for 'libname' argument in 'external' annotation!"
@@ -233,7 +235,7 @@ namespace types {
             }
             return nullptr;
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 rawAnnotation->expressionToken(),
                 "Unknown annotation '" + rawAnnotation->name() + "'!"
@@ -254,7 +256,7 @@ namespace types {
 
     void type_check(ast::VariableDeclaration *node, Context &context);
 
-    void type_check(const ast::ReturnStatement *node, Context &context);
+    void type_check(ast::ReturnStatement *node, Context &context);
 
     void type_check(ast::BinaryExpression *node, Context &context);
 
@@ -449,7 +451,7 @@ namespace types {
         }
         DBG_ASSERT(node != nullptr, "Node is null");
 
-        context.messages.push_back({
+        context.messages.insert({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
@@ -464,7 +466,7 @@ namespace types {
         }
 
         if (!node->instanceNode()->expressionType()) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of method call instance."
@@ -494,7 +496,7 @@ namespace types {
                 return method->functionName() == methodName;
             });
             if (filteredMethods.empty()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type '" + instanceType->name() + "' does not have a method named '" + methodName + "'."
@@ -538,7 +540,7 @@ namespace types {
                 node->setExpressionType(context.currentScope->getTypeByName("i32").value());
                 return;
             } else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Array type does not have a method named '" + methodName + "'."
@@ -549,7 +551,7 @@ namespace types {
         } else if (auto enumType = std::dynamic_pointer_cast<types::EnumType>(instanceType)) {
             // OK
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Type '" + instanceType->name() + "' does not support method calls."
@@ -560,7 +562,7 @@ namespace types {
 
 
         if (!matchedMethod) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "No matching overload found for method '" + methodName + "' with the given argument types for the signature '"+node->functionSignature()+"'."
@@ -581,7 +583,7 @@ namespace types {
                                                                 return variant.name == node->variantName().lexical();
                                                             });
                 if (variantIt == enumType->variants().end()) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Enum '" + enumType->name() + "' does not have a variant named '" +
@@ -591,7 +593,7 @@ namespace types {
                 }
                 node->setExpressionType(type.value());
             } else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Attempting to access enum variant on a non-enum type '" +
@@ -600,7 +602,7 @@ namespace types {
                 return;
             }
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of enum access base."
@@ -614,7 +616,7 @@ namespace types {
         if (node->start()->expressionType() && node->end()->expressionType()) {
             if (node->start()->expressionType().value()->name() !=
                 node->end()->expressionType().value()->name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in range expression: start is of type '" +
@@ -626,7 +628,7 @@ namespace types {
 
             node->setExpressionType(node->start()->expressionType().value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types in range expression."
@@ -643,7 +645,7 @@ namespace types {
                 if (key->expressionType() != node->accessNode()->expressionType() and
                     key->expressionToken().lexical() != "_"
                 ) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         key->expressionToken(),
                         "The case element has a diffent type than the match expression!"
@@ -668,7 +670,7 @@ namespace types {
             node->setExpressionType(
                 types::TypeRegistry::getReferenceType(node->accessNode()->expressionType().value()).value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of reference access base."
@@ -682,7 +684,7 @@ namespace types {
         if (node->accessNode()->expressionType() && node->expression()->expressionType()) {
             if (node->accessNode()->expressionType().value()->name() != node->expression()->expressionType().value()->
                 name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in field assignment: field '" + node->accessNode()->expressionToken().
@@ -699,7 +701,7 @@ namespace types {
 
             node->setExpressionType(node->expression()->expressionType().value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types in field assignment."
@@ -708,7 +710,7 @@ namespace types {
         }
 
         if (node->accessNode()->constant()) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "cannot modify a field of an immutable variable."
@@ -722,7 +724,7 @@ namespace types {
         if (node->accessNode()) {
             if (const auto varAccess = dynamic_cast<ast::VariableAccess *>(node->accessNode())) {
                 if (!varAccess->expressionType()) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Could not determine type of variable '" + varAccess->expressionToken().lexical() +
@@ -747,7 +749,7 @@ namespace types {
                                                                   return field.name == node->fieldName().lexical();
                                                               });
                     if (fieldIt == structType->fields().end()) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             node->expressionToken(),
                             "Field '" + node->fieldName().lexical() + "' does not exist in struct type '" +
@@ -758,7 +760,7 @@ namespace types {
                     node->setExpressionType(fieldIt->type);
                     node->setStructType(varAccess->expressionType().value());
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Type '" + varAccess->expressionType().value()->name() +
@@ -768,7 +770,7 @@ namespace types {
                 }
             } else if (const auto fieldAccess = dynamic_cast<ast::FieldAccess *>(node->accessNode())) {
                 if (!fieldAccess->expressionType()) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Could not determine type of field '" + fieldAccess->fieldName().lexical() +
@@ -783,7 +785,7 @@ namespace types {
                                                                   return field.name == node->fieldName().lexical();
                                                               });
                     if (fieldIt == structType->fields().end()) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             node->expressionToken(),
                             "Field '" + node->fieldName().lexical() + "' does not exist in struct type '" +
@@ -795,7 +797,7 @@ namespace types {
                     node->setStructType(fieldAccess->expressionType().value());
                 }
             } else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Field access base is not a variable or field access."
@@ -818,7 +820,7 @@ namespace types {
                 }
                 node->setExpressionType(type.value());
             } else {
-                context.messages.push_back({
+                context.messages.insert({
                     .outputType = parser::OutputType::ERROR,
                     .token = node->expressionToken(),
                     .message = "The type " + node->structName() +
@@ -826,7 +828,7 @@ namespace types {
                 });
             }
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 .outputType = parser::OutputType::ERROR,
                 .token = node->expressionToken(),
                 .message = "Could not determine type " + node->structName() +
@@ -838,7 +840,7 @@ namespace types {
     void type_check(ast::TypeCast *node, Context &context) {
         const auto type = resolveFromRawType(node->rawType(), context.currentScope);
         if (!type) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->rawType()->typeToken,
                 "Unknown type '" + node->rawType()->fullTypeName() + "' in type cast."
@@ -848,7 +850,7 @@ namespace types {
         node->setExpressionType(type.value());
         type_check_base(node->value(), context);
         if (!node->value()->expressionType()) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->value()->expressionToken(),
                 "Could not determine type of expression in type cast."
@@ -865,7 +867,7 @@ namespace types {
         if (node->lhs() && node->lhs()->expressionType() && node->rhs() && node->rhs()->expressionType()) {
             if (node->lhs()->expressionType().value()->name() != "bool" ||
                 node->rhs()->expressionType().value()->name() != "bool") {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Logical expressions require boolean operands, but got '" +
@@ -878,7 +880,7 @@ namespace types {
         } else if (node->rhs()->expressionType() && node->logical_operator() == ast::LogicalOperator::NOT) {
             node->setExpressionType(context.currentScope->getTypeByName("bool").value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types of operands in logical expression."
@@ -890,7 +892,7 @@ namespace types {
     bool type_check_iterator_loop(ast::ForLoop *node, Context &context) {
         const auto varType = node->range()->expressionType();
         if (!varType) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of the for loop range expression."
@@ -1002,7 +1004,7 @@ namespace types {
                         return true;
                     }
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Operator '" + node->operatorFunctionName() + "' is not overloaded for struct type '" +
@@ -1024,7 +1026,7 @@ namespace types {
         const auto rhs = node->rhs();
         if (lhs->expressionType() && rhs->expressionType()) {
             if (lhs->expressionType().value()->name() != rhs->expressionType().value()->name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in comparison: left is of type '" +
@@ -1035,7 +1037,7 @@ namespace types {
             }
             node->setExpressionType(context.currentScope->getTypeByName("bool").value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types of operands in comparison."
@@ -1047,7 +1049,7 @@ namespace types {
         type_check_base(node->value(), context);
         type_check_base(node->count(), context);
         if (!node->value()->expressionType()) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of array value."
@@ -1056,7 +1058,7 @@ namespace types {
         }
         if (node->count()->expressionType()) {
             if (node->count()->expressionType().value()->name() != "i32") {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Array repeat count must be of type 'i32', but got '" +
@@ -1065,7 +1067,7 @@ namespace types {
                 return;
             }
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine type of array repeat count."
@@ -1091,7 +1093,7 @@ namespace types {
                 if (element->expressionType()) {
                     elementType = element->expressionType().value();
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Could not determine type of array element."
@@ -1102,7 +1104,7 @@ namespace types {
                 type_check_base(element.get(), context);
                 if (element->expressionType()) {
                     if (element->expressionType().value()->name() != elementType->name()) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             node->expressionToken(),
                             "Type mismatch in array initializer: expected element of type '" +
@@ -1114,7 +1116,7 @@ namespace types {
                         types::TypeRegistry::getArrayType(element->expressionType().value(), node->elements().size()).
                         value());
                 } else {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Could not determine type of array element."
@@ -1124,7 +1126,7 @@ namespace types {
             }
         }
         if (node->elements().empty()) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Array initializer cannot be empty."
@@ -1139,7 +1141,7 @@ namespace types {
         type_check_base(node->index(), context);
         const auto varType = node->accessNode()->expressionType();
         if (!varType) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Type of the array access expression could not be determined."
@@ -1152,7 +1154,7 @@ namespace types {
         } else if (const auto pointerType = dynamic_cast<PointerType *>(varType.value().get())) {
             node->setExpressionType(pointerType->baseType());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Type '" + varType.value()->name() + "' is not an array or pointer type."
@@ -1161,7 +1163,7 @@ namespace types {
         }
         if (node->expressionType() && node->value()->expressionType()) {
             if (node->expressionType().value()->name() != node->value()->expressionType().value()->name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in array assignment: array element is of type '" +
@@ -1171,7 +1173,7 @@ namespace types {
                 return;
             }
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types in array assignment."
@@ -1185,7 +1187,7 @@ namespace types {
         type_check_base(node->index(), context);
         const auto varType = node->accessExpression()->expressionType();
         if (!varType) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Type of the array access expression could not be determined."
@@ -1198,7 +1200,7 @@ namespace types {
         } else if (const auto pointerType = dynamic_cast<PointerType *>(varType.value().get())) {
             node->setExpressionType(pointerType->baseType());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Type '" + varType.value()->name() + "' is not an array or pointer type."
@@ -1220,7 +1222,7 @@ namespace types {
             return;
         }
         if (!var) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
@@ -1231,7 +1233,7 @@ namespace types {
             node->setExpressionType(var->type);
             node->setConstant(var->constant);
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Variable '" + node->expressionToken().lexical() + "' has no type information."
@@ -1248,7 +1250,7 @@ namespace types {
 
         if (node->lhs()->expressionType() && node->rhs()->expressionType()) {
             if (node->lhs()->expressionType().value()->name() != node->rhs()->expressionType().value()->name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in binary expression: left is of type '" +
@@ -1261,7 +1263,7 @@ namespace types {
             if (node->lhs()->expressionType())
                 node->setExpressionType(node->lhs()->expressionType().value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Could not determine types of operands in binary expression."
@@ -1277,7 +1279,7 @@ namespace types {
         //  find function
         if (node->functionName() == "println") {
             if (node->args().size() != 1) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "'println' expects exactly one argument."
@@ -1289,7 +1291,7 @@ namespace types {
             return;
         } else if (node->functionName() == "printf") {
             if (node->args().empty()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "'printf' expects at least one argument."
@@ -1301,7 +1303,7 @@ namespace types {
             return;
         } else if (node->functionName() == "sizeof") {
             if (!node->args().empty()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "'sizeof' expects exactly zero arguments."
@@ -1309,7 +1311,7 @@ namespace types {
                 return;
             }
             if (node->genericParam() == std::nullopt) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "'sizeof' requires a generic type parameter."
@@ -1331,7 +1333,7 @@ namespace types {
             messages.clear();
             if (funcDef->functionName() == node->functionName()) {
                 if (funcDef->args().size() != node->args().size()) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Function '" + node->functionName() + "' expects " +
@@ -1392,7 +1394,7 @@ namespace types {
         if (const auto var = context.currentScope->findVariable(node->functionName())) {
             if (const auto funcType = std::dynamic_pointer_cast<types::FunctionType>(var->type)) {
                 if (funcType->argumentTypes().size() != node->args().size()) {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Function variable '" + node->functionName() + "' expects " +
@@ -1425,7 +1427,7 @@ namespace types {
                     }
                 }
             } else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "'" + node->functionName() + "' is not a function."
@@ -1437,19 +1439,19 @@ namespace types {
         if (!functionMatchFound) {
             if (lastFunctionDefinition) {
                 // there was a function with the same name but different arguments
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Function '" + node->functionName() + "' called with incorrect arguments."
                 });
                 for (const auto &msg: messages) {
-                    context.messages.push_back(msg);
+                    context.messages.insert(msg);
                 }
                 return;
             }
         }
 
-        context.messages.push_back({
+        context.messages.insert({
             parser::OutputType::ERROR,
             node->expressionToken(),
             "Function '" + node->functionSignature() + "' is not declared."
@@ -1458,22 +1460,69 @@ namespace types {
         // Further type checking logic would go here...
     }
 
-    void type_check(const ast::ReturnStatement *node, Context &context) {
-        if (node->returnValue()) {
+    void type_check(ast::ReturnStatement *node, Context &context) {
+        if (node->returnValue())
+        {
             type_check_base(node->returnValue().value(), context);
-            if (auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
+            if (const auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
             {
-                auto field = reference->fieldName().lexical();
-                auto var = context.currentScope->findVariable(field,false);
+                const auto field = reference->fieldName().lexical();
+                const auto var = context.currentScope->findVariable(field,false);
                 if (!reference->constant() && var)
                 {
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->returnValue().value()->expressionToken(),
                         "Cannot return a reference for a mutable local variable."
                     });
                 }
             }
+            node->setExpressionType(node->returnValue().value()->expressionType().value());
+        }else
+        {
+            node->setExpressionType(context.currentScope->getTypeByName("void").value());
+        }
+        if (context.currentFunction)
+        {
+
+            if (const auto returnType = context.currentFunction->expressionType()) {
+                if (node->returnValue()) {
+                    if (!node->returnValue().value()->expressionType()) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->returnValue().value()->expressionToken(),
+                            "Could not determine type of return value in function '" + context.currentFunction->functionName() + "'."
+                        });
+                    } else if (node->expressionType() && *returnType.value() != *node->expressionType().value()) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->returnValue().value()->expressionToken(),
+                            "Type mismatch in return statement of function '" + context.currentFunction->functionName() +
+                            "': expected '" +
+                            returnType.value()->name() +
+                            "', but got '" +
+                            node->returnValue().value()->expressionType().value()->name() + "'."
+                        });
+                    }
+                } else {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Return statement in function '" + context.currentFunction->functionName() +
+                        "' must return a value of type '" +
+                        context.currentFunction->returnType().value()->fullTypeName() + "'."
+                    });
+                }
+            } else {
+                if (node->returnValue()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->returnValue().value()->expressionToken(),
+                        "Return statement in void function '" + context.currentFunction->functionName() + "' must not return a value."
+                    });
+                }
+            }
+
         }
     }
 
@@ -1481,7 +1530,7 @@ namespace types {
     void type_check(ast::VariableDeclaration *node, Context &context) {
         const auto varType = resolveFromRawType(node->type(), context.currentScope, true);
         if (!varType) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Unknown type '" + node->type()->fullTypeName() + "' for variable '" + node->expressionToken().
@@ -1494,7 +1543,7 @@ namespace types {
 
         const auto varName = node->expressionToken().lexical();
         if (context.currentScope->findVariable(varName)) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Variable '" + varName + "' is already declared in this scope."
@@ -1512,7 +1561,7 @@ namespace types {
             const auto initalType = node->initialValue().value()->expressionType();
             const auto declaredType = node->expressionType();
             if (!initalType) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->initialValue().value()->expressionToken(),
                     "Could not determine type of initial value for variable '" + node->expressionToken().
@@ -1521,7 +1570,7 @@ namespace types {
                 });
             }
             if (initalType && declaredType && initalType.value()->name() != declaredType.value()->name()) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->initialValue().value()->expressionToken(),
                     "Type mismatch in variable initialization: variable '" + node->expressionToken().lexical() +
@@ -1539,7 +1588,7 @@ namespace types {
                 if (slice->name() =="slice")
                 {
                     // global string slices must be constant
-                    context.messages.push_back({
+                    context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Global string slices must be declared as constant."
@@ -1557,7 +1606,7 @@ namespace types {
         // check whenever the variable exists
         const auto var = context.currentScope->findVariable(node->expressionToken().lexical());
         if (!var) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Variable '" + node->expressionToken().lexical() + "' is not declared in this scope."
@@ -1565,7 +1614,7 @@ namespace types {
             return;
         }
         if (var->constant) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Cannot assign to constant variable '" + node->expressionToken().lexical() + "'."
@@ -1590,7 +1639,7 @@ namespace types {
             if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
                 node->setExpressionType(returnType.value());
             else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function retu."
@@ -1603,7 +1652,7 @@ namespace types {
         for (auto &arg: node->args()) {
             arg.type = resolveFromRawType(arg.rawType.get(), context.currentScope);
             if (!arg.type) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Unknown type '" + arg.rawType->fullTypeName() + "' for argument '" + arg.name.lexical() + "'."
@@ -1614,6 +1663,7 @@ namespace types {
                                               });
         }
         bool hasReturnStatement = false;
+        context.currentFunction = node;
         for (auto &stmt: node->statements()) {
             type_check_base(stmt.get(), context);
             if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
@@ -1621,7 +1671,7 @@ namespace types {
                 if (node->returnType()) {
                     if (returnStatement->returnValue()) {
                         if (!returnStatement->returnValue().value()->expressionType()) {
-                            context.messages.push_back({
+                            context.messages.insert({
                                 parser::OutputType::ERROR,
                                 returnStatement->returnValue().value()->expressionToken(),
                                 "Could not determine type of return value in function '" + node->functionName() + "'."
@@ -1630,7 +1680,7 @@ namespace types {
                                    value()
                                    != *node->
                                    expressionType().value()) {
-                            context.messages.push_back({
+                            context.messages.insert({
                                 parser::OutputType::ERROR,
                                 returnStatement->returnValue().value()->expressionToken(),
                                 "Type mismatch in return statement of function '" + node->functionName() +
@@ -1641,7 +1691,7 @@ namespace types {
                             });
                         }
                     } else {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             returnStatement->expressionToken(),
                             "Return statement in function '" + node->functionName() +
@@ -1651,7 +1701,7 @@ namespace types {
                     }
                 } else {
                     if (returnStatement->returnValue()) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             returnStatement->returnValue().value()->expressionToken(),
                             "Return statement in void function '" + node->functionName() + "' must not return a value."
@@ -1660,12 +1710,12 @@ namespace types {
                 }
             }
         }
-
+        context.currentFunction = nullptr;
         context.currentScope = context.currentScope->parentScope();
         if (node->functionName() == "main" and (!node->returnType() or node->returnType().value()->fullTypeName() !=
                                                 "i32")) {
             // main function must return i32
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "The 'main' function must have a return type of 'i32'."
@@ -1673,7 +1723,7 @@ namespace types {
         }
 
         if (node->returnType() and node->returnType().value()->fullTypeName() != "void" and !hasReturnStatement) {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
                 "Function '" + node->functionName() + "' must have a return statement."
@@ -1695,7 +1745,7 @@ namespace types {
         for (auto &arg: node->args()) {
             arg.type = resolveFromRawType(arg.rawType.get(), context.currentScope);
             if (!arg.type) {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Unknown type '" + arg.rawType->fullTypeName() + "' for argument '" + arg.name.lexical() + "'."
@@ -1709,7 +1759,7 @@ namespace types {
             if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
                 node->setExpressionType(returnType.value());
             else {
-                context.messages.push_back({
+                context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function return."
@@ -1730,7 +1780,7 @@ namespace types {
         if (const auto intLiteral = dynamic_cast<ast::NumberConstant *>(value->get())) {
             return std::get<int64_t>(intLiteral->value());
         } else {
-            context.messages.push_back({
+            context.messages.insert({
                 parser::OutputType::ERROR,
                 value->get()->expressionToken(),
                 "Enum variant value must be an integer literal."
@@ -1764,7 +1814,7 @@ namespace types {
                 for (const auto &[name, type]: structDecl->fields()) {
                     const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
                     if (!fieldType) {
-                        context.messages.push_back({
+                        context.messages.insert({
                             parser::OutputType::ERROR,
                             type->typeToken,
                             "Unknown type '" + type->typeToken.lexical() + "' for field '" + name.lexical() +
@@ -1820,7 +1870,7 @@ namespace types {
     void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result) {
         Context context;
         type_check(module, context, result);
-        result.messages = std::move(context.messages);
+        std::ranges::copy(context.messages, std::back_inserter(result.messages));
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
     }
 }

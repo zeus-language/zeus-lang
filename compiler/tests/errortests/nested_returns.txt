@@ -1,0 +1,6 @@
+FILENAME:4:16: error: Type mismatch in return statement of function 'nested': expected 'i32', but got 'float'.
+        return x;
+               ^
+FILENAME:6:16: error: Type mismatch in return statement of function 'nested': expected 'i32', but got 'slice'.
+        return y;
+               ^
