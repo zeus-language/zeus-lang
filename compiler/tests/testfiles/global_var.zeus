@@ -1,0 +1,23 @@
+use std::io;
+use std::str;
+
+let mut GLOBAL_VAR: i32 = 42;
+let mut GLOBAL_FLOAT: float = 0.123f;
+
+
+fn print_global_var() :void{
+    let mut output : string = "Global int: ${GLOBAL_VAR}";
+    println(output.as_c_str());
+    destroy(&output);
+    let mut output2 :string = "Global float: ${GLOBAL_FLOAT}";
+    println(output2.as_c_str());
+    destroy(&output2);
+}
+
+fn main() : i32 {
+    print_global_var();
+    GLOBAL_VAR = 100;
+    GLOBAL_FLOAT = 13.14f;
+    print_global_var();
+    return 0;
+}

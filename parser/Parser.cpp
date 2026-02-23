@@ -89,7 +89,8 @@ namespace parser
 
         ostream << token.source_location.sourceline() << "\n";
         const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-        const size_t endOffset = std::min(token.source_location.num_bytes, token.source_location.lineEnd() - token.source_location.byte_offset);
+        const size_t endOffset = std::min(token.source_location.num_bytes,
+                                          token.source_location.lineEnd() - token.source_location.byte_offset);
 
         ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
                         static_cast<int>(endOffset)) <<
@@ -104,6 +105,7 @@ namespace parser
         std::vector<std::unique_ptr<ast::RawAnnotation> > m_pendingAnnotations;
         std::vector<std::unique_ptr<ast::ASTNode> > m_blockNodes;
         std::vector<std::unique_ptr<ast::ASTNode> > m_deferedNodes;
+        size_t m_currentTempVarIndex = 0;
 
     public:
         explicit Parser(std::vector<Token> tokens) : m_tokens(std::move(tokens))
@@ -214,23 +216,26 @@ namespace parser
             Token stringToken = current();
             consume(Token::INTERPOLATED_STRING);
             std::vector<std::unique_ptr<ast::ASTNode> > parts;
-            Token tempToken = Token("temp",Token::IDENTIFIER, stringToken.source_location);
+            auto tempVarName = "temp" + std::to_string(m_currentTempVarIndex++);
+            Token tempToken = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
             Token typeToken = Token("string", Token::IDENTIFIER, stringToken.source_location);
             bool constant = false;
-            auto type = std::make_unique<ast::RawType>(typeToken, std::vector<Token>{}, ast::TypeModifier::NONE, std::nullopt);
+            auto type = std::make_unique<ast::RawType>(typeToken, std::vector<Token>{}, ast::TypeModifier::NONE,
+                                                       std::nullopt);
             auto tempString = std::make_unique<ast::VariableDeclaration>(std::move(tempToken), std::move(type),
-                                                              constant, std::nullopt);
-            m_blockNodes.push_back(std::move(tempString));
-            {
+                                                                         constant, std::nullopt);
+            m_blockNodes.push_back(std::move(tempString)); {
                 auto stringConstant = std::make_unique<ast::StringConstant>(stringToken);
                 auto args = std::vector<std::unique_ptr<ast::ASTNode> >();
                 args.push_back(std::move(stringConstant));
-                Token tempToken = Token("temp",Token::IDENTIFIER, stringToken.source_location);
+                Token tempToken = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
                 Token appendToken = Token("append", Token::IDENTIFIER, stringToken.source_location);
                 auto accessNode = std::make_unique<ast::VariableAccess>(tempToken);
                 auto instanceNode = std::make_unique<ast::ReferenceAccess>(accessNode->expressionToken(),
-                                                   std::move(accessNode));
-                m_blockNodes.push_back(std::make_unique<ast::MethodCallNode>( std::move(appendToken),std::move(instanceNode), std::move(args)));
+                                                                           std::move(accessNode));
+                m_blockNodes.push_back(
+                        std::make_unique<ast::MethodCallNode>(std::move(appendToken), std::move(instanceNode),
+                                                              std::move(args)));
 
             }
             while (canConsume(Token::INTERPOLATION_START) || canConsume(Token::INTERPOLATED_STRING))
@@ -242,25 +247,31 @@ namespace parser
                     auto stringConstant = std::make_unique<ast::StringConstant>(partToken);
                     auto args = std::vector<std::unique_ptr<ast::ASTNode> >();
                     args.push_back(std::move(stringConstant));
-                    Token tempToken = Token("temp",Token::IDENTIFIER, stringToken.source_location);
+                    Token tempToken = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
                     Token appendToken = Token("append", Token::IDENTIFIER, stringToken.source_location);
                     auto accessNode = std::make_unique<ast::VariableAccess>(tempToken);
                     auto instanceNode = std::make_unique<ast::ReferenceAccess>(accessNode->expressionToken(),
-                                                       std::move(accessNode));
-                    m_blockNodes.push_back(std::make_unique<ast::MethodCallNode>( std::move(appendToken),std::move(instanceNode), std::move(args)));
+                                                                               std::move(accessNode));
+                    m_blockNodes.push_back(
+                            std::make_unique<ast::MethodCallNode>(std::move(appendToken), std::move(instanceNode),
+                                                                  std::move(args)));
 
-                }else if (tryConsume(Token::INTERPOLATION_START)) {
+                }
+                else if (tryConsume(Token::INTERPOLATION_START))
+                {
                     if (auto expr = parseExpression(true))
                     {
                         auto args = std::vector<std::unique_ptr<ast::ASTNode> >();
                         args.push_back(std::move(expr.value()));
-                        Token tempToken = Token("temp",Token::IDENTIFIER, stringToken.source_location);
+                        Token tempToken = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
                         Token appendToken = Token("append", Token::IDENTIFIER, stringToken.source_location);
 
                         auto accessNode = std::make_unique<ast::VariableAccess>(tempToken);
                         auto instanceNode = std::make_unique<ast::ReferenceAccess>(accessNode->expressionToken(),
-                                                           std::move(accessNode));
-                        m_blockNodes.push_back(std::make_unique<ast::MethodCallNode>( std::move(appendToken),std::move(instanceNode), std::move(args)));
+                            std::move(accessNode));
+                        m_blockNodes.push_back(
+                                std::make_unique<ast::MethodCallNode>(std::move(appendToken), std::move(instanceNode),
+                                                                      std::move(args)));
                     }
                     consume(Token::INTERPOLATION_END);
                 }
@@ -275,7 +286,7 @@ namespace parser
                 }
             }
 
-            Token token = Token("temp",Token::IDENTIFIER, stringToken.source_location);
+            Token token = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
             return std::make_unique<ast::VariableAccess>(token);
         }
 
@@ -1302,6 +1313,8 @@ namespace parser
                                                               std::move(value));
         }
 
+
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseIfCondition()
         {
             if (!canConsumeKeyWord("if"))
@@ -1569,10 +1582,10 @@ namespace parser
             consume(Token::Type::CLOSE_BRACE);
 
             nodes.insert(
-                nodes.end(),
-                std::make_move_iterator(m_blockNodes.begin()),
-                std::make_move_iterator(m_blockNodes.end())
-            );
+                    nodes.end(),
+                    std::make_move_iterator(m_blockNodes.begin()),
+                    std::make_move_iterator(m_blockNodes.end())
+                    );
             // for (auto &node: m_deferedNodes)
             // {
             //     nodes.push_back(std::move(node));
@@ -2161,6 +2174,10 @@ namespace parser
                 else if (auto functionDef = parseFunctionDefinition())
                 {
                     module->functions.push_back(std::move(functionDef.value()));
+                }
+                else if (auto varDecl = parseVariableDeclaration())
+                {
+                    module->nodes.push_back(std::move(varDecl.value()));
                 }
                 else if (auto externType = parseExternType())
                 {

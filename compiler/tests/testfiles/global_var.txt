@@ -1,0 +1,4 @@
+Global int: 42
+Global float: 0.123000003
+Global int: 100
+Global float: 13.140000343

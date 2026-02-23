@@ -1,0 +1,2 @@
+Number constant: 42
+String constant: Hello, World!

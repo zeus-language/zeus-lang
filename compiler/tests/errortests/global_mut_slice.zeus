@@ -1,0 +1,9 @@
+
+
+let mut GLOBAL: [u8] = "Hello, World!";
+
+fn main() :i32 {
+
+    GLOBAL.data[0] = 'h';
+    return 0;
+}

@@ -1531,6 +1531,24 @@ namespace types {
                 });
             }
         }
+
+        if (context.currentScope->isGlobalScope() && !node->constant() && varType)
+        {
+            if (const auto slice = dynamic_cast<types::StructType*>(varType.value().get()))
+            {
+                if (slice->name() =="slice")
+                {
+                    // global string slices must be constant
+                    context.messages.push_back({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Global string slices must be declared as constant."
+                    });
+                }
+                // global string slices are allowed, but they must be constant
+                return;
+            }
+        }
     }
 
 

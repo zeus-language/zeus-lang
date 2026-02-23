@@ -42,5 +42,7 @@ namespace types {
         std::shared_ptr<Scope> parentScope() { return m_parentScope; }
 
         std::vector<std::shared_ptr<VariableType> > registeredTypes();
+
+         [[nodiscard]] bool isGlobalScope() const;
     };
 }

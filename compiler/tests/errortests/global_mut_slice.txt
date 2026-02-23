@@ -1,0 +1,3 @@
+FILENAME:3:9: error: Global string slices must be declared as constant.
+let mut GLOBAL: [u8] = "Hello, World!";
+        ^-----
