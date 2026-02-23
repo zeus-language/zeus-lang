@@ -55,6 +55,15 @@ namespace parser {
         std::string message;
 
         void msg(std::ostream &ostream, bool printColor) const;
+        int operator<(const ParserMessasge& other) const {
+            if (message != other.message) {
+                return message < other.message;
+            }
+            if (token.source_location.row == other.token.source_location.row) {
+                return token.source_location.col < other.token.source_location.col;
+            }
+            return token.source_location.row < other.token.source_location.row;
+        }
     };
 
     struct Module;
