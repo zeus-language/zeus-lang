@@ -486,7 +486,18 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,st
         item.insertText = insertText;
         item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
         item.insertTextFormat = lsp::InsertTextFormat::Snippet;
-        item.kind = lsp::CompletionItemKind::Function;
+        if (auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(function)) {
+            if (funcDef->isMethod()) {
+                item.kind = lsp::CompletionItemKind::Method;
+            } else
+            {
+                item.kind = lsp::CompletionItemKind::Function;
+            }
+        } else
+        {
+            item.kind = lsp::CompletionItemKind::Function;
+        }
+
         item.detail = nsPrefix+function->functionSignature(false);
         addToCompletionListIfMatches(std::move(item), completions);
     }
@@ -549,7 +560,7 @@ bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result
             if (fieldAccess->expressionType()) {
                 if (auto structType = std::dynamic_pointer_cast<types::StructType>(
                     fieldAccess->expressionType().value())) {
-                    for (const auto &[type, name]: structType->fields()) {
+                    for (const auto &[visibility,type, name]: structType->fields()) {
                         lsp::CompletionItem item;
                         item.label = name;
                         item.kind = lsp::CompletionItemKind::Field;

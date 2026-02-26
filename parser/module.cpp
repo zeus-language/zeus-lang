@@ -49,14 +49,6 @@ namespace modules {
                 module->aliasName = useModule->aliasName();
                 for (auto &function: module->functions) {
                     function->setModulePath(useModule->modulePath());
-                    // if (funcDef->isPrivate()) {
-                    //     result.messages.push_back(parser::ParserMessasge{
-                    //         .outputType = parser::OutputType::ERROR,
-                    //         .token = funcDef->expressionToken(),
-                    //         .message = "Cannot use private function '" + funcDef->functionName() +
-                    //                    "' from module '" + fullPath.string() + "'!"
-                    //     });
-                    // }
                 }
                 result.module->modules.push_back(module);
                 moduleLoadedSuccessfully = true;

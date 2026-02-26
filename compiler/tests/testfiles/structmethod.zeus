@@ -3,11 +3,11 @@ struct Vec2{
     x: float,
     y: float,
 
-     fn multiply(self: &Vec2, other: Vec2) : Vec2 {
+     pub fn multiply(self: &Vec2, other: Vec2) : Vec2 {
         return Vec2 { x: self.x * other.x, y: self.y * other.y };
      }
 
-     fn print(self: &Vec2): void {
+     pub fn print(self: &Vec2): void {
         println(self.x);
         println(self.y);
      }

@@ -1,19 +1,19 @@
 
 
-extern fn malloc(size: u64) : *u8;
-extern fn realloc(ptr: *u8, size: u64) : *u8;
-extern fn free(ptr: *u8) : void;
-extern fn memcpy(dest: *u8, src: *u8, n: u64) : void;
-extern fn println(msg: *u8) : void;
-extern fn puts(msg: *u8) : i32;
-extern fn exit(code: i32) : void;
+extern pub fn malloc(size: u64) : *u8;
+extern pub fn realloc(ptr: *u8, size: u64) : *u8;
+extern pub fn free(ptr: *u8) : void;
+extern pub fn memcpy(dest: *u8, src: *u8, n: u64) : void;
+extern pub fn println(msg: *u8) : void;
+extern pub fn puts(msg: *u8) : i32;
+extern pub fn exit(code: i32) : void;
 
-extern fn strlen(s: *u8) : u64;
-extern fn strcmp(s1: *u8, s2: *u8) : i32;
-extern fn strcpy(dest: *u8, src: *u8) : *u8;
+extern pub fn strlen(s: *u8) : u64;
+extern pub fn strcmp(s1: *u8, s2: *u8) : i32;
+extern pub fn strcpy(dest: *u8, src: *u8) : *u8;
 
 // file api
 extern type FILE;
-extern fn fopen(filename: *u8, mode: *u8) : *FILE;
-extern fn fclose(file: *FILE) : i32;
-extern fn fgets(buf: *u8, size: i32, file: *FILE) : *u8;
+extern pub fn fopen(filename: *u8, mode: *u8) : *FILE;
+extern pub fn fclose(file: *FILE) : i32;
+extern pub fn fgets(buf: *u8, size: i32, file: *FILE) : *u8;

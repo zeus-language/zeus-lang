@@ -5,13 +5,14 @@
 #include "ast/FunctionDefinition.h"
 
 namespace ast {
-    FunctionDefinition::FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+    FunctionDefinition::FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
                                            std::optional<std::unique_ptr<RawType> > returnType,
                                            std::vector<std::unique_ptr<ASTNode> > statements,
                                            std::optional<Token> genericParam,
-                                           std::vector<std::unique_ptr<RawAnnotation> > annotations)
-        : FunctionDefinitionBase(std::move(functionName), std::move(args), std::move(returnType),
-                                 std::move(annotations)),
+                                           std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                        const VisibilityModifier visibilityModifier)
+        : FunctionDefinitionBase(functionName, std::move(args), std::move(returnType),
+                                 std::move(annotations),visibilityModifier),
           m_statements(std::move(statements)), genericParam(std::move(genericParam)) {
     }
 
@@ -27,9 +28,14 @@ namespace ast {
     }
 
     std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
+        return cloneFunction2();
+    }
+
+    std::unique_ptr<ast::FunctionDefinition> FunctionDefinition::cloneFunction2()
+    {
         auto returnTypeClone = returnType().has_value()
-                                   ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
-                                   : std::nullopt;
+                                 ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                 : std::nullopt;
         std::vector<std::unique_ptr<ASTNode> > statementsClones;
         for (auto &stmt: m_statements) {
             statementsClones.push_back(stmt->clone());
@@ -43,10 +49,15 @@ namespace ast {
                                                               std::move(returnTypeClone),
                                                               std::move(statementsClones),
                                                               genericParam,
-                                                              std::move(annotationsClones));
+                                                              std::move(annotationsClones),
+                                                              visibilityModifier());
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return cloneNode;
+    }
+
+    bool FunctionDefinition::isMethod() const{
+        return m_parentStruct.has_value();
     }
 
     std::string FunctionDefinitionBase::functionName() const {

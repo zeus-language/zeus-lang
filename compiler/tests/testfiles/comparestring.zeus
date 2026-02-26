@@ -23,9 +23,9 @@ fn main() : i32 {
     } else {
         println("a and d are not equal.");
     }
-    destroy(&a);
-    destroy(&b);
-    destroy(&c);
-    destroy(&d);
+    a.destroy();
+    b.destroy();
+    c.destroy();
+    d.destroy();
     return 0;
 }

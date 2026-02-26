@@ -31,7 +31,7 @@ namespace ast {
         std::optional<std::unique_ptr<RawType> > m_returnType;
         std::vector<Token> m_namespacePrefix;
         std::vector<std::unique_ptr<RawAnnotation> > m_rawAnnotations;
-
+        VisibilityModifier m_visibilityModifier = VisibilityModifier::PRIVATE;
     public:
         [[nodiscard]] std::optional<RawType *> returnType() const {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
@@ -73,18 +73,23 @@ namespace ast {
             return m_rawAnnotations;
         }
 
-        explicit FunctionDefinitionBase(Token functionName, std::vector<FunctionArgument> args,
+        explicit FunctionDefinitionBase(const Token& functionName, std::vector<FunctionArgument> args,
                                         std::optional<std::unique_ptr<RawType> > returnType,
-                                        std::vector<std::unique_ptr<RawAnnotation> > annotations) : AnnotatedNode(
-                std::move(
-                    functionName)),
+                                        std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                        const VisibilityModifier visibilityModifier) : AnnotatedNode(
+                functionName),
             m_functionName(expressionToken().lexical()),
             m_args(std::move(args)),
             m_returnType(std::move(returnType)),
-            m_rawAnnotations(std::move(annotations)) {
+            m_rawAnnotations(std::move(annotations)),
+            m_visibilityModifier(visibilityModifier) {
         }
 
         [[nodiscard]] std::string functionSignature(bool withNamespace = true) const;
+
+        [[nodiscard]] VisibilityModifier visibilityModifier() const {
+            return m_visibilityModifier;
+        }
 
         virtual std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() = 0;
     };
@@ -92,13 +97,15 @@ namespace ast {
     class FunctionDefinition final : public FunctionDefinitionBase {
         std::vector<std::unique_ptr<ASTNode> > m_statements;
         std::optional<Token> genericParam;
-
+        std::optional<types::VariableType*> m_parentStruct = std::nullopt;
     public:
-        explicit FunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+        explicit FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
                                     std::optional<std::unique_ptr<RawType> > returnType,
                                     std::vector<std::unique_ptr<ASTNode> > statements,
                                     std::optional<Token> genericParam,
-                                    std::vector<std::unique_ptr<RawAnnotation> > annotations);
+                                    std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                        const VisibilityModifier visibilityModifier
+                                        );
 
         ~FunctionDefinition() override = default;
 
@@ -120,6 +127,16 @@ namespace ast {
             return genericParam;
         }
         std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
+        std::unique_ptr<ast::FunctionDefinition> cloneFunction2();
+
+        [[nodiscard]] bool isMethod() const ;
+        [[nodiscard]] std::optional<types::VariableType*> parentStruct() const {
+            return m_parentStruct;
+        }
+
+        void setParentStruct(types::VariableType* structType) {
+            m_parentStruct = std::make_optional(structType);
+        }
     };
 } // ast
 

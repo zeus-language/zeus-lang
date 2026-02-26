@@ -35,7 +35,7 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSli
             .name = "data"
         }
     };
-    std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods = {
+    std::vector<std::unique_ptr<ast::FunctionDefinition> > methods = {
 
     };
     std::optional<std::shared_ptr<VariableType> > genericParam;

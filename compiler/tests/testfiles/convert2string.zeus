@@ -23,12 +23,12 @@ fn main() : i32 {
     let pos_double_num: double = 987654.321098;
     let str_pos_double_num: string = double_to_str(pos_double_num);
     println2("The string representation of {}", &str_pos_double_num);
-    destroy(&str_num);
-    destroy(&str_pos_num);
-    destroy(&str_float_num);
-    destroy(&str_pos_float_num);
-    destroy(&str_double_num);
-    destroy(&str_pos_double_num);
+    str_num.destroy();
+    str_pos_num.destroy();
+    str_float_num.destroy();
+    str_pos_float_num.destroy();
+    str_double_num.destroy();
+    str_pos_double_num.destroy();
     return 0;
 
 

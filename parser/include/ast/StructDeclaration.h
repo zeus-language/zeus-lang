@@ -6,6 +6,7 @@
 
 namespace ast {
     struct StructField {
+        VisibilityModifier visibilityModifier;
         Token name;
         std::unique_ptr<RawType> type;
     };
@@ -13,12 +14,12 @@ namespace ast {
     class StructDeclaration final : public ASTNode {
     private:
         std::vector<StructField> m_fields;
-        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > m_methods;
+        std::vector<std::unique_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<Token> m_genericParam;
 
     public:
         StructDeclaration(Token name, std::vector<StructField> fields,
-                          std::vector<std::unique_ptr<ast::FunctionDefinitionBase> >
+                          std::vector<std::unique_ptr<ast::FunctionDefinition> >
                           methods, std::optional<Token> genericParam) : ASTNode(std::move(name)),
                                                                         m_fields(std::move(fields)),
                                                                         m_methods(std::move(methods)),
@@ -36,7 +37,7 @@ namespace ast {
         StructDeclaration &operator=(const StructDeclaration &) = delete;
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
-        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > &methods() { return m_methods; }
+        std::vector<std::unique_ptr<ast::FunctionDefinition> > &methods() { return m_methods; }
 
         [[nodiscard]] std::optional<Token> genericParam() const { return m_genericParam; }
         std::unique_ptr<ASTNode> clone() override;
@@ -50,9 +51,9 @@ namespace ast {
                 .type = field.type->clone()
             });
         }
-        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methodsClone;
-        for (const auto &method: m_methods) {
-            methodsClone.push_back(method->cloneFunction());
+        std::vector<std::unique_ptr<ast::FunctionDefinition> > methodsClone;
+        for (auto &method: m_methods) {
+            methodsClone.push_back( method->cloneFunction2());
         }
         auto cloneNode = std::make_unique<StructDeclaration>(expressionToken(),
                                                             std::move(fieldsClone),

@@ -265,7 +265,7 @@ namespace llvm_backend
         if (cached_type == nullptr)
         {
             std::vector<llvm::Type *> types;
-            for (const auto &[type, _]: structType->fields())
+            for (const auto &[visibility,type, _]: structType->fields())
             {
                 types.emplace_back(resolveLlvmType(type, context));
             }
@@ -770,7 +770,7 @@ namespace llvm_backend
         const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
         for (size_t i = 0; i < values.size(); i++)
         {
-            const auto [fieldType, fieldName] = type->fields()[i];
+            const auto [visibility,fieldType, fieldName] = type->fields()[i];
             const auto elementPointer =
                     llvmState.Builder->CreateStructGEP(structType, val, i, fieldName);
             const auto llvmFieldType = resolveLlvmType(fieldType, llvmState);
@@ -2757,6 +2757,10 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
             {
                 auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
                 llvm_backend::codegen_functionstub(methodDef, context);
+            }
+            for (auto &method: structType->methods())
+            {
+                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
                 llvm_backend::codegen(dynamic_cast<ast::FunctionDefinition *>(method.get()), context);
             }
         }

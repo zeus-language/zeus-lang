@@ -17,7 +17,7 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
 }
 
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
-                              std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods,
+                              std::vector<std::unique_ptr<ast::FunctionDefinition> > methods,
                               std::optional<std::shared_ptr<VariableType> > genericParam) : VariableType(
         std::move(name),
         TypeKind::STRUCT), m_fields(fields),
@@ -27,7 +27,7 @@ types::StructType::StructType(std::string name, const std::vector<StructField> &
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
 }
 
-const ast::FunctionDefinitionBase * types::StructType::getMethodByName(const std::string &methodName) const {
+const ast::FunctionDefinition * types::StructType::getMethodByName(const std::string &methodName) const {
     for (const auto &method: m_methods) {
         if (method->functionName() == methodName) {
             return method.get();
@@ -44,12 +44,11 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
             field.type = genericParam;
         }
     }
-    std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods;
+    std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
 
     for (const auto &method: this->m_methods) {
-        if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(method.get())) {
-            auto returnType = make_optional(funcDef->returnType().value()->clone());
-            Token token = funcDef->expressionToken();
+            auto returnType = std::make_optional(method->returnType().value()->clone());
+            Token token = method->expressionToken();
             std::vector<ast::FunctionArgument> args;
             for (auto &argOld: method->args()) {
                 auto arg = ast::FunctionArgument(argOld.name, argOld.rawType->clone(), argOld.isConstant);
@@ -64,12 +63,12 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
             }
             std::vector<std::unique_ptr<ast::ASTNode> > statements;
             // Clone statements
-            for (auto &stmtOld: funcDef->statements()) {
+            for (auto &stmtOld: method->statements()) {
                 auto stmtClone = stmtOld->clone();
                 statements.push_back(std::move(stmtClone));
             }
             auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
-            for (auto &annotationOld: funcDef->rawAnnotations()) {
+            for (auto &annotationOld: method->rawAnnotations()) {
                 annotations.push_back(std::move(annotationOld->cloneAnnotation()));
             }
 
@@ -78,9 +77,11 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
                 std::move(args),
                 std::move(returnType),
                 std::move(statements),
-                funcDef->getGenericParam(),
-                std::move(annotations)
+                method->getGenericParam(),
+                std::move(annotations),
+                method->visibilityModifier()
             );
+            functionClone->setParentStruct(this);
 
             if (method->returnType()) {
                 if (method->returnType().value()->genericParam) {
@@ -99,7 +100,7 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
                 stmt->makeNonGeneric(genericParam);
             }
             methods.push_back(std::move(functionClone));
-        }
+
     }
 
     auto structType = std::make_shared<StructType>(VariableType::rawTypeName(), fields, std::move(methods),

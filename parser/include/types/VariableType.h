@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "ast/VisibilityModifier.h"
+
 
 namespace ast {
-    class FunctionDefinitionBase;
+    class FunctionDefinition;
     class IntrinsicFunctionDefinition;
 }
 
@@ -122,6 +124,7 @@ namespace types {
     };
 
     struct StructField {
+        ast::VisibilityModifier visibilityModifier;
         std::shared_ptr<VariableType> type;
         std::string name;
     };
@@ -129,23 +132,23 @@ namespace types {
     class StructType final : public VariableType {
     private:
         std::vector<StructField> m_fields;
-        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > m_methods;
+        std::vector<std::unique_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
         std::string m_typename;
         std::string m_linkageName;
 
     public:
         StructType(std::string name, const std::vector<StructField> &fields,
-                   std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods,
+                   std::vector<std::unique_ptr<ast::FunctionDefinition> > methods,
                    std::optional<std::shared_ptr<VariableType> > genericParam);
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
 
-        [[nodiscard]] const std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > &methods() const {
+        [[nodiscard]] const std::vector<std::unique_ptr<ast::FunctionDefinition> > &methods() const {
             return m_methods;
         }
 
-        [[nodiscard]] const ast::FunctionDefinitionBase* getMethodByName(const std::string &methodName) const;
+        [[nodiscard]] const ast::FunctionDefinition* getMethodByName(const std::string &methodName) const;
 
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {

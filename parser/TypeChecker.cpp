@@ -47,7 +47,7 @@ namespace types {
         std::set<parser::ParserMessasge> messages;
         std::shared_ptr<parser::Module> module;
         std::shared_ptr<Scope> currentScope = std::make_shared<Scope>();
-        ast::FunctionDefinitionBase* currentFunction = nullptr;
+        ast::FunctionDefinition* currentFunction = nullptr;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
             const std::string &name) const {
@@ -74,7 +74,7 @@ namespace types {
                     or (path.empty() and !aliasName2)
                 ) {
                     for (const auto &node: m->functions) {
-                        if (node->functionName() == name) {
+                        if (node->functionName() == name && node->visibilityModifier() == ast::VisibilityModifier::PUBLIC) {
                             result.push_back(node.get());
                         }
                     }
@@ -530,6 +530,19 @@ namespace types {
                 }
 
                 if (allParamsMatch) {
+                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and (!context.currentFunction->isMethod() or
+                        context.currentFunction->parentStruct().value()->name() != structType->name())
+                        ) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Method '" + methodName + "' is private and cannot be accessed from this module."
+                        });
+                        context.currentScope = context.currentScope->parentScope();
+                        return;
+                    }
+
+
                     matchedMethod = method.get();
                     break;
                 }
@@ -754,6 +767,18 @@ namespace types {
                             node->expressionToken(),
                             "Field '" + node->fieldName().lexical() + "' does not exist in struct type '" +
                             structType->name() + "'."
+                        });
+                        return;
+                    }
+                    if (context.currentFunction && context.currentFunction->isMethod() && context.currentFunction->parentStruct() &&
+                        context.currentFunction->parentStruct().value()->name() == structType->name() &&
+                        fieldIt->visibilityModifier == ast::VisibilityModifier::PRIVATE) {
+                        // OK, accessing private field from within the same struct
+                    } else if (fieldIt->visibilityModifier == ast::VisibilityModifier::PRIVATE) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Field '" + node->fieldName().lexical() + "' is private and cannot be accessed from this module."
                         });
                         return;
                     }
@@ -1333,13 +1358,7 @@ namespace types {
             messages.clear();
             if (funcDef->functionName() == node->functionName()) {
                 if (funcDef->args().size() != node->args().size()) {
-                    context.messages.insert({
-                        parser::OutputType::ERROR,
-                        node->expressionToken(),
-                        "Function '" + node->functionName() + "' expects " +
-                        std::to_string(funcDef->args().size()) + " arguments, but got " +
-                        std::to_string(node->args().size()) + "."
-                    });
+
                     continue;
                 }
                 bool argsMatch = true;
@@ -1477,7 +1496,16 @@ namespace types {
                     });
                 }
             }
-            node->setExpressionType(node->returnValue().value()->expressionType().value());
+            if (node->returnValue().value()->expressionType())
+                node->setExpressionType(node->returnValue().value()->expressionType().value());
+            else
+            {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->returnValue().value()->expressionToken(),
+                    "Could not determine type of return value."
+                });
+            }
         }else
         {
             node->setExpressionType(context.currentScope->getTypeByName("void").value());
@@ -1504,7 +1532,7 @@ namespace types {
                             node->returnValue().value()->expressionType().value()->name() + "'."
                         });
                     }
-                } else {
+                } else if (returnType && returnType.value()->name() != "void") {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
@@ -1829,7 +1857,7 @@ namespace types {
                     genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
                     context.currentScope->registerTypeInScope(genericType.value());
                 }
-                for (const auto &[name, type]: structDecl->fields()) {
+                for (const auto &[visibility,name, type]: structDecl->fields()) {
                     const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
                     if (!fieldType) {
                         context.messages.insert({
@@ -1841,11 +1869,12 @@ namespace types {
                         continue;
                     }
                     structFields.push_back({
+                        .visibilityModifier = visibility,
                         .type = fieldType.value(),
                         .name = name.lexical()
                     });
                 }
-                std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods;
+                std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
                 for (auto &method: structDecl->methods()) {
                     methods.push_back(std::move(method));
                 }
@@ -1856,6 +1885,9 @@ namespace types {
 
 
                 context.currentScope->registerType(type);
+                for (const auto &method: type->methods()) {
+                    method->setParentStruct(type.get());
+                }
                 for (const auto &method: type->methods()) {
                     type_check_base(method.get(), context);
                 }

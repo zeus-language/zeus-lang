@@ -1,8 +1,5 @@
 use core::libc;
-fn panic(msg : *u8) : void {
-    printf("Panic: %s\n" as *u8, msg);
-    exit(1);
-}
+use core::utils;
 /**
 * A dynamic array implementation in Zeus
 * @tparam T The type of elements stored in the array
@@ -12,11 +9,11 @@ struct array<T>{
     capacity : i64,
     data : *T,
 
-    fn length(self: &array<T>) : i64 {
+    pub fn length(self: &array<T>) : i64 {
         return self.length;
     }
 
-    fn push(self: mut &array<T>,value : T) : void {
+    pub fn push(self: mut &array<T>,value : T) : void {
         let size_of_t : i64 = sizeof<T>();
         if self.length >= self.capacity {
             // Resize logic (simple doubling strategy)
@@ -42,34 +39,34 @@ struct array<T>{
 //        return data[index];
 //    }
 
-    fn set(self: mut &array<T>,index : i64, value : T) : void {
+    pub fn set(self: mut &array<T>,index : i64, value : T) : void {
         if index < 0 as i64 or index >= self.length {
-            panic("Index out of bounds" as *u8);
+            panic("Index out of bounds");
         }
         self.data[index ] = value;
     }
 
-    fn pop(self: mut &array<T>) : T {
+    pub fn pop(self: mut &array<T>) : T {
         if self.length == 0 as i64 {
-            panic("Pop from empty array" as *u8);
+            panic("Pop from empty array");
         }
         self.length = self.length - 1 as i64;
         return self.data[self.length];
     }
-    fn get(self: &array<T>,index : i64) : T {
+    pub fn get(self: &array<T>,index : i64) : T {
         if index < 0 as i64 or index >= self.length {
-            panic("Index out of bounds" as *u8);
+            panic("Index out of bounds");
         }
 
         let value: T = self.data[index];
         return value;
     }
 
-    fn clear(self: mut &array<T>) : void {
+    pub fn clear(self: mut &array<T>) : void {
         self.length = 0 as i64;
     }
 
-    fn destroy(self: mut &array<T>) : void {
+    pub fn destroy(self: mut &array<T>) : void {
         core::libc::free(self.data as *u8);
         self.data = null as *T;
         self.length = 0 as i64;
@@ -78,6 +75,6 @@ struct array<T>{
     }
 }
 
-fn new_array<T>() : array<T> {
+pub fn new_array<T>() : array<T> {
     return array<T> { data: null, length: 0, capacity: 0 };
 }
