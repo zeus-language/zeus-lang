@@ -1,25 +1,31 @@
+pub fn abs(value : double) : double {
+    if value < 0.0 as double {
+        return 0.0 as double - value;
+    }
+    return value;
+}
 
-fn abs(a : i32, b : i32) : i32 {
+pub fn abs(a : i32, b : i32) : i32 {
     if a < b {
         return b - a;
     }
      return a - b;
 }
-fn max(a : i32, b : i32) : i32 {
+pub fn max(a : i32, b : i32) : i32 {
     if a > b {
         return a;
     }
     return b;
 }
 
-fn min(a : i32, b : i32) : i32 {
+pub fn min(a : i32, b : i32) : i32 {
     if a < b {
         return a;
     }
     return b;
 }
 @extern(libname="m", funcname="sqrtf")
-extern fn sqrtf(x: float) : float;
+extern pub fn sqrtf(x: float) : float;
 
 @extern(libname="m", funcname="sqrt")
-extern fn sqrt(x: double) : double;
+extern pub fn sqrt(x: double) : double;

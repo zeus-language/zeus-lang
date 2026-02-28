@@ -5,11 +5,12 @@
 namespace ast {
     class ExternFunctionDefinition final : public FunctionDefinitionBase {
     public:
-        explicit ExternFunctionDefinition(Token functionName, std::vector<FunctionArgument> args,
+        explicit ExternFunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
                                           std::optional<std::unique_ptr<RawType> > returnType,
                                           std::vector<std::unique_ptr<RawAnnotation> >
-                                          annotations) : FunctionDefinitionBase(
-            std::move(functionName), std::move(args), std::move(returnType), std::move(annotations)) {
+                                          annotations,
+                                        const VisibilityModifier visibilityModifier) : FunctionDefinitionBase(
+            functionName, std::move(args), std::move(returnType), std::move(annotations),visibilityModifier) {
         }
 
         ~ExternFunctionDefinition() override = default;

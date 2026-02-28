@@ -1,0 +1,10 @@
+use internal;
+
+fn main () : i32 {
+    let result : i32 = internal::private_function(); // Error: function is private
+    println(result);
+    let result2 : i32 = private_function(); // Error: function is private
+    println(result);
+
+    return 0;
+}

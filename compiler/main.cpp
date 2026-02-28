@@ -72,6 +72,8 @@ int main(int args, char **argv) {
     std::cerr << "the first argument is not a valid input file\n";
     return 1;
   }
+  options.stdlibDirectories.push_back(file_path.parent_path() / "stdlib");
+  options.stdlibDirectories.push_back(file_path.parent_path() );
   modules::ModuleCache moduleCache(true);
   compiler::parse_and_compile(options,moduleCache, file_path, std::cerr, std::cout);
 

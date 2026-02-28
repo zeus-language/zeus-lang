@@ -16,7 +16,8 @@ namespace ast {
         auto cloneNode = std::make_unique<ExternFunctionDefinition>(expressionToken(),
                                                                     args(),
                                                                     std::move(returnTypeClone),
-                                                                    std::move(annotationsClones));
+                                                                    std::move(annotationsClones),
+                                                                    visibilityModifier());
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return cloneNode;

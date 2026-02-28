@@ -86,9 +86,23 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
     const lsp::Uri &uri,
     const std::string &text) {
     std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
-    const auto tokens = lexer::lex_file(std::string(uri.path()), text);
+
+    const  std::filesystem::path file_path(uri.path());
+    const std::filesystem::path parentDir = file_path.parent_path();
+    const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
     auto result = parser::parse_tokens(tokens);
-    modules::include_modules(rtlDirectories,moduleCache, result);
+    std::vector<std::filesystem::path> includeDirs;
+    for (auto &dir: rtlDirectories) {
+        if (std::filesystem::exists(dir)) {
+            includeDirs.push_back(dir);
+        }
+    }
+    includeDirs.push_back(parentDir);
+    for (auto &tmpDir : includeDirs) {
+        std::cerr << "Warning: Include directory '" << tmpDir.string() << "' !\n";
+
+    }
+    modules::include_modules(includeDirs,moduleCache, result);
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, type_check_result);
@@ -486,7 +500,18 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,st
         item.insertText = insertText;
         item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
         item.insertTextFormat = lsp::InsertTextFormat::Snippet;
-        item.kind = lsp::CompletionItemKind::Function;
+        if (auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(function)) {
+            if (funcDef->isMethod()) {
+                item.kind = lsp::CompletionItemKind::Method;
+            } else
+            {
+                item.kind = lsp::CompletionItemKind::Function;
+            }
+        } else
+        {
+            item.kind = lsp::CompletionItemKind::Function;
+        }
+
         item.detail = nsPrefix+function->functionSignature(false);
         addToCompletionListIfMatches(std::move(item), completions);
     }
@@ -549,7 +574,7 @@ bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result
             if (fieldAccess->expressionType()) {
                 if (auto structType = std::dynamic_pointer_cast<types::StructType>(
                     fieldAccess->expressionType().value())) {
-                    for (const auto &[type, name]: structType->fields()) {
+                    for (const auto &[visibility,type, name]: structType->fields()) {
                         lsp::CompletionItem item;
                         item.label = name;
                         item.kind = lsp::CompletionItemKind::Field;
@@ -641,6 +666,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
+
     modules::include_modules(this->m_options.stdlibDirectories,m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, typeCheckResult);

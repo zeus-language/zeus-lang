@@ -7,7 +7,7 @@ fn main() : i32 {
     println(output.as_c_str());
     let mut output2 :string = "String constant: ${STRING_CONST}";
     println(output2.as_c_str());
-    destroy(&output);
-    destroy(&output2);
+    output.destroy();
+    output2.destroy();
     return 0;
 }

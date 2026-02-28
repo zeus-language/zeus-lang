@@ -1,0 +1,12 @@
+FILENAME:4:34: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = internal::private_function(); // Error: function is private
+                                 ^---------------
+FILENAME:6:25: error: Could not determine type of initial value for variable 'result2'.
+    let result2 : i32 = private_function(); // Error: function is private
+                        ^---------------
+FILENAME:4:34: error: Function 'private_function' is private and cannot be accessed from this module.
+    let result : i32 = internal::private_function(); // Error: function is private
+                                 ^---------------
+FILENAME:6:25: error: Function 'private_function' is private and cannot be accessed from this module.
+    let result2 : i32 = private_function(); // Error: function is private
+                        ^---------------

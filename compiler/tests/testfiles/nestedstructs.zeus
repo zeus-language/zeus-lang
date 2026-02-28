@@ -1,11 +1,11 @@
 struct Vec2 {
-    x: float,
-    y: float,
+    pub x: float,
+    pub y: float,
 }
 
 struct Vec3 {
-    v2: Vec2,
-    z: float,
+    pub v2: Vec2,
+    pub z: float,
 }
 
 fn main(): i32 {

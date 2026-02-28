@@ -1,18 +1,18 @@
 use std::str;
 use core::libc;
-fn print(fmt: [u8], arg1 : &std::str::string) : void {
+pub fn print(fmt: [u8], arg1 : &std::str::string) : void {
     // A simple implementation of print that handles basic formatting
     let formatted : string = std::str::from_slice(fmt);
 
-    let replaced : string = std::str::replace(&formatted,"{}",arg1);
+    let replaced : string = formatted.replace("{}",arg1);
 
     printf(r"%s",replaced.as_c_str());
-    core::libc::free(formatted.data);
-    core::libc::free(replaced.data);
+    formatted.destroy();
+    replaced.destroy();
 }
 
 
-fn println2(fmt: [u8], arg1 : &std::str::string) : void {
+pub fn println2(fmt: [u8], arg1 : &std::str::string) : void {
     print(fmt,arg1);
     printf(r"\n");
 }

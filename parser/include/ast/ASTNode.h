@@ -8,7 +8,6 @@
 
 #include "lexer/Lexer.h"
 #include "types/VariableType.h"
-
 namespace ast {
     class ASTNode {
     private:

@@ -1,7 +1,7 @@
 struct TestStruct {
-    value : i32,
-    other_value : i32,
-    stuff : *u8,
+    pub value : i32,
+    pub other_value : i32,
+    pub stuff : *u8,
 }
 fn test() : &TestStruct {
     let mut value : TestStruct = TestStruct { value: 10, other_value: 20 };

@@ -1,0 +1,5 @@
+use core::libc;
+pub fn panic(msg : [u8]) : void {
+    printf("Panic: %s\n" as *u8, msg.data);
+    exit(1);
+}

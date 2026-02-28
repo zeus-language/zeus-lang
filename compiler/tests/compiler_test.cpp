@@ -119,6 +119,8 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     std::stringstream erstream;
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.emplace_back(base_path);
+
     options.runProgram = true;
     options.runArguments.push_back(output_path.string());
     options.buildMode = compiler::BuildMode::Debug;
@@ -212,6 +214,7 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     std::stringstream erstream;
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.emplace_back(base_path);
     options.colorOutput = false;
     compiler::parse_and_compile(options,moduleCache, input_path, erstream, ostream);
 
@@ -304,7 +307,7 @@ INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
 
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double"));
+                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double","private_fields","private_function"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

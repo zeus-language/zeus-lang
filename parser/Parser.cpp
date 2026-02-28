@@ -1714,6 +1714,9 @@ namespace parser
             if (canConsumeKeyWord("extern"))
             {
                 consumeKeyWord("extern");
+                auto  visibility = tryConsumeKeyWord("pub")?ast::VisibilityModifier::PUBLIC:ast::VisibilityModifier::PRIVATE;
+
+
                 if (!canConsumeKeyWord("fn"))
                 {
                     m_messages.push_back(ParserMessasge{
@@ -1768,17 +1771,18 @@ namespace parser
                 return std::make_unique<ast::ExternFunctionDefinition>(std::move(nameToken),
                                                                        std::move(functionArgs),
                                                                        std::move(returnType),
-                                                                       std::move(annotations));
+                                                                       std::move(annotations),visibility);
             }
             return std::nullopt;
         }
 
-        std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseFunctionDefinition()
+        std::optional<std::unique_ptr<ast::FunctionDefinition> > parseFunctionDefinition(bool isMethod = false)
         {
-            if (!canConsumeKeyWord("fn"))
+            if (!canConsumeKeyWord("fn") && !(canConsumeKeyWord("pub") && canConsumeKeyWord("fn", 1)))
             {
                 return std::nullopt;
             }
+            auto  visibility = tryConsumeKeyWord("pub")?ast::VisibilityModifier::PUBLIC:ast::VisibilityModifier::PRIVATE;
             consumeKeyWord("fn");
             Token nameToken = current();
             if (!canConsume(Token::IDENTIFIER))
@@ -1844,10 +1848,10 @@ namespace parser
             return std::make_unique<ast::FunctionDefinition>(std::move(nameToken), std::move(functionArgs),
                                                              std::move(returnType),
                                                              std::move(block)
-                                                             , std::move(genericParam), std::move(annotations));
+                                                             , std::move(genericParam), std::move(annotations),visibility);
         }
 
-        bool isFunctionCall() const
+        [[nodiscard]] bool isFunctionCall() const
         {
             int lookaheadIndex = 0;
             if (!canConsume(Token::IDENTIFIER))
@@ -2065,14 +2069,20 @@ namespace parser
             }
             consume(Token::OPEN_BRACE);
             std::vector<ast::StructField> fields;
-            std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > methods;
+            std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
 
             while (!canConsume(Token::CLOSE_BRACE) && hasNext())
             {
-                if (auto method = parseFunctionDefinition())
+                if (auto method = parseFunctionDefinition(true))
                 {
                     methods.push_back(std::move(method.value()));
                     continue;
+                }
+                ast::VisibilityModifier visibilityModifier = ast::VisibilityModifier::PRIVATE;
+                if (canConsumeKeyWord("pub") && canConsume(Token::IDENTIFIER,1))
+                {
+                    consumeKeyWord("pub");
+                    visibilityModifier = ast::VisibilityModifier::PUBLIC;
                 }
                 if (!canConsume(Token::IDENTIFIER))
                 {
@@ -2094,7 +2104,7 @@ namespace parser
                     return std::nullopt;
                 }
 
-                fields.push_back(ast::StructField{.name = fieldName, .type = std::move(type.value())});
+                fields.push_back(ast::StructField{.visibilityModifier = visibilityModifier,.name = fieldName, .type = std::move(type.value())});
                 if (!tryConsume(Token::COMMA))
                 {
                     break;
