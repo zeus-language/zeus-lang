@@ -89,7 +89,7 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
 
     const  std::filesystem::path file_path(uri.path());
     const std::filesystem::path parentDir = file_path.parent_path();
-    const auto tokens = lexer::lex_file(std::string(file_path), text);
+    const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
     auto result = parser::parse_tokens(tokens);
     std::vector<std::filesystem::path> includeDirs;
     for (auto &dir: rtlDirectories) {
