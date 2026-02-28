@@ -11,6 +11,7 @@ fn print_global_var() :void{
     output.destroy();
     let mut output2 :string = "Global float: ${GLOBAL_FLOAT}";
     println(output2.as_c_str());
+    output.destroy();
     output2.destroy();
 }
 

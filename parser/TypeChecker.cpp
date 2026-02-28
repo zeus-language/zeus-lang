@@ -50,7 +50,7 @@ namespace types {
         ast::FunctionDefinition* currentFunction = nullptr;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
-            const std::string &name) const {
+            const std::string &name, const bool includePrivate) const {
             std::vector<ast::FunctionDefinitionBase *> result;
             const std::optional<std::string> aliasName = module->aliasName.has_value()
                                                              ? std::make_optional(module->aliasName.value() + "::")
@@ -74,7 +74,7 @@ namespace types {
                     or (path.empty() and !aliasName2)
                 ) {
                     for (const auto &node: m->functions) {
-                        if (node->functionName() == name && node->visibilityModifier() == ast::VisibilityModifier::PUBLIC) {
+                        if (node->functionName() == name and (node->visibilityModifier() == ast::VisibilityModifier::PUBLIC or includePrivate)) {
                             result.push_back(node.get());
                         }
                     }
@@ -1010,7 +1010,7 @@ namespace types {
                     return true;
                 }
             } else {
-                const auto &functions = context.findFunctionsByName("", node->operatorFunctionName());
+                const auto &functions = context.findFunctionsByName("", node->operatorFunctionName(),false);
                 auto operatorFunctionIt = std::ranges::find_if(functions, [&](const auto &method) {
                     return method->args().size() == 2 &&
                            method->args()[0].type &&
@@ -1238,7 +1238,7 @@ namespace types {
         if (node->expressionToken().lexical() == "_")
             return;
         const auto var = context.currentScope->findVariable(node->expressionToken().lexical());
-        const auto functions = context.findFunctionsByName("", node->expressionToken().lexical());
+        const auto functions = context.findFunctionsByName("", node->expressionToken().lexical(),false);
         if (!var && !functions.empty()) {
             for (auto &func: functions) {
                 type_check_base(func, context);
@@ -1352,7 +1352,7 @@ namespace types {
         const ast::FunctionDefinitionBase *lastFunctionDefinition = nullptr;
         bool functionMatchFound = false;
         std::vector<parser::ParserMessasge> messages;
-        for (const auto funcDef: context.findFunctionsByName(node->modulePathName(), node->functionName())) {
+        for (const auto funcDef: context.findFunctionsByName(node->modulePathName(), node->functionName(),true)) {
             type_check_base(funcDef, context);
             lastFunctionDefinition = funcDef;
             messages.clear();
@@ -1385,6 +1385,16 @@ namespace types {
                 if (!argsMatch) {
                     continue;
                 }
+                if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
+                    funcDef->modulePath() != context.currentFunction->modulePath()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Function '" + node->functionName() + "' is private and cannot be accessed from this module."
+                    });
+                    return;
+                }
+
                 if (funcDef->returnType() && node->genericParam()) {
                     const auto rawType = funcDef->returnType().value();
 

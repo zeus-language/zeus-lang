@@ -1,0 +1,3 @@
+fn private_function() : i32 {
+    return 42;
+}

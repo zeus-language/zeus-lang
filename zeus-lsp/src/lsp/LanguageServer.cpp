@@ -86,9 +86,23 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
     const lsp::Uri &uri,
     const std::string &text) {
     std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
-    const auto tokens = lexer::lex_file(std::string(uri.path()), text);
+
+    const  std::filesystem::path file_path(uri.path());
+    const std::filesystem::path parentDir = file_path.parent_path();
+    const auto tokens = lexer::lex_file(std::string(file_path), text);
     auto result = parser::parse_tokens(tokens);
-    modules::include_modules(rtlDirectories,moduleCache, result);
+    std::vector<std::filesystem::path> includeDirs;
+    for (auto &dir: rtlDirectories) {
+        if (std::filesystem::exists(dir)) {
+            includeDirs.push_back(dir);
+        }
+    }
+    includeDirs.push_back(parentDir);
+    for (auto &tmpDir : includeDirs) {
+        std::cerr << "Warning: Include directory '" << tmpDir.string() << "' !\n";
+
+    }
+    modules::include_modules(includeDirs,moduleCache, result);
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, type_check_result);
@@ -652,6 +666,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
+
     modules::include_modules(this->m_options.stdlibDirectories,m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, typeCheckResult);

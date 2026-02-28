@@ -1,0 +1,11 @@
+struct PrivateFieldTest {
+    field: i32,
+    other: i32,
+}
+
+fn main() : i32 {
+    let test : PrivateFieldTest = PrivateFieldTest { field: 10, other: 20 };
+    println(test.field); // Error: field is private
+    println(test.other); // Error: field is private
+    return 0;
+}

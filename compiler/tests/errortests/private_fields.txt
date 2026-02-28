@@ -1,0 +1,6 @@
+FILENAME:8:18: error: Field 'field' is private and cannot be accessed from this module.
+    println(test.field); // Error: field is private
+                 ^----
+FILENAME:9:18: error: Field 'other' is private and cannot be accessed from this module.
+    println(test.other); // Error: field is private
+                 ^----
