@@ -803,6 +803,7 @@ namespace llvm_backend
         {
             assert(false && "Unknown type");
         }
+        assert(node->expressionType().has_value() && "Type cast node has no target type");
         const auto targetType = resolveLlvmType(node->expressionType().value(), llvmState);
         if (!targetType)
         {
@@ -1153,7 +1154,7 @@ namespace llvm_backend
         llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
         llvmState.Builder->SetInsertPoint(LoopBB);
-        for (auto &exp: node->block())
+        for (auto &exp: node->block()->statements())
         {
             codegen_base(exp.get(), llvmState);
         }
@@ -1249,7 +1250,7 @@ namespace llvm_backend
         // Generate the loop body.
         llvmState.Builder->SetInsertPoint(LoopBB);
 
-        for (auto &exp: node->block())
+        for (auto &exp: node->block()->statements())
         {
             codegen_base(exp.get(), llvmState);
         }
@@ -1506,7 +1507,7 @@ namespace llvm_backend
         llvmState.currentBreakBlock.currentLoop = LoopBB;
         llvmState.currentBreakBlock.afterLoop = AfterBB;
 
-        for (auto &exp: node->block())
+        for (auto &exp: node->block()->statements())
         {
             codegen_base(exp.get(), llvmState);
         }
@@ -1533,7 +1534,7 @@ namespace llvm_backend
 
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
         llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*llvmState.TheContext, "then", TheFunction);
-        const bool hasElse = !node->elseBlock().empty();
+        const bool hasElse = node->elseBlock().has_value();
         llvm::BasicBlock *ElseBB = (hasElse) ? llvm::BasicBlock::Create(*llvmState.TheContext, "else") : nullptr;
 
         llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*llvmState.TheContext, "ifcont");
@@ -1545,7 +1546,7 @@ namespace llvm_backend
 
         llvmState.Builder->SetInsertPoint(ThenBB);
 
-        for (auto &exp: node->ifBlock())
+        for (auto &exp: node->ifBlock()->statements())
         {
             codegen_base(exp.get(), llvmState);
         }
@@ -1559,7 +1560,7 @@ namespace llvm_backend
             TheFunction->insert(TheFunction->end(), ElseBB);
             llvmState.Builder->SetInsertPoint(ElseBB);
 
-            for (auto &exp: node->elseBlock())
+            for (auto &exp: node->elseBlock().value()->statements())
             {
                 codegen_base(exp.get(), llvmState);
             }
@@ -2487,7 +2488,7 @@ namespace llvm_backend
             llvmState.KSDbgInfo.LexicalBlocks.push_back(SP);
         }
 
-        for (auto &stmt: node->statements())
+        for (auto &stmt: node->block()->statements())
         {
             llvm_backend::codegen_base(stmt.get(), llvmState);
         }

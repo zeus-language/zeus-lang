@@ -3,8 +3,9 @@
 #include <memory>
 #include <vector>
 
-#include "RawAnnotation.h"
 #include "AnnotatedNode.h"
+#include "BlockNode.h"
+#include "RawAnnotation.h"
 #include "VariableDeclaration.h"
 #include "lexer/Lexer.h"
 
@@ -95,13 +96,13 @@ namespace ast {
     };
 
     class FunctionDefinition final : public FunctionDefinitionBase {
-        std::vector<std::unique_ptr<ASTNode> > m_statements;
+        std::unique_ptr<BlockNode> m_blockNode;
         std::optional<Token> genericParam;
         std::optional<types::VariableType*> m_parentStruct = std::nullopt;
     public:
         explicit FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
                                     std::optional<std::unique_ptr<RawType> > returnType,
-                                    std::vector<std::unique_ptr<ASTNode> > statements,
+                                    std::unique_ptr<BlockNode> blockNode,
                                     std::optional<Token> genericParam,
                                     std::vector<std::unique_ptr<RawAnnotation> > annotations,
                                         const VisibilityModifier visibilityModifier
@@ -110,7 +111,7 @@ namespace ast {
         ~FunctionDefinition() override = default;
 
 
-        std::vector<std::unique_ptr<ASTNode> > &statements() { return m_statements; }
+        [[nodiscard]] BlockNode *block() const { return m_blockNode.get(); }
 
         std::optional<ASTNode *> getVariableDefinition(const Token &token) const;
 

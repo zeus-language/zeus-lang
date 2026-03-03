@@ -16,6 +16,7 @@ add_library(${PROJECT_NAME} STATIC
         ast/ExternFunctionDefinition.cpp
         ast/VariableDeclaration.cpp
         ast/VariableAssignment.cpp
+        ast/BlockNode.cpp
         include/parser/module.h
         module.cpp
 

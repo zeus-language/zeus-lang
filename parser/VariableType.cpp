@@ -61,12 +61,8 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
 
                 args.push_back(std::move(arg));
             }
-            std::vector<std::unique_ptr<ast::ASTNode> > statements;
-            // Clone statements
-            for (auto &stmtOld: method->statements()) {
-                auto stmtClone = stmtOld->clone();
-                statements.push_back(std::move(stmtClone));
-            }
+            auto  statements = method->block()->cloneBlock();
+
             auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
             for (auto &annotationOld: method->rawAnnotations()) {
                 annotations.push_back(std::move(annotationOld->cloneAnnotation()));
@@ -96,7 +92,7 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
             }
 
 
-            for (auto &stmt: functionClone->statements()) {
+            for (auto &stmt: functionClone->block()->statements()) {
                 stmt->makeNonGeneric(genericParam);
             }
             methods.push_back(std::move(functionClone));

@@ -7,11 +7,11 @@ namespace ast {
         Token m_iterator;
         std::unique_ptr<ASTNode> m_range;
         bool m_isConstant;
-        std::vector<std::unique_ptr<ASTNode> > m_block;
+        std::unique_ptr<BlockNode>  m_block;
 
     public:
         ForLoop(Token forToken, Token iterator, std::unique_ptr<ASTNode> rangeStart,
-                const bool isConstant, std::vector<std::unique_ptr<ASTNode> > body) : ASTNode(std::move(forToken)),
+                const bool isConstant, std::unique_ptr<BlockNode> body) : ASTNode(std::move(forToken)),
             m_iterator(std::move(iterator)),
             m_range(std::move(rangeStart)),
             m_isConstant(isConstant),
@@ -31,14 +31,14 @@ namespace ast {
         [[nodiscard]] Token iteratorToken() const { return m_iterator; }
         [[nodiscard]] ASTNode *range() const { return m_range.get(); }
         [[nodiscard]] bool isConstant() const { return m_isConstant; }
-        [[nodiscard]] const std::vector<std::unique_ptr<ASTNode> > &block() const { return m_block; }
+        [[nodiscard]] BlockNode* block() const { return m_block.get(); }
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_range->getNodeByToken(token);
             if (result.has_value()) {
                 return result;
             }
-            for (auto &stmt: m_block) {
+            for (auto &stmt: m_block->statements()) {
                 result = stmt->getNodeByToken(token);
                 if (result.has_value()) {
                     return result;
@@ -48,10 +48,7 @@ namespace ast {
         }
 
         std::unique_ptr<ASTNode> clone() override {
-            std::vector<std::unique_ptr<ASTNode> > blockClones;
-            for (auto &stmt: m_block) {
-                blockClones.push_back(stmt->clone());
-            }
+            auto blockClones = m_block->cloneBlock();
             auto cloneNode = std::make_unique<ForLoop>(expressionToken(),
                                                        m_iterator,
                                                        m_range->clone(),
@@ -65,7 +62,7 @@ namespace ast {
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
             ASTNode::makeNonGeneric(genericParam);
             m_range->makeNonGeneric(genericParam);
-            for (const auto &stmt: m_block) {
+            for (const auto &stmt: m_block->statements()) {
                 stmt->makeNonGeneric(genericParam);
             }
         }

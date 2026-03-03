@@ -1334,12 +1334,15 @@ namespace parser
                 return std::nullopt;
             }
             auto ifBlock = parseBlock();
-            std::vector<std::unique_ptr<ast::ASTNode> > elseBlock;
+            std::optional<std::unique_ptr<ast::BlockNode>> elseBlock = std::nullopt;
             if (tryConsumeKeyWord("else"))
             {
                 if (auto elseIf = parseIfCondition())
                 {
-                    elseBlock.push_back(std::move(elseIf.value()));
+                    auto statements = std::vector<std::unique_ptr<ast::ASTNode> >{};
+                    auto token = elseIf.value()->expressionToken();
+                    statements.push_back(std::move(elseIf.value()));
+                    elseBlock = std::make_unique<ast::BlockNode>(token,std::move(statements));
                 }
                 else
                 {
@@ -1506,8 +1509,9 @@ namespace parser
             return std::make_unique<ast::MatchExpression>(name, std::move(identifier.value()), std::move(matchCases));
         }
 
-        std::vector<std::unique_ptr<ast::ASTNode> > parseBlock()
+        std::unique_ptr<ast::BlockNode> parseBlock()
         {
+            Token token = current();
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
             std::vector<std::unique_ptr<ast::ASTNode> > oldBLockNodes = std::move(m_blockNodes);
@@ -1594,7 +1598,7 @@ namespace parser
             m_deferedNodes.clear();
             m_blockNodes = std::move(oldBLockNodes);
 
-            return nodes;
+            return std::make_unique<ast::BlockNode>(token,std::move(nodes));
         }
 
         std::optional<ast::FunctionArgument> tryParseFunctionArgument()
@@ -2376,7 +2380,7 @@ namespace parser
             }
             if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(func.get()))
             {
-                for (auto &node: funcDef->statements())
+                for (auto &node: funcDef->block()->statements())
                 {
                     if (const auto result = node->getNodeByToken(token))
                     {
