@@ -2,7 +2,7 @@ use std::str;
 use core::libc;
 pub fn print(fmt: [u8], arg1 : &std::str::string) : void {
     // A simple implementation of print that handles basic formatting
-    let formatted : string = std::str::from_slice(fmt);
+    let formatted : string = string::from_slice(fmt);
 
     let replaced : string = formatted.replace("{}",arg1);
 

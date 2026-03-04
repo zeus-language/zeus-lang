@@ -4,9 +4,7 @@
 #include <gtest/gtest.h>
 #include <iostream>
 #include <string>
-#include <utility>
 
-#include "os/command.h"
 
 using namespace std::literals;
 
@@ -55,7 +53,7 @@ TEST_P(CompilerTest, TestNoError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "testfiles";
-    auto name = GetParam();
+    auto& name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
     std::cerr << "current path" << std::filesystem::current_path();
@@ -104,7 +102,7 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "testfiles";
-    auto name = GetParam();
+    auto& name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
     std::cerr << "current path" << std::filesystem::current_path();
@@ -157,7 +155,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "projecteuler";
-    const auto name = GetParam();
+    const auto& name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
     ASSERT_TRUE(std::filesystem::exists(input_path));
@@ -204,7 +202,7 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
     std::filesystem::path base_path = "errortests";
-    const auto name = GetParam();
+    const auto& name = GetParam();
     std::filesystem::path input_path = base_path / (name + ".zeus");
     std::filesystem::path output_path = base_path / (name + ".txt");
 
@@ -301,13 +299,14 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
                              "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
-                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading","comparestring","stringinterpolation","global_constants","global_var"));
+                             "functionpointer","externannotation","stringslice", "convert2string","convertfromstring","operator_overloading","comparestring","stringinterpolation","global_constants","global_var","new-string"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double","private_fields","private_function","fail-decl-in-blocks"));
+                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double","private_fields","private_function",
+                             "fail-decl-in-blocks","defer-noarg"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

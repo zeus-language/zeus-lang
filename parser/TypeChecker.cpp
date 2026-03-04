@@ -14,6 +14,7 @@
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
 #include "ast/ContinueStatement.h"
+#include "ast/DeferStatement.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -294,6 +295,8 @@ namespace types {
 
     void type_check(ast::BlockNode *node, Context &context);
 
+    void type_check(ast::DeferStatement *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -450,6 +453,9 @@ namespace types {
         if (const auto arrayRepeatInit = dynamic_cast<ast::ArrayRepeatInitializer *>(node)) {
             return type_check(arrayRepeatInit, context);
         }
+        if (const auto deferStmt = dynamic_cast<ast::DeferStatement *>(node)) {
+            return type_check(deferStmt, context);
+        }
         DBG_ASSERT(node != nullptr, "Node is null");
 
         context.messages.insert({
@@ -457,6 +463,10 @@ namespace types {
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::DeferStatement *node, Context &context) {
+        type_check_base(node->deferredNode(), context);
     }
 
     void type_check(ast::BlockNode *node, Context &context) {
@@ -1464,6 +1474,26 @@ namespace types {
                 return;
             }
         }
+        if (!functionMatchFound and !node->modulePathName().empty()) {
+            if (auto type = context.currentScope->getTypeByName(node->firstNamespace())) {
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
+                    const auto &methods = structType->methods();
+                    const auto methodIt = std::ranges::find_if(methods, [&](const auto &method) {
+                        return method->functionName() == node->functionName() &&
+                               method->args().size() == node->args().size();
+                    });
+                    if (methodIt != methods.end()) {
+                        type_check_base(methodIt->get(), context);
+                        if (methodIt->get()->expressionType()) {
+                            node->setExpressionType(methodIt->get()->expressionType().value());
+                            return;
+                        }
+                    }
+                }
+            }
+
+        }
+
 
         if (!functionMatchFound) {
             if (lastFunctionDefinition) {
