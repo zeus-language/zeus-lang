@@ -7,24 +7,17 @@
 namespace ast {
     FunctionDefinition::FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
                                            std::optional<std::unique_ptr<RawType> > returnType,
-                                           std::vector<std::unique_ptr<ASTNode> > statements,
+                                           std::unique_ptr<BlockNode> blockNode,
                                            std::optional<Token> genericParam,
                                            std::vector<std::unique_ptr<RawAnnotation> > annotations,
                                         const VisibilityModifier visibilityModifier)
         : FunctionDefinitionBase(functionName, std::move(args), std::move(returnType),
                                  std::move(annotations),visibilityModifier),
-          m_statements(std::move(statements)), genericParam(std::move(genericParam)) {
+          m_blockNode(std::move(blockNode)), genericParam(std::move(genericParam)) {
     }
 
     std::optional<ASTNode *> FunctionDefinition::getVariableDefinition(const Token &token) const {
-        for (auto &stmt: m_statements) {
-            if (const auto node = stmt->getNodeByToken(token)) {
-                if (auto varDef = dynamic_cast<VariableDeclaration *>(node.value())) {
-                    return varDef;
-                }
-            }
-        }
-        return std::nullopt;
+        return block()->getNodeByToken(token);
     }
 
     std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
@@ -37,17 +30,15 @@ namespace ast {
                                  ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
                                  : std::nullopt;
         std::vector<std::unique_ptr<ASTNode> > statementsClones;
-        for (auto &stmt: m_statements) {
-            statementsClones.push_back(stmt->clone());
-        }
+        auto block = m_blockNode->cloneBlock();
         std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
-        for (auto &annotation: rawAnnotations()) {
+        for (const auto &annotation: rawAnnotations()) {
             annotationsClones.push_back(annotation->cloneAnnotation());
         }
         auto cloneNode = std::make_unique<FunctionDefinition>(expressionToken(),
                                                               args(),
                                                               std::move(returnTypeClone),
-                                                              std::move(statementsClones),
+                                                              std::move(block),
                                                               genericParam,
                                                               std::move(annotationsClones),
                                                               visibilityModifier());
@@ -99,7 +90,7 @@ namespace ast {
     }
 
 
-    std::string FunctionDefinitionBase::functionSignature(bool withNamespace) const {
+    std::string FunctionDefinitionBase::functionSignature(const bool withNamespace) const {
         std::string signature;
         if (withNamespace) {
             for (auto &ns: m_namespacePrefix) {

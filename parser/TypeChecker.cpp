@@ -2,7 +2,6 @@
 
 #include <cassert>
 #include <cmath>
-#include <map>
 #include <ranges>
 #include <set>
 
@@ -166,11 +165,8 @@ namespace types {
         if (auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
             switch (numberConst->numberType()) {
                 case ast::NumberType::INTEGER:
-                    return numberConst->value();
                 case ast::NumberType::FLOAT:
-                    return numberConst->value();
                 case ast::NumberType::CHAR:
-                    return numberConst->value();
                 case ast::NumberType::BOOLEAN:
                     return numberConst->value();
                 default:
@@ -296,6 +292,8 @@ namespace types {
 
     void type_check(ast::MethodCallNode *node, Context &context);
 
+    void type_check(ast::BlockNode *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -351,6 +349,9 @@ namespace types {
     void type_check_base(ast::ASTNode *node, Context &context) {
         if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node)) {
             return type_check(funcDef, context);
+        }
+        if (const auto block = dynamic_cast<ast::BlockNode *>(node)) {
+          return type_check(block, context);
         }
         if (const auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node)) {
             return type_check(funcDef, context);
@@ -456,6 +457,14 @@ namespace types {
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check(ast::BlockNode *node, Context &context) {
+      context.currentScope = std::make_shared<Scope>(context.currentScope);
+      for (auto& stmt : node->statements()) {
+        type_check_base(stmt.get(),context);
+      }
+      context.currentScope = context.currentScope->parentScope();
     }
 
     void type_check(ast::MethodCallNode *node, Context &context) {
@@ -942,36 +951,28 @@ namespace types {
                                               node->iteratorToken().lexical(), varType,
                                               false
                                           });
-        for (auto &stmt: node->block()) {
-            type_check_base(stmt.get(), context);
-        }
+        type_check_base(node->block(), context);
     }
 
     void type_check(const ast::WhileLoop *node, Context &context) {
         type_check_base(node->condition(), context);
-        for (auto &stmt: node->block()) {
-            type_check_base(stmt.get(), context);
-        }
+        type_check_base(node->block(),context);
     }
 
     void type_check(ast::IfCondition *node, Context &context) {
-        type_check_base(node->condition(), context);
-        for (auto &stmt: node->ifBlock()) {
-            type_check_base(stmt.get(), context);
-        }
-        for (auto &stmt: node->elseBlock()) {
-            type_check_base(stmt.get(), context);
-        }
+      type_check_base(node->condition(), context);
+      type_check_base(node->ifBlock(), context);
+      if (auto elseBlock = node->elseBlock()) {
+        type_check_base(elseBlock.value(), context);
+      }
     }
 
     bool typecheckOperatorMethod(ast::OperatorNode *node, Context &context) {
-        bool isStructualOperand = false;
         std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
         std::optional<std::shared_ptr<types::StructType> > rhsStructType = std::nullopt;
 
         if (node->lhs()->expressionType()) {
             if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->lhs()->expressionType().value())) {
-                isStructualOperand = true;
                 lhsStructType = structType;
                 auto lhsToken = node->lhs()->expressionToken();
                 node->setLhs(std::make_unique<ast::ReferenceAccess>(
@@ -983,7 +984,6 @@ namespace types {
         }
         if (node->rhs()->expressionType()) {
             if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->rhs()->expressionType().value())) {
-                isStructualOperand = true;
                 rhsStructType = structType;
             }
         }
@@ -1720,7 +1720,7 @@ namespace types {
         }
         bool hasReturnStatement = false;
         context.currentFunction = node;
-        for (auto &stmt: node->statements()) {
+        for (auto &stmt: node->block()->statements()) {
             type_check_base(stmt.get(), context);
             if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
                 hasReturnStatement = true;

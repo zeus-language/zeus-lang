@@ -3,12 +3,12 @@
 
 namespace ast {
     class WhileLoop final : public ASTNode {
-        std::vector<std::unique_ptr<ASTNode> > m_block;
+        std::unique_ptr<BlockNode>  m_block;
         std::unique_ptr<ASTNode> m_condition;
 
     public:
         WhileLoop(Token whileToken, std::unique_ptr<ASTNode> condition,
-                  std::vector<std::unique_ptr<ASTNode> > block) : ASTNode(std::move(whileToken)),
+                  std::unique_ptr<BlockNode> block) : ASTNode(std::move(whileToken)),
                                                                   m_condition(std::move(condition)),
                                                                   m_block(std::move(block)) {
         }
@@ -17,7 +17,7 @@ namespace ast {
 
         [[nodiscard]] ASTNode *condition() const { return m_condition.get(); }
 
-        [[nodiscard]] const std::vector<std::unique_ptr<ASTNode> > &block() const { return m_block; }
+        [[nodiscard]] BlockNode* block() const { return m_block.get(); }
 
         WhileLoop(WhileLoop &&) = default;
 
@@ -27,25 +27,16 @@ namespace ast {
 
         WhileLoop &operator=(const WhileLoop &) = delete;
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_condition->getNodeByToken(token);
             if (result.has_value()) {
                 return result;
             }
-            for (auto &stmt: m_block) {
-                result = stmt->getNodeByToken(token);
-                if (result.has_value()) {
-                    return result;
-                }
-            }
-            return std::nullopt;
+            return  m_block->getNodeByToken(token);
         }
 
         std::unique_ptr<ASTNode> clone() override {
-            std::vector<std::unique_ptr<ASTNode> > blockClones;
-            for (auto &stmt: m_block) {
-                blockClones.push_back(stmt->clone());
-            }
+            auto blockClones = m_block->cloneBlock();
             auto cloneNode = std::make_unique<WhileLoop>(expressionToken(),
                                                          m_condition->clone(),
                                                          std::move(blockClones));

@@ -1,0 +1,17 @@
+fn main() : i32 {
+    let x :i32= 5;
+    if x > 3 {
+        let y :i32 = 10;
+    }
+    let z :i32 = y; // Error: 'y' is not in scope here
+    while x < 10 {
+        let w :i32 = 20;
+    }
+    let v :i32 = w; // Error: 'w' is not in scope
+    for i in 0..5 {
+        let u :i32 = i * 2;
+    }
+    let t :i32 = u; // Error: 'u' is not in scope
+
+    return 0;
+}
