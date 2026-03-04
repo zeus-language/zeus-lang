@@ -1143,6 +1143,10 @@ namespace llvm_backend {
     llvm::Value *codegenStructOperatorNodeCall(const ast::OperatorNode *node, LLVMBackendState &llvmState) {
         const auto lhs = codegen_base(node->lhs(), llvmState);
         const auto rhs = codegen_base(node->rhs(), llvmState);
+        const auto returnTypeKind = node->expressionType().has_value()
+                                        ? node->expressionType().value()->typeKind()
+                                        : types::TypeKind::VOID;
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
 
         const auto opFunction = node->operatorFunction();
         assert(opFunction && "Struct binary expression operator function not found");
@@ -1150,12 +1154,19 @@ namespace llvm_backend {
         if (!function) {
             function = llvmState.TheModule->getFunction(opFunction.value()->functionSignature());
         }
+        // the function might be a struct method
+        if (!function) {
+            if (const auto funcDef = dynamic_cast<ast::FunctionDefinition*>(opFunction.value())) {
+                if (funcDef->isMethod()) {
+                    const auto structTypeName = funcDef->parentStruct().value()->rawTypeName();
+                    function = llvmState.TheModule->getFunction(structTypeName + "::" + opFunction.value()->functionSignature());
+                }
+            }
+        }
+
         assert(function && "Struct binary expression operator function not found in module");
         std::vector<llvm::Value *> args;
-        const auto returnTypeKind = node->expressionType().has_value()
-                                        ? node->expressionType().value()->typeKind()
-                                        : types::TypeKind::VOID;
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+
         llvm::Value *returnAlloca = nullptr;
         if (isStructReturn) {
             const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
@@ -1165,6 +1176,7 @@ namespace llvm_backend {
         args.push_back(lhs);
         args.push_back(rhs);
         auto call = llvmState.Builder->CreateCall(function, args);
+
         if (isStructReturn) {
             call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
                                                                         resolveLlvmType(
@@ -1678,12 +1690,20 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
         }
-        auto functionCall = llvmState.TheModule->getFunction(methodName);
+        auto instanceType = node->instanceNode()->expressionType();
+        if (auto refTye = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
+            instanceType = refTye->baseType();
+        }
+        auto typeName = instanceType.has_value() ? instanceType.value()->rawTypeName() : "";
+        std::string mangleName(typeName);
+        mangleName += "::" + methodName;
+        auto functionCall = llvmState.TheModule->getFunction(mangleName);
         if (!functionCall) {
-            functionCall = llvmState.TheModule->getFunction(node->functionSignature());
+            mangleName = typeName + "::" + node->functionSignature();
+            functionCall = llvmState.TheModule->getFunction(mangleName);
         }
         if (!functionCall) {
-            std::cerr << "Method " << node->functionSignature() << " not found in module.\n";
+            std::cerr << "Method " << mangleName << " not found in structure.\n";
             assert(false && "Method not declared before call");
 
             return nullptr; // Error handling
@@ -1782,6 +1802,7 @@ namespace llvm_backend {
         if (!functionCall) {
             functionCall = llvmState.TheModule->getFunction(node->functionSignature());
         }
+
         const auto functionVar = llvmState.findVariable(node->functionName());
         // call the function through function pointer
         if (!functionCall && functionVar) {
@@ -1806,6 +1827,9 @@ namespace llvm_backend {
         }
 
         if (!functionCall) {
+            for (auto &func: llvmState.TheModule->functions()) {
+                std::cerr << "Available function: " << func.getName().str() << "\n";
+            }
             std::cerr << "Function " << node->functionSignature() << " not found in module.\n";
             assert(false && "Function not declared before call");
 
@@ -1974,6 +1998,9 @@ namespace llvm_backend {
             linkage = llvm::Function::PrivateLinkage;
             mangledName = node->functionSignature();
         }
+        if (node->parentStruct()) {
+            mangledName = node->parentStruct().value()->rawTypeName() + "::" + mangledName;
+        }
         // uncomment for debugging
         //std::cerr << "Creating function stub for " << mangledName << "\n";
 
@@ -2031,7 +2058,9 @@ namespace llvm_backend {
         if (node->functionName() == "main") {
             mangledName = "main";
         }
-
+        if (node->parentStruct()) {
+            mangledName = node->parentStruct().value()->rawTypeName() + "::" + mangledName;
+        }
         const auto functionDefinition = llvmState.TheModule->getFunction(mangledName);
         assert(functionDefinition && "Function definition not found in module");
 

@@ -16,6 +16,24 @@ struct string {
     pub fn capacity(self : &string) : u32 {
         return self.capacity as u32;
     }
+
+    pub fn new(capacity : i32) : string {
+        let mut str_obj : string;
+        str_obj.data = core::libc::malloc(capacity as u64);
+        if str_obj.data == 0 as *u8 {
+            panic("could not allocate memory for new string!");
+            return str_obj; // Return an empty string object on allocation failure
+        }
+        str_obj.data[0] = 0 as u8; // Null-terminate
+        str_obj.length = 0;
+        str_obj.capacity = capacity;
+        return str_obj;
+    }
+
+    pub fn new() : string {
+        return string::new(1); // Default initial capacity
+    }
+
     fn increase_capacity(self : mut &string, new_length : i32) : void {
         if new_length + 1 > self.capacity {
             // Need to reallocate
@@ -194,33 +212,50 @@ struct string {
             }
         }
         // If no match found, return a copy of the original string
-        return copy(self);
+        return self.copy();
+    }
+    pub fn from_c_str(cstr: *u8) : string {
+        let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
+        str_obj.length  = core::libc::strlen(cstr) as i32;
+        str_obj.capacity = str_obj.length + 1;
+
+        str_obj.data = core::libc::malloc(str_obj.capacity as u64);
+        core::libc::strcpy(str_obj.data, cstr);
+
+
+        return str_obj;
+    }
+
+    pub fn from_slice(cstr: [u8]) : string {
+        let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
+        str_obj.length  = cstr.length as i32;
+        str_obj.capacity = str_obj.length + 1;
+
+        str_obj.data = core::libc::malloc(str_obj.capacity as u64);
+        core::libc::strcpy(str_obj.data, cstr.data);
+
+
+        return str_obj;
+    }
+
+    pub fn copy(self : &string) : string {
+        let mut copy_str : string;
+        copy_str.data = core::libc::malloc(self.capacity as u64);
+        if copy_str.data == 0 as *u8 {
+            // Handle memory allocation failure
+            copy_str.data = 0 as *u8;
+            copy_str.length = 0;
+            copy_str.capacity = 0;
+            return copy_str;
+        }
+        core::libc::strcpy(copy_str.data, self.data);
+        copy_str.length = self.length;
+        copy_str.capacity = self.capacity;
+        return copy_str;
     }
 }
 
-pub fn from_c_str(cstr: *u8) : string {
-    let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
-    str_obj.length  = core::libc::strlen(cstr) as i32;
-    str_obj.capacity = str_obj.length + 1;
 
-    str_obj.data = core::libc::malloc(str_obj.capacity as u64);
-    core::libc::strcpy(str_obj.data, cstr);
-
-
-    return str_obj;
-}
-
-pub fn from_slice(cstr: [u8]) : string {
-    let mut str_obj : string;// = {data: 0 as *u8, length: 0, capacity: 0};
-    str_obj.length  = cstr.length as i32;
-    str_obj.capacity = str_obj.length + 1;
-
-    str_obj.data = core::libc::malloc(str_obj.capacity as u64);
-    core::libc::strcpy(str_obj.data, cstr.data);
-
-
-    return str_obj;
-}
 
 
 
@@ -229,10 +264,10 @@ pub fn from_slice(cstr: [u8]) : string {
 
 pub fn concat(a : &string, b : &string) : string {
     if(a.length == 0) {
-        return copy(b);
+        return b.copy();
     }
     if(b.length == 0) {
-        return copy(a);
+        return a.copy();
     }
     let  new_length : i32 = a.length + b.length;
     let mut new_data : *u8 = core::libc::malloc(new_length as u64 + 1  as u64);
@@ -252,21 +287,7 @@ pub fn concat(a : &string, b : &string) : string {
     return new_str;
 }
 
-pub fn copy(self : &string) : string {
-    let mut copy_str : string;
-    copy_str.data = core::libc::malloc(self.capacity as u64);
-    if copy_str.data == 0 as *u8 {
-        // Handle memory allocation failure
-        copy_str.data = 0 as *u8;
-        copy_str.length = 0;
-        copy_str.capacity = 0;
-        return copy_str;
-    }
-    core::libc::strcpy(copy_str.data, self.data);
-    copy_str.length = self.length;
-    copy_str.capacity = self.capacity;
-    return copy_str;
-}
+
 // Converts an integer to string
 pub fn char(value : i32) : u8 {
     return value as u8+ '0';

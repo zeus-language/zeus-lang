@@ -25,6 +25,10 @@ namespace ast {
 
         std::string functionName() const { return expressionToken().lexical(); }
 
+        [[nodiscard]] std::string firstNamespace() const {
+            return m_namespacePrefix.empty() ? "" : m_namespacePrefix[0].lexical();
+        }
+
         [[nodiscard]] std::string modulePathName() const {
             std::string name;
             for (auto &ns: m_namespacePrefix) {

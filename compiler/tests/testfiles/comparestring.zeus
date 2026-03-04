@@ -1,10 +1,10 @@
 use std::str;
 
 fn main() : i32 {
-    let a : string = from_slice("Hello, World!");
-    let b : string = from_slice("Hello, World!");
-    let c : string = from_slice("Hello, Zeus!");
-    let d : string = from_slice("Hello, world!");
+    let a : string = string::from_slice("Hello, World!");
+    let b : string = string::from_slice("Hello, World!");
+    let c : string = string::from_slice("Hello, Zeus!");
+    let d : string = string::from_slice("Hello, world!");
     // Compare strings
     if a == b {
         println("a and b are equal.");

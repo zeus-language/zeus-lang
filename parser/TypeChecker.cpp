@@ -1464,6 +1464,26 @@ namespace types {
                 return;
             }
         }
+        if (!functionMatchFound and !node->modulePathName().empty()) {
+            if (auto type = context.currentScope->getTypeByName(node->firstNamespace())) {
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
+                    const auto &methods = structType->methods();
+                    const auto methodIt = std::ranges::find_if(methods, [&](const auto &method) {
+                        return method->functionName() == node->functionName() &&
+                               method->args().size() == node->args().size();
+                    });
+                    if (methodIt != methods.end()) {
+                        type_check_base(methodIt->get(), context);
+                        if (methodIt->get()->expressionType()) {
+                            node->setExpressionType(methodIt->get()->expressionType().value());
+                            return;
+                        }
+                    }
+                }
+            }
+
+        }
+
 
         if (!functionMatchFound) {
             if (lastFunctionDefinition) {
