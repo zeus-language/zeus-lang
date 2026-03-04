@@ -460,9 +460,11 @@ namespace types {
     }
 
     void type_check(ast::BlockNode *node, Context &context) {
-        for (auto& stmt : node->statements()) {
-          type_check_base(stmt.get(),context);
-        }
+      context.currentScope = std::make_shared<Scope>(context.currentScope);
+      for (auto& stmt : node->statements()) {
+        type_check_base(stmt.get(),context);
+      }
+      context.currentScope = context.currentScope->parentScope();
     }
 
     void type_check(ast::MethodCallNode *node, Context &context) {

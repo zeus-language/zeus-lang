@@ -113,7 +113,7 @@ namespace ast {
 
         [[nodiscard]] BlockNode *block() const { return m_blockNode.get(); }
 
-        std::optional<ASTNode *> getVariableDefinition(const Token &token) const;
+        [[nodiscard]] std::optional<ASTNode *> getVariableDefinition(const Token &token) const;
 
 
         FunctionDefinition(FunctionDefinition &&) = default;

@@ -1,0 +1,18 @@
+FILENAME:14:18: error: Could not determine type of initial value for variable 't'.
+    let t :i32 = u; // Error: 'u' is not in scope
+                 ^
+FILENAME:10:18: error: Could not determine type of initial value for variable 'v'.
+    let v :i32 = w; // Error: 'w' is not in scope
+                 ^
+FILENAME:6:18: error: Could not determine type of initial value for variable 'z'.
+    let z :i32 = y; // Error: 'y' is not in scope here
+                 ^
+FILENAME:14:18: error: Variable 'u' is not declared in this scope.
+    let t :i32 = u; // Error: 'u' is not in scope
+                 ^
+FILENAME:10:18: error: Variable 'w' is not declared in this scope.
+    let v :i32 = w; // Error: 'w' is not in scope
+                 ^
+FILENAME:6:18: error: Variable 'y' is not declared in this scope.
+    let z :i32 = y; // Error: 'y' is not in scope here
+                 ^

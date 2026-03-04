@@ -4,6 +4,8 @@
 
 #include "ast/BlockNode.h"
 
+#include "ast/VariableDeclaration.h"
+
 namespace ast
 {
     BlockNode::BlockNode(const Token &token, std::vector<std::unique_ptr<ASTNode>> statements)
@@ -29,5 +31,16 @@ namespace ast
     std::unique_ptr<ASTNode> BlockNode::clone()
     {
         return cloneBlock();
+    }
+
+    std::optional<ASTNode *> BlockNode::getNodeByToken(const Token &token) const  {
+        for (auto &stmt: m_statements) {
+            if (const auto node = stmt->getNodeByToken(token)) {
+                if (auto varDef = dynamic_cast<VariableDeclaration *>(node.value())) {
+                    return varDef;
+                }
+            }
+        }
+        return std::nullopt;
     }
 } // namespace ast

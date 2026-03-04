@@ -27,18 +27,12 @@ namespace ast {
 
         WhileLoop &operator=(const WhileLoop &) = delete;
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_condition->getNodeByToken(token);
             if (result.has_value()) {
                 return result;
             }
-            for (auto &stmt: m_block->statements()) {
-                result = stmt->getNodeByToken(token);
-                if (result.has_value()) {
-                    return result;
-                }
-            }
-            return std::nullopt;
+            return  m_block->getNodeByToken(token);
         }
 
         std::unique_ptr<ASTNode> clone() override {

@@ -157,7 +157,7 @@ std::optional<int> mapTokenType(const Token::Type type) {
 }
 
 
-void processMultiLineToken(const Token &token, int tokenType,
+void processMultiLineToken(const Token &token, const int tokenType,
                            std::vector<uint32_t> &semanticTokens,
                            size_t &lastRow, size_t &lastCol) {
     const std::string &text = token.source_location.text();
@@ -199,7 +199,7 @@ void processMultiLineToken(const Token &token, int tokenType,
         size_t segmentStart = 0;
         for (size_t i = 0; i < text.length(); ++i) {
             if (i == text.length() - 1 || text[i] == '\n') {
-                size_t segmentLength = i - segmentStart;
+                const size_t segmentLength = i - segmentStart;
                 if (segmentLength > 0) {
                     // Emit token for this segment
                     if (lastRow != currentRow) {
@@ -470,8 +470,7 @@ void addCompletionItemForModule(const parser::Module * module, const char * toke
     if (module->aliasName.has_value()) {
         moduleName = module->aliasName.value();
     }
-    auto containsName = moduleName.find(token);
-    if (containsName != std::string::npos) {
+    if (moduleName.find(token) != std::string::npos) {
         lsp::CompletionItem item;
         item.label = moduleName;
         item.insertText = moduleName + "::";
@@ -482,11 +481,10 @@ void addCompletionItemForModule(const parser::Module * module, const char * toke
     }
 
 }
-void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,std::string nsPrefix, const std::string& token,
+void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,const std::string& nsPrefix, const std::string& token,
                                   lsp::CompletionList &completions) {
     const auto definedName = function->functionName();
-    const auto containsName = definedName.find(token);
-    if (containsName != std::string::npos) {
+    if (definedName.find(token) != std::string::npos) {
         lsp::CompletionItem item;
         item.label = function->functionName();
         auto insertText = function->functionName() + "(";
@@ -548,7 +546,7 @@ bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result
                 return true;
             }
             if (auto functionDef = dynamic_cast<ast::FunctionDefinition *>(parent)) {
-                for (const auto &statement: functionDef->statements()) {
+                for (const auto &statement: functionDef->block()->statements()) {
                     if (auto varDefinition = dynamic_cast<ast::VariableDeclaration *>(statement.get())) {
                         auto definedName = varDefinition->expressionToken().lexical();
                         auto containsName = definedName.find(varName.lexical());
@@ -644,8 +642,8 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     const lsp::requests::TextDocument_Completion::Params &params)  {
     auto result = lsp::requests::TextDocument_Completion::Result();
 
-    auto uri = params.textDocument.uri.toString();
-    auto document = m_openDocuments.at(uri);
+    const auto uri = params.textDocument.uri.toString();
+    const auto& [_, text] = m_openDocuments.at(uri);
 
     auto completionList = lsp::CompletionList{
         .isIncomplete = true,
@@ -653,7 +651,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     };
     result = completionList;
     auto size = (params.context.value().triggerCharacter) ? params.context.value().triggerCharacter.value().size() : 0;
-    auto tokens = lexer::lex_file(uri, document.text);
+    auto tokens = lexer::lex_file(uri, text);
     std::optional<Token> foundToken = std::nullopt;
     for (auto &token: tokens) {
         if (tokenInRange(token, params.position.line, params.position.character - size)) {

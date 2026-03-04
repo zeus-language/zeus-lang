@@ -14,5 +14,6 @@ namespace ast
 
         [[nodiscard]] std::unique_ptr<BlockNode> cloneBlock() const;
         std::unique_ptr<ASTNode> clone() override;
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
     };
 } // namespace ast

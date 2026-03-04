@@ -17,14 +17,7 @@ namespace ast {
     }
 
     std::optional<ASTNode *> FunctionDefinition::getVariableDefinition(const Token &token) const {
-        for (auto &stmt: m_blockNode->statements()) {
-            if (const auto node = stmt->getNodeByToken(token)) {
-                if (auto varDef = dynamic_cast<VariableDeclaration *>(node.value())) {
-                    return varDef;
-                }
-            }
-        }
-        return std::nullopt;
+        return block()->getNodeByToken(token);
     }
 
     std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
@@ -39,7 +32,7 @@ namespace ast {
         std::vector<std::unique_ptr<ASTNode> > statementsClones;
         auto block = m_blockNode->cloneBlock();
         std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
-        for (auto &annotation: rawAnnotations()) {
+        for (const auto &annotation: rawAnnotations()) {
             annotationsClones.push_back(annotation->cloneAnnotation());
         }
         auto cloneNode = std::make_unique<FunctionDefinition>(expressionToken(),
@@ -97,7 +90,7 @@ namespace ast {
     }
 
 
-    std::string FunctionDefinitionBase::functionSignature(bool withNamespace) const {
+    std::string FunctionDefinitionBase::functionSignature(const bool withNamespace) const {
         std::string signature;
         if (withNamespace) {
             for (auto &ns: m_namespacePrefix) {
