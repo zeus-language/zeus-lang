@@ -305,7 +305,8 @@ INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
 
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
-                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double","private_fields","private_function","fail-decl-in-blocks"));
+                         testing::Values("returntype","constmodification","typeerror_operator","unclosed_string","temp_reference","global_mut_slice","nested_returns","assign-float-to-double","private_fields","private_function",
+                             "fail-decl-in-blocks","defer-noarg"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

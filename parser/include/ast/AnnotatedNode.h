@@ -22,6 +22,23 @@ public:
         return m_annotations;
     }
 
+    [[nodiscard]] bool hasAnnotation(const std::string &annotationName) const {
+        for (const auto &annotation: m_annotations) {
+            if (annotation->name() == annotationName) {
+                return true;
+            }
+        }
+        return false;
+    }
+    template<typename T>
+    [[nodiscard]] bool hasAnnotation() const {
+        for (const auto &annotation: m_annotations) {
+            if (auto casted = std::dynamic_pointer_cast<T>(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
     template<typename T>
     std::vector<std::shared_ptr<T> > getAnnotationsOfType() const {
         std::vector<std::shared_ptr<T> > result;

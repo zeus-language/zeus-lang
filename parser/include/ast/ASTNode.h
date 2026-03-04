@@ -68,7 +68,7 @@ namespace ast {
 
         [[nodiscard]] Token expressionToken() const { return m_token; }
 
-        virtual std::optional<ASTNode *> getNodeByToken(const Token &token) const {
+        [[nodiscard]] virtual std::optional<ASTNode *> getNodeByToken(const Token &token) const {
             if (m_token == token) {
                 return const_cast<ASTNode *>(this);
             }

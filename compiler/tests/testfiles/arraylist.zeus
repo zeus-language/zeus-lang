@@ -2,6 +2,7 @@ use std::array;
 
 fn main() : i32 {
     let mut arr : array<i32> = new_array<i32>();
+    defer arr.destroy();
     arr.push(10);
     arr.push(20);
     arr.push(30);
@@ -18,7 +19,5 @@ fn main() : i32 {
 
     arr.clear();
     printf(r"Array length after clear: %d\n", arr.length());
-
-    arr.destroy();
     return 0;
 }

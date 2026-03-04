@@ -29,6 +29,8 @@ namespace types {
         [[nodiscard]] AnnotationTarget target() const { return m_target; }
     };
 
+
+
     class ExternalAnnotation : public Annotation {
     private:
         std::string m_library;

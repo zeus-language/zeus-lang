@@ -34,6 +34,16 @@ struct string {
         return string::new(1); // Default initial capacity
     }
 
+    pub fn destroy(self : mut &string) : void {
+        if self.data != 0 as *u8 {
+            core::libc::free(self.data);
+        }
+        // Optionally, you can set fields to zero to avoid dangling pointers
+        self.data = 0 as *u8;
+        self.length = 0;
+        self.capacity = 0;
+    }
+
     fn increase_capacity(self : mut &string, new_length : i32) : void {
         if new_length + 1 > self.capacity {
             // Need to reallocate
@@ -118,15 +128,7 @@ struct string {
         return true;
     }
 
-    pub fn destroy(self : mut &string) : void {
-        if self.data != 0 as *u8 {
-            core::libc::free(self.data);
-        }
-        // Optionally, you can set fields to zero to avoid dangling pointers
-        self.data = 0 as *u8;
-        self.length = 0;
-        self.capacity = 0;
-    }
+
 
     pub fn get(self : &string, index : i32) : u8 {
         if index < 0 or index >= self.length {

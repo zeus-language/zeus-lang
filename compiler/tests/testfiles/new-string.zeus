@@ -2,8 +2,9 @@ use std::str;
 
 fn main() :i32{
     let s : string = string::new();
+    defer s.destroy();
     s.append("Hello World");
     println(s.as_c_str());
-    s.destroy();
+
     return 0;
 }
