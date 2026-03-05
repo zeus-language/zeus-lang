@@ -73,7 +73,8 @@ namespace ast {
 
         std::unique_ptr<ASTNode> clone() override {
             std::vector<std::unique_ptr<ASTNode> > argsClones;
-            for (auto &arg: m_args) {
+            argsClones.reserve(m_args.size());
+            for (const auto &arg: m_args) {
                 argsClones.push_back(arg->clone());
             }
             auto cloneNode = std::make_unique<MethodCallNode>(expressionToken(),

@@ -1,5 +1,4 @@
 use std::str;
-use core::libc;
 
 pub fn print(fmt: [u8]) : void {
     printf(fmt.data);
@@ -60,21 +59,5 @@ pub fn print(s : string) : void {
 }
 pub fn println(s : string) : void {
     printf(r"%s\n",s.as_c_str());
-}
-pub fn print(fmt: [u8], arg1 : &std::str::string) : void {
-    // A simple implementation of print that handles basic formatting
-    let formatted : string = string::from_slice(fmt);
-
-    let replaced : string = formatted.replace("{}",arg1);
-
-    printf(r"%s",replaced.as_c_str());
-    formatted.destroy();
-    replaced.destroy();
-}
-
-
-pub fn println2(fmt: [u8], arg1 : &std::str::string) : void {
-    print(fmt,arg1);
-    printf(r"\n");
 }
 

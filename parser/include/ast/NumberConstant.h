@@ -42,7 +42,7 @@ namespace ast {
 
         ~NumberConstant() override = default;
 
-        size_t numBits() const;
+        [[nodiscard]] size_t numBits() const;
 
         NumberConstant(NumberConstant &&) = default;
 

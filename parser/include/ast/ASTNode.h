@@ -10,12 +10,45 @@
 #include "lexer/Lexer.h"
 #include "types/VariableType.h"
 namespace ast {
+    enum class NodeType {
+        RETURN,
+        VARIABLE_DECLARATION,
+        VARIABLE_ASSIGNMENT,
+        VARIABLE_ACCESS,
+        FUNCTION_DEFINITION,
+        FUNCTION_CALL,
+        IF_STATEMENT,
+        WHILE_LOOP,
+        FOR_LOOP,
+        BLOCK,
+        COMPARISSON,
+        STRING_CONSTANT,
+        NUMBER_CONSTANT,
+        RAW_STRING_CONSTANT,
+        TYPE_CAST,
+        STRUCT_DECLARATION,
+        STRUCT_INITIALIZATION,
+        REFERENCE_ACCESS,
+        ARRAY_ACCESS,
+        MATCH_STATEMENT,
+        ENUM_DECLARATION,
+        ENUM_VARIANT,
+        USE_MODULE,
+        MODULE,
+        ANNOTATION,
+        GENERIC_PARAM,
+        OTHER
+    };
+
     class ASTNode {
     private:
         Token m_token;
+        NodeType m_nodeType = NodeType::OTHER;
         std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
 
     protected:
+        explicit ASTNode(Token  token,NodeType nodeType) : m_token(std::move(token)), m_nodeType(nodeType) {
+        }
         explicit ASTNode(Token  token) : m_token(std::move(token)) {
         }
 
@@ -75,6 +108,7 @@ namespace ast {
             }
             return std::nullopt;
         }
+        [[nodiscard]] NodeType nodeType() const { return m_nodeType; }
     };
 } // ast
 

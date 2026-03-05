@@ -94,6 +94,7 @@ namespace modules {
                     // }
                 }
                 if (!moduleResult.hasError()) {
+                    moduleResult.module->sourceFilePath = fullPath;
                     moduleCache.addModule(fullPath.string(), moduleResult.module);
                 }
             }
@@ -128,7 +129,7 @@ namespace modules {
     std::vector<std::shared_ptr<parser::Module> > ModuleCache::findModulesByPathStart(
         const std::vector<Token> &pathTokens) const {
         std::vector<std::shared_ptr<parser::Module> > result;
-        for (const auto &[path, mod]: entries) {
+        for (const auto &mod: entries | std::views::values) {
             bool matches = true;
             if (pathTokens.size() == 1 && mod->aliasName.has_value()) {
                 if (mod->aliasName.value() == pathTokens[0].lexical()) {

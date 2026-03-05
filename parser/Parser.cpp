@@ -947,7 +947,7 @@ namespace parser {
                                                               std::move(varAccess.value()),
                                                               std::move(value.value()));
             }
-            return std::make_unique<ast::VariableAssignment>(std::move(varAccess.value()->expressionToken()),
+            return std::make_unique<ast::VariableAssignment>(varAccess.value()->expressionToken(),
                                                              std::move(value.value()));
         }
 
@@ -1344,7 +1344,7 @@ namespace parser {
         }
 
         std::unique_ptr<ast::BlockNode> parseBlock() {
-            Token token = current();
+            Token& token = current();
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
             std::vector<std::unique_ptr<ast::ASTNode> > oldBLockNodes = std::move(m_blockNodes);
@@ -2100,6 +2100,8 @@ namespace parser {
         m_modulePath = other.m_modulePath;
         aliasName = other.aliasName;
         modName = other.modName;
+        isTypeChecked = other.isTypeChecked;
+        sourceFilePath = other.sourceFilePath;
         // Deep copy of nodes
         nodes.reserve(other.nodes.size());
         for (const auto &node: other.nodes) {

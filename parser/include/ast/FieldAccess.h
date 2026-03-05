@@ -18,7 +18,7 @@ namespace ast {
             m_accessNode(std::move(accessNode)) {
         }
 
-        [[nodiscard]] Token fieldName() const {
+        [[nodiscard]] const Token& fieldName() const {
             return expressionToken();
         }
 
@@ -36,7 +36,7 @@ namespace ast {
 
         FieldAccess &operator=(const FieldAccess &) = delete;
 
-        [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > structType() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> >& structType() const {
             return m_structType;
         }
 

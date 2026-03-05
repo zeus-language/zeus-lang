@@ -5,6 +5,7 @@
 #ifndef ZEUS_LANG_PARSER_H
 #define ZEUS_LANG_PARSER_H
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 #include <ranges>
 #include <iostream>
@@ -76,6 +77,7 @@ namespace parser {
         std::string modName;
 
     public:
+        bool isTypeChecked = false;
         std::vector<std::shared_ptr<Module> > modules;
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
         std::vector<std::unique_ptr<ast::RawType> > externTypes;
@@ -84,6 +86,7 @@ namespace parser {
         std::vector<std::unique_ptr<ast::UseModule> > useModuleNodes;
 
         std::optional<std::string> aliasName;
+        std::filesystem::path sourceFilePath;
 
         void setModulePath(const std::vector<Token> &pathTokens) {
             m_modulePath = pathTokens;

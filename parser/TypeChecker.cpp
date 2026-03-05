@@ -242,7 +242,7 @@ namespace types {
         }
     }
 
-    void type_check(ast::FunctionDefinition *node, Context &context);
+    void type_check_funcdef(ast::FunctionDefinition *node, Context &context);
 
     void type_check(ast::ExternFunctionDefinition *node, Context &context);
 
@@ -351,8 +351,10 @@ namespace types {
 
 
     void type_check_base(ast::ASTNode *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
         if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node)) {
-            return type_check(funcDef, context);
+            return type_check_funcdef(funcDef, context);
         }
         if (const auto block = dynamic_cast<ast::BlockNode *>(node)) {
           return type_check(block, context);
@@ -505,7 +507,7 @@ namespace types {
                     instanceType = ptrType->baseType();
                 }
             }
-        } else if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType)) {
+        } else if (const auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType)) {
             instanceType = refType->baseType();
         }
 
@@ -1355,66 +1357,65 @@ namespace types {
             type_check_base(funcDef, context);
             lastFunctionDefinition = funcDef;
             messages.clear();
-                if (funcDef->args().size() != node->args().size()) {
+            if (funcDef->args().size() != node->args().size()) {
+                continue;
+            }
+            bool argsMatch = true;
 
-                    continue;
-                }
-                bool argsMatch = true;
-
-                for (size_t i = 0; i < funcDef->args().size(); ++i) {
-                    if (!node->args()[i]->expressionType() ||
-                        !funcDef->args()[i].type ||
-                        *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
-                    ) {
-                        messages.push_back({
-                            parser::OutputType::ERROR,
-                            node->args()[i]->expressionToken(),
-                            "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
-                            node->functionName() + "': expected '" +
-                            (funcDef->args()[i].type ? funcDef->args()[i].type.value()->name() : "unknown") +
-                            "', but got '" +
-                            (node->args()[i]->expressionType()
-                                 ? node->args()[i]->expressionType().value()->name()
-                                 : "unknown") + "'."
-                        });
-                        argsMatch = false;
-                    }
-                }
-                if (!argsMatch) {
-                    continue;
-                }
-                if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
-                    funcDef->modulePath() != context.currentFunction->modulePath()) {
-                    context.messages.insert({
+            for (size_t i = 0; i < funcDef->args().size(); ++i) {
+                if (!node->args()[i]->expressionType() ||
+                    !funcDef->args()[i].type ||
+                    *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
+                ) {
+                    messages.push_back({
                         parser::OutputType::ERROR,
-                        node->expressionToken(),
-                        "Function '" + node->functionName() + "' is private and cannot be accessed from this module."
+                        node->args()[i]->expressionToken(),
+                        "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
+                        node->functionName() + "': expected '" +
+                        (funcDef->args()[i].type ? funcDef->args()[i].type.value()->name() : "unknown") +
+                        "', but got '" +
+                        (node->args()[i]->expressionType()
+                             ? node->args()[i]->expressionType().value()->name()
+                             : "unknown") + "'."
                     });
-                    return;
+                    argsMatch = false;
                 }
-
-                if (funcDef->returnType() && node->genericParam()) {
-                    const auto rawType = funcDef->returnType().value();
-
-                    auto nonGenericType = context.currentScope->getTypeByName(rawType->fullTypeName(), false);
-                    if (nonGenericType) {
-                        const auto param = context.currentScope->getTypeByName(
-                            node->genericParam().value().lexical(), false);
-                        const auto typeWithGeneric = context.currentScope->getTypeByName(
-                            rawType->typeToken.lexical(), true);
-                        nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
-                        context.currentScope->registerType(nonGenericType.value());
-                    }
-
-                    node->setExpressionType(nonGenericType.value());
-                } else if (funcDef->returnType()) {
-                    node->setExpressionType(
-                        resolveFromRawType(funcDef->returnType().value(), context.currentScope).value());
-                } else {
-                    node->setExpressionType(context.currentScope->getTypeByName("void").value());
-                }
-                node->setNamespacePrefix(funcDef->modulePath());
+            }
+            if (!argsMatch) {
+                continue;
+            }
+            if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
+                funcDef->modulePath() != context.currentFunction->modulePath()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Function '" + node->functionName() + "' is private and cannot be accessed from this module."
+                });
                 return;
+            }
+
+            if (funcDef->returnType() && node->genericParam()) {
+                const auto rawType = funcDef->returnType().value();
+
+                auto nonGenericType = context.currentScope->getTypeByName(rawType->fullTypeName(), false);
+                if (nonGenericType) {
+                    const auto param = context.currentScope->getTypeByName(
+                        node->genericParam().value().lexical(), false);
+                    const auto typeWithGeneric = context.currentScope->getTypeByName(
+                        rawType->typeToken.lexical(), true);
+                    nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
+                    context.currentScope->registerType(nonGenericType.value());
+                }
+
+                node->setExpressionType(nonGenericType.value());
+            } else if (funcDef->returnType()) {
+                node->setExpressionType(
+                    resolveFromRawType(funcDef->returnType().value(), context.currentScope).value());
+            } else {
+                node->setExpressionType(context.currentScope->getTypeByName("void").value());
+            }
+            node->setNamespacePrefix(funcDef->modulePath());
+            return;
 
         }
         // look for variable with function name
@@ -1511,17 +1512,19 @@ namespace types {
         if (node->returnValue())
         {
             type_check_base(node->returnValue().value(), context);
-            if (const auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
-            {
-                const auto field = reference->fieldName().lexical();
-                const auto var = context.currentScope->findVariable(field,false);
-                if (!reference->constant() && var)
+            if (node->returnValue().value()->nodeType() == ast::NodeType::REFERENCE_ACCESS) {
+                if (const auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
                 {
-                    context.messages.insert({
-                        parser::OutputType::ERROR,
-                        node->returnValue().value()->expressionToken(),
-                        "Cannot return a reference for a mutable local variable."
-                    });
+                    const auto field = reference->fieldName().lexical();
+                    const auto var = context.currentScope->findVariable(field,false);
+                    if (!reference->constant() && var)
+                    {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->returnValue().value()->expressionToken(),
+                            "Cannot return a reference for a mutable local variable."
+                        });
+                    }
                 }
             }
             if (node->returnValue().value()->expressionType())
@@ -1615,7 +1618,7 @@ namespace types {
             type_check_base(node->initialValue().value(), context);
             // check whenever the types match
             const auto initalType = node->initialValue().value()->expressionType();
-            const auto declaredType = node->expressionType();
+            const auto& declaredType = node->expressionType();
             if (!initalType) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -1698,7 +1701,7 @@ namespace types {
         }
     }
 
-    void type_check(ast::FunctionDefinition *node, Context &context) {
+    void type_check_funcdef(ast::FunctionDefinition *node, Context &context) {
         if (node->expressionType().has_value())
             return;
 
@@ -1740,46 +1743,48 @@ namespace types {
         context.currentFunction = node;
         for (auto &stmt: node->block()->statements()) {
             type_check_base(stmt.get(), context);
-            if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
-                hasReturnStatement = true;
-                if (node->returnType()) {
-                    if (returnStatement->returnValue()) {
-                        if (!returnStatement->returnValue().value()->expressionType()) {
+            if (stmt->nodeType() == ast::NodeType::RETURN) {
+                if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
+                    hasReturnStatement = true;
+                    if (node->returnType()) {
+                        if (returnStatement->returnValue()) {
+                            if (!returnStatement->returnValue().value()->expressionType()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Could not determine type of return value in function '" + node->functionName() + "'."
+                                });
+                            } else if (node->expressionType() && *returnStatement->returnValue().value()->expressionType().
+                                       value()
+                                       != *node->
+                                       expressionType().value()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Type mismatch in return statement of function '" + node->functionName() +
+                                    "': expected '" +
+                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->name() +
+                                    "', but got '" +
+                                    returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                                });
+                                       }
+                        } else {
                             context.messages.insert({
                                 parser::OutputType::ERROR,
-                                returnStatement->returnValue().value()->expressionToken(),
-                                "Could not determine type of return value in function '" + node->functionName() + "'."
-                            });
-                        } else if (node->expressionType() && *returnStatement->returnValue().value()->expressionType().
-                                   value()
-                                   != *node->
-                                   expressionType().value()) {
-                            context.messages.insert({
-                                parser::OutputType::ERROR,
-                                returnStatement->returnValue().value()->expressionToken(),
-                                "Type mismatch in return statement of function '" + node->functionName() +
-                                "': expected '" +
-                                resolveFromRawType(node->returnType().value(), context.currentScope).value()->name() +
-                                "', but got '" +
-                                returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                                returnStatement->expressionToken(),
+                                "Return statement in function '" + node->functionName() +
+                                "' must return a value of type '" +
+                                node->returnType().value()->fullTypeName() + "'."
                             });
                         }
                     } else {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            returnStatement->expressionToken(),
-                            "Return statement in function '" + node->functionName() +
-                            "' must return a value of type '" +
-                            node->returnType().value()->fullTypeName() + "'."
-                        });
-                    }
-                } else {
-                    if (returnStatement->returnValue()) {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            returnStatement->returnValue().value()->expressionToken(),
-                            "Return statement in void function '" + node->functionName() + "' must not return a value."
-                        });
+                        if (returnStatement->returnValue()) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                returnStatement->returnValue().value()->expressionToken(),
+                                "Return statement in void function '" + node->functionName() + "' must not return a value."
+                            });
+                        }
                     }
                 }
             }
@@ -1807,6 +1812,8 @@ namespace types {
     }
 
     void type_check(ast::ExternFunctionDefinition *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
         // Example type checking logic for a function definition
         context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
 
@@ -1863,10 +1870,13 @@ namespace types {
         }
     }
 
-    void type_check(const std::shared_ptr<parser::Module> &module, Context &context, TypeCheckResult &result) {
+    void type_check_internal(const std::shared_ptr<parser::Module> &module, Context &context) {
+        // if (module->isTypeChecked) {
+        //     return;
+        // }
         context.module = module;
         for (auto &childModule: module->modules) {
-            type_check(childModule, context, result);
+            type_check_internal(childModule, context);
         }
 
         context.module = module;
@@ -1903,9 +1913,11 @@ namespace types {
                     });
                 }
                 std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
+                methods.reserve(structDecl->methods().size());
                 for (auto &method: structDecl->methods()) {
-                    methods.push_back(std::move(method));
+                    methods.push_back(method->cloneFunction2());
                 }
+                //structDecl->methods().clear();
 
 
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
@@ -1943,11 +1955,12 @@ namespace types {
         for (const auto &node: module->functions) {
             type_check_base(node.get(), context);
         }
+        module->isTypeChecked = true;
     }
 
     void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result) {
         Context context;
-        type_check(module, context, result);
+        type_check_internal(module, context);
         std::ranges::copy(context.messages, std::back_inserter(result.messages));
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
     }

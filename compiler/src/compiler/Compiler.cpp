@@ -78,6 +78,9 @@ namespace compiler {
         }
         types::TypeCheckResult typeCheckResult;
         types::type_check(result.module, typeCheckResult);
+        for (auto &mod : result.module->modules) {
+            moduleCache.addModule(mod->sourceFilePath.string(), mod);
+        }
         for (const auto &message: typeCheckResult.messages) {
             message.msg(errorStream, options.colorOutput);
         }

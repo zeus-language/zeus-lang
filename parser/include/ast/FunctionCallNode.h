@@ -23,7 +23,7 @@ namespace ast {
 
         ~FunctionCallNode() override = default;
 
-        std::string functionName() const { return expressionToken().lexical(); }
+        [[nodiscard]] std::string functionName() const { return expressionToken().lexical(); }
 
         [[nodiscard]] std::string firstNamespace() const {
             return m_namespacePrefix.empty() ? "" : m_namespacePrefix[0].lexical();
