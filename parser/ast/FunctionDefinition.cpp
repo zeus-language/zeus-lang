@@ -29,7 +29,6 @@ namespace ast {
         auto returnTypeClone = returnType().has_value()
                                  ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
                                  : std::nullopt;
-        std::vector<std::unique_ptr<ASTNode> > statementsClones;
         auto block = m_blockNode->cloneBlock();
         std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
         for (const auto &annotation: rawAnnotations()) {
@@ -44,14 +43,28 @@ namespace ast {
                                                               visibilityModifier());
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
-        return cloneNode;
+        cloneNode->setModulePath(modulePath());
+        return std::move(cloneNode);
     }
 
     bool FunctionDefinition::isMethod() const{
         return m_parentStruct.has_value();
     }
 
-    std::string FunctionDefinitionBase::functionName() const {
+    void FunctionDefinitionBase::setModulePath(const std::vector<Token> &module_path) {
+            m_namespacePrefix = module_path;
+
+        m_modulePathName = "";
+        for (auto &ns: m_namespacePrefix) {
+            m_modulePathName += ns.lexical() + "::";
+        }
+    }
+
+    const std::string& FunctionDefinitionBase::modulePathName() const {
+        return m_modulePathName;
+    }
+
+    const std::string& FunctionDefinitionBase::functionName() const {
         return m_functionName;
     }
 

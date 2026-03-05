@@ -42,7 +42,7 @@ namespace ast {
 
         ~NumberConstant() override = default;
 
-        size_t numBits() const;
+        [[nodiscard]] size_t numBits() const;
 
         NumberConstant(NumberConstant &&) = default;
 
@@ -56,7 +56,7 @@ namespace ast {
             auto cloneNode = std::make_unique<NumberConstant>(expressionToken(), m_numberType);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 } // ast

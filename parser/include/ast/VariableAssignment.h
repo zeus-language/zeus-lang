@@ -32,7 +32,7 @@ namespace ast {
 
         VariableAssignment &operator=(const VariableAssignment &) = delete;
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             auto result = m_expression->getNodeByToken(token);
             if (result.has_value()) {
                 return result;
@@ -46,7 +46,7 @@ namespace ast {
                                                                   m_expression->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 } // ast

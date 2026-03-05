@@ -5,15 +5,10 @@ use std::str;
 
 fn main() : i32 {
     let  hello : std::str::string = string::from_c_str(r"Hello, World!" as *u8);
-    println2("String: {}", &hello);
+    defer hello.destroy();
+    println("String: ${hello}");
     printf(r"length: %d\n" as *u8, hello.length());
     printf(r"capacity: %d\n" as *u8, hello.capacity());
-    //std::io::println2("Length: {}" as *u8, hello.length());
-    //std::io::println2("Capacity: {}" as *u8, hello.capacity());
 
-//    let mut new_hello : std::str::string = str::from_c_str("Universe" as *u8);
-//    let replaced : std::str::string = hello.replace(str::from_c_str("World" as *u8), new_hello);
-//    std::io::println2("Replaced String: {}" as *u8, replaced);
-    libc::free(hello.data);
     return 0;
 }

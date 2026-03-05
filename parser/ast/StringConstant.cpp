@@ -10,7 +10,7 @@ namespace ast {
     }
 
     std::string StringConstant::value() const {
-        auto lexical = expressionToken().lexical();
+        const auto lexical = expressionToken().lexical();
 
         std::string result;
         for (size_t i = 0; i < lexical.size(); ++i) {

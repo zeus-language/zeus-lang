@@ -69,7 +69,7 @@ namespace ast {
                 cloneNode->setExpressionType(expressionType().value());
             if (m_arrayType)
                 cloneNode->setArrayType(m_arrayType.value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

@@ -48,6 +48,7 @@ namespace types {
         std::shared_ptr<parser::Module> module;
         std::shared_ptr<Scope> currentScope = std::make_shared<Scope>();
         ast::FunctionDefinition* currentFunction = nullptr;
+        types::TypeRegistry typeRegistry;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
             const std::string &name, const bool includePrivate) const {
@@ -62,7 +63,7 @@ namespace types {
                         or (aliasName and path == aliasName.value())
                         or (path.empty() and !aliasName)
                     )) {
-                    result.push_back(f.get());
+                    result.emplace_back(f.get());
                 }
             }
 
@@ -75,7 +76,7 @@ namespace types {
                 ) {
                     for (const auto &node: m->functions) {
                         if (node->functionName() == name and (node->visibilityModifier() == ast::VisibilityModifier::PUBLIC or includePrivate)) {
-                            result.push_back(node.get());
+                            result.emplace_back(node.get());
                         }
                     }
                 }
@@ -163,7 +164,7 @@ namespace types {
     typedef std::variant<ast::NumberValue, std::string> Constant;
 
     std::optional<Constant> evalConstantExpression(ast::ASTNode *node, Context &context) {
-        if (auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
+        if (const auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
             switch (numberConst->numberType()) {
                 case ast::NumberType::INTEGER:
                 case ast::NumberType::FLOAT:
@@ -241,11 +242,11 @@ namespace types {
         }
     }
 
-    void type_check(ast::FunctionDefinition *node, Context &context);
+    void type_check_funcdef(ast::FunctionDefinition *node, Context &context);
 
     void type_check(ast::ExternFunctionDefinition *node, Context &context);
 
-    void type_check(ast::FunctionCallNode *node, Context &context);
+    void type_check_funcall(ast::FunctionCallNode *node, Context &context);
 
     void type_check(const ast::VariableAssignment *node, Context &context);
 
@@ -279,9 +280,9 @@ namespace types {
 
     void type_check(ast::StructInitialization *node, Context &context);
 
-    void type_check(ast::FieldAccess *node, Context &context);
+    void type_check_field_access(ast::FieldAccess *node, Context &context);
 
-    void type_check(ast::FieldAssignment *node, Context &context);
+    void type_check_field_assign(ast::FieldAssignment *node, Context &context);
 
     void type_check(ast::ReferenceAccess *node, Context &context);
 
@@ -350,8 +351,10 @@ namespace types {
 
 
     void type_check_base(ast::ASTNode *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
         if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node)) {
-            return type_check(funcDef, context);
+            return type_check_funcdef(funcDef, context);
         }
         if (const auto block = dynamic_cast<ast::BlockNode *>(node)) {
           return type_check(block, context);
@@ -369,7 +372,7 @@ namespace types {
             return type_check(returnStmt, context);
         }
         if (const auto funcCall = dynamic_cast<ast::FunctionCallNode *>(node)) {
-            return type_check(funcCall, context);
+            return type_check_funcall(funcCall, context);
         }
         if (const auto number = dynamic_cast<ast::NumberConstant *>(node)) {
             return type_check(number, context);
@@ -429,10 +432,10 @@ namespace types {
             return type_check(structInit, context);
         }
         if (const auto fieldAccess = dynamic_cast<ast::FieldAccess *>(node)) {
-            return type_check(fieldAccess, context);
+            return type_check_field_access(fieldAccess, context);
         }
         if (const auto fieldAssign = dynamic_cast<ast::FieldAssignment *>(node)) {
-            return type_check(fieldAssign, context);
+            return type_check_field_assign(fieldAssign, context);
         }
         if (const auto refAccess = dynamic_cast<ast::ReferenceAccess *>(node)) {
             return type_check(refAccess, context);
@@ -470,7 +473,7 @@ namespace types {
     }
 
     void type_check(ast::BlockNode *node, Context &context) {
-      context.currentScope = std::make_shared<Scope>(context.currentScope);
+      context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
       for (auto& stmt : node->statements()) {
         type_check_base(stmt.get(),context);
       }
@@ -478,7 +481,7 @@ namespace types {
     }
 
     void type_check(ast::MethodCallNode *node, Context &context) {
-        context.currentScope = std::make_shared<Scope>(context.currentScope);
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
         type_check_base(node->instanceNode(), context);
         for (auto &arg: node->args()) {
             type_check_base(arg.get(), context);
@@ -504,7 +507,7 @@ namespace types {
                     instanceType = ptrType->baseType();
                 }
             }
-        } else if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType)) {
+        } else if (const auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType)) {
             instanceType = refType->baseType();
         }
 
@@ -529,7 +532,7 @@ namespace types {
                 if (method->args().size() - 1 != node->args().size()) {
                     continue;
                 }
-                context.currentScope = std::make_shared<Scope>(context.currentScope);
+                context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
 
                 type_check_base(method.get(), context);
                 context.currentScope = context.currentScope->parentScope();
@@ -710,7 +713,7 @@ namespace types {
         }
     }
 
-    void type_check(ast::FieldAssignment *node, Context &context) {
+    void type_check_field_assign(ast::FieldAssignment *node, Context &context) {
         type_check_base(node->expression(), context);
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType() && node->expression()->expressionType()) {
@@ -751,7 +754,7 @@ namespace types {
         }
     }
 
-    void type_check(ast::FieldAccess *node, Context &context) {
+    void type_check_field_access(ast::FieldAccess *node, Context &context) {
         type_check_base(node->accessNode(), context);
         if (node->accessNode()) {
             if (const auto varAccess = dynamic_cast<ast::VariableAccess *>(node->accessNode())) {
@@ -945,8 +948,16 @@ namespace types {
         }
         if (const auto arrayType = dynamic_cast<ArrayType *>(varType.value().get())) {
             node->setExpressionType(arrayType->baseType());
+            context.currentScope->addVariable(node->iteratorToken().lexical(), Variable{
+                                                  node->iteratorToken().lexical(), arrayType->baseType(),
+                                                  false
+                                              });
         } else {
             node->setExpressionType(varType.value());
+            context.currentScope->addVariable(node->iteratorToken().lexical(), Variable{
+                                                  node->iteratorToken().lexical(), varType.value(),
+                                                  false
+                                              });
         }
 
         return false;
@@ -956,11 +967,7 @@ namespace types {
         type_check_base(node->range(), context);
         if (type_check_iterator_loop(node, context)) return;
         // Create a new scope for the loop variable
-        const auto varType = node->range()->expressionType().value();
-        context.currentScope->addVariable(node->iteratorToken().lexical(), Variable{
-                                              node->iteratorToken().lexical(), varType,
-                                              false
-                                          });
+
         type_check_base(node->block(), context);
     }
 
@@ -979,7 +986,6 @@ namespace types {
 
     bool typecheckOperatorMethod(ast::OperatorNode *node, Context &context) {
         std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
-        std::optional<std::shared_ptr<types::StructType> > rhsStructType = std::nullopt;
 
         if (node->lhs()->expressionType()) {
             if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->lhs()->expressionType().value())) {
@@ -992,11 +998,7 @@ namespace types {
                 type_check_base(node->lhs(), context);
             }
         }
-        if (node->rhs()->expressionType()) {
-            if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->rhs()->expressionType().value())) {
-                rhsStructType = structType;
-            }
-        }
+
 
         if (lhsStructType) {
             const auto &methods = lhsStructType.value()->methods();
@@ -1021,7 +1023,7 @@ namespace types {
                 }
             } else {
                 const auto &functions = context.findFunctionsByName("", node->operatorFunctionName(),false);
-                auto operatorFunctionIt = std::ranges::find_if(functions, [&](const auto &method) {
+                const auto operatorFunctionIt = std::ranges::find_if(functions, [&](const auto &method) {
                     return method->args().size() == 2 &&
                            method->args()[0].type &&
                            method->args()[0].type.value()->name() ==
@@ -1248,13 +1250,15 @@ namespace types {
         if (node->expressionToken().lexical() == "_")
             return;
         const auto var = context.currentScope->findVariable(node->expressionToken().lexical());
-        const auto functions = context.findFunctionsByName("", node->expressionToken().lexical(),false);
-        if (!var && !functions.empty()) {
-            for (auto &func: functions) {
-                type_check_base(func, context);
+        if (!var ) {
+            const auto functions = context.findFunctionsByName("", node->expressionToken().lexical(),false);
+            if (!functions.empty()) {
+                for (auto &func: functions) {
+                    type_check_base(func, context);
+                }
+                node->setExpressionType(functions[0]->asFunctionType());
+                return;
             }
-            node->setExpressionType(functions[0]->asFunctionType());
-            return;
         }
         if (!var) {
             context.messages.insert({
@@ -1307,24 +1311,11 @@ namespace types {
         // Further type checking logic would go here...
     }
 
-    void type_check(ast::FunctionCallNode *node, Context &context) {
+    void type_check_funcall(ast::FunctionCallNode *node, Context &context) {
         for (auto &arg: node->args()) {
             type_check_base(arg.get(), context);
         }
-        //  find function
-        if (node->functionName() == "println") {
-            if (node->args().size() != 1) {
-                context.messages.insert({
-                    parser::OutputType::ERROR,
-                    node->expressionToken(),
-                    "'println' expects exactly one argument."
-                });
-                return;
-            }
-            // 'println' can accept any type for now
-            node->setExpressionType(context.currentScope->getTypeByName("void").value());
-            return;
-        } else if (node->functionName() == "printf") {
+        if (node->functionName() == "printf") {
             if (node->args().empty()) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -1366,68 +1357,66 @@ namespace types {
             type_check_base(funcDef, context);
             lastFunctionDefinition = funcDef;
             messages.clear();
-            if (funcDef->functionName() == node->functionName()) {
-                if (funcDef->args().size() != node->args().size()) {
+            if (funcDef->args().size() != node->args().size()) {
+                continue;
+            }
+            bool argsMatch = true;
 
-                    continue;
-                }
-                bool argsMatch = true;
-
-                for (size_t i = 0; i < funcDef->args().size(); ++i) {
-                    if (!node->args()[i]->expressionType() ||
-                        !funcDef->args()[i].type ||
-                        *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
-                    ) {
-                        messages.push_back({
-                            parser::OutputType::ERROR,
-                            node->args()[i]->expressionToken(),
-                            "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
-                            node->functionName() + "': expected '" +
-                            (funcDef->args()[i].type ? funcDef->args()[i].type.value()->name() : "unknown") +
-                            "', but got '" +
-                            (node->args()[i]->expressionType()
-                                 ? node->args()[i]->expressionType().value()->name()
-                                 : "unknown") + "'."
-                        });
-                        argsMatch = false;
-                    }
-                }
-                if (!argsMatch) {
-                    continue;
-                }
-                if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
-                    funcDef->modulePath() != context.currentFunction->modulePath()) {
-                    context.messages.insert({
+            for (size_t i = 0; i < funcDef->args().size(); ++i) {
+                if (!node->args()[i]->expressionType() ||
+                    !funcDef->args()[i].type ||
+                    *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
+                ) {
+                    messages.push_back({
                         parser::OutputType::ERROR,
-                        node->expressionToken(),
-                        "Function '" + node->functionName() + "' is private and cannot be accessed from this module."
+                        node->args()[i]->expressionToken(),
+                        "Type mismatch for argument " + std::to_string(i + 1) + " in function '" +
+                        node->functionName() + "': expected '" +
+                        (funcDef->args()[i].type ? funcDef->args()[i].type.value()->name() : "unknown") +
+                        "', but got '" +
+                        (node->args()[i]->expressionType()
+                             ? node->args()[i]->expressionType().value()->name()
+                             : "unknown") + "'."
                     });
-                    return;
+                    argsMatch = false;
                 }
-
-                if (funcDef->returnType() && node->genericParam()) {
-                    const auto rawType = funcDef->returnType().value();
-
-                    auto nonGenericType = context.currentScope->getTypeByName(rawType->fullTypeName(), false);
-                    if (nonGenericType) {
-                        const auto param = context.currentScope->getTypeByName(
-                            node->genericParam().value().lexical(), false);
-                        const auto typeWithGeneric = context.currentScope->getTypeByName(
-                            rawType->typeToken.lexical(), true);
-                        nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
-                        context.currentScope->registerType(nonGenericType.value());
-                    }
-
-                    node->setExpressionType(nonGenericType.value());
-                } else if (funcDef->returnType()) {
-                    node->setExpressionType(
-                        resolveFromRawType(funcDef->returnType().value(), context.currentScope).value());
-                } else {
-                    node->setExpressionType(context.currentScope->getTypeByName("void").value());
-                }
-                node->setNamespacePrefix(funcDef->modulePath());
+            }
+            if (!argsMatch) {
+                continue;
+            }
+            if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
+                funcDef->modulePath() != context.currentFunction->modulePath()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Function '" + node->functionName() + "' is private and cannot be accessed from this module."
+                });
                 return;
             }
+
+            if (funcDef->returnType() && node->genericParam()) {
+                const auto rawType = funcDef->returnType().value();
+
+                auto nonGenericType = context.currentScope->getTypeByName(rawType->fullTypeName(), false);
+                if (nonGenericType) {
+                    const auto param = context.currentScope->getTypeByName(
+                        node->genericParam().value().lexical(), false);
+                    const auto typeWithGeneric = context.currentScope->getTypeByName(
+                        rawType->typeToken.lexical(), true);
+                    nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
+                    context.currentScope->registerType(nonGenericType.value());
+                }
+
+                node->setExpressionType(nonGenericType.value());
+            } else if (funcDef->returnType()) {
+                node->setExpressionType(
+                    resolveFromRawType(funcDef->returnType().value(), context.currentScope).value());
+            } else {
+                node->setExpressionType(context.currentScope->getTypeByName("void").value());
+            }
+            node->setNamespacePrefix(funcDef->modulePath());
+            return;
+
         }
         // look for variable with function name
         if (const auto var = context.currentScope->findVariable(node->functionName())) {
@@ -1523,17 +1512,19 @@ namespace types {
         if (node->returnValue())
         {
             type_check_base(node->returnValue().value(), context);
-            if (const auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
-            {
-                const auto field = reference->fieldName().lexical();
-                const auto var = context.currentScope->findVariable(field,false);
-                if (!reference->constant() && var)
+            if (node->returnValue().value()->nodeType() == ast::NodeType::REFERENCE_ACCESS) {
+                if (const auto reference = dynamic_cast<ast::ReferenceAccess*>( node->returnValue().value()))
                 {
-                    context.messages.insert({
-                        parser::OutputType::ERROR,
-                        node->returnValue().value()->expressionToken(),
-                        "Cannot return a reference for a mutable local variable."
-                    });
+                    const auto field = reference->fieldName().lexical();
+                    const auto var = context.currentScope->findVariable(field,false);
+                    if (!reference->constant() && var)
+                    {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->returnValue().value()->expressionToken(),
+                            "Cannot return a reference for a mutable local variable."
+                        });
+                    }
                 }
             }
             if (node->returnValue().value()->expressionType())
@@ -1627,7 +1618,7 @@ namespace types {
             type_check_base(node->initialValue().value(), context);
             // check whenever the types match
             const auto initalType = node->initialValue().value()->expressionType();
-            const auto declaredType = node->expressionType();
+            const auto& declaredType = node->expressionType();
             if (!initalType) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -1710,11 +1701,11 @@ namespace types {
         }
     }
 
-    void type_check(ast::FunctionDefinition *node, Context &context) {
+    void type_check_funcdef(ast::FunctionDefinition *node, Context &context) {
         if (node->expressionType().has_value())
             return;
 
-        context.currentScope = std::make_shared<Scope>(context.currentScope);
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
 
         for (auto &raw: node->rawAnnotations()) {
             if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
@@ -1752,46 +1743,48 @@ namespace types {
         context.currentFunction = node;
         for (auto &stmt: node->block()->statements()) {
             type_check_base(stmt.get(), context);
-            if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
-                hasReturnStatement = true;
-                if (node->returnType()) {
-                    if (returnStatement->returnValue()) {
-                        if (!returnStatement->returnValue().value()->expressionType()) {
+            if (stmt->nodeType() == ast::NodeType::RETURN) {
+                if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
+                    hasReturnStatement = true;
+                    if (node->returnType()) {
+                        if (returnStatement->returnValue()) {
+                            if (!returnStatement->returnValue().value()->expressionType()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Could not determine type of return value in function '" + node->functionName() + "'."
+                                });
+                            } else if (node->expressionType() && *returnStatement->returnValue().value()->expressionType().
+                                       value()
+                                       != *node->
+                                       expressionType().value()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Type mismatch in return statement of function '" + node->functionName() +
+                                    "': expected '" +
+                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->name() +
+                                    "', but got '" +
+                                    returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                                });
+                                       }
+                        } else {
                             context.messages.insert({
                                 parser::OutputType::ERROR,
-                                returnStatement->returnValue().value()->expressionToken(),
-                                "Could not determine type of return value in function '" + node->functionName() + "'."
-                            });
-                        } else if (node->expressionType() && *returnStatement->returnValue().value()->expressionType().
-                                   value()
-                                   != *node->
-                                   expressionType().value()) {
-                            context.messages.insert({
-                                parser::OutputType::ERROR,
-                                returnStatement->returnValue().value()->expressionToken(),
-                                "Type mismatch in return statement of function '" + node->functionName() +
-                                "': expected '" +
-                                resolveFromRawType(node->returnType().value(), context.currentScope).value()->name() +
-                                "', but got '" +
-                                returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                                returnStatement->expressionToken(),
+                                "Return statement in function '" + node->functionName() +
+                                "' must return a value of type '" +
+                                node->returnType().value()->fullTypeName() + "'."
                             });
                         }
                     } else {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            returnStatement->expressionToken(),
-                            "Return statement in function '" + node->functionName() +
-                            "' must return a value of type '" +
-                            node->returnType().value()->fullTypeName() + "'."
-                        });
-                    }
-                } else {
-                    if (returnStatement->returnValue()) {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            returnStatement->returnValue().value()->expressionToken(),
-                            "Return statement in void function '" + node->functionName() + "' must not return a value."
-                        });
+                        if (returnStatement->returnValue()) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                returnStatement->returnValue().value()->expressionToken(),
+                                "Return statement in void function '" + node->functionName() + "' must not return a value."
+                            });
+                        }
                     }
                 }
             }
@@ -1819,8 +1812,10 @@ namespace types {
     }
 
     void type_check(ast::ExternFunctionDefinition *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
         // Example type checking logic for a function definition
-        context.currentScope = std::make_shared<Scope>(context.currentScope);
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
 
         for (auto &raw: node->rawAnnotations()) {
             if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
@@ -1875,10 +1870,13 @@ namespace types {
         }
     }
 
-    void type_check(const std::shared_ptr<parser::Module> &module, Context &context, TypeCheckResult &result) {
+    void type_check_internal(const std::shared_ptr<parser::Module> &module, Context &context) {
+        // if (module->isTypeChecked) {
+        //     return;
+        // }
         context.module = module;
         for (auto &childModule: module->modules) {
-            type_check(childModule, context, result);
+            type_check_internal(childModule, context);
         }
 
         context.module = module;
@@ -1891,7 +1889,7 @@ namespace types {
         for (auto &node: module->nodes) {
             if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 std::vector<types::StructField> structFields;
-                context.currentScope = std::make_shared<Scope>(context.currentScope);
+                context.currentScope = std::make_shared<Scope>(context.typeRegistry,context.currentScope);
                 std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
                 if (auto genericParams = structDecl->genericParam()) {
                     genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
@@ -1915,9 +1913,11 @@ namespace types {
                     });
                 }
                 std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
+                methods.reserve(structDecl->methods().size());
                 for (auto &method: structDecl->methods()) {
-                    methods.push_back(std::move(method));
+                    methods.push_back(method->cloneFunction2());
                 }
+                //structDecl->methods().clear();
 
 
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
@@ -1955,11 +1955,12 @@ namespace types {
         for (const auto &node: module->functions) {
             type_check_base(node.get(), context);
         }
+        module->isTypeChecked = true;
     }
 
     void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result) {
         Context context;
-        type_check(module, context, result);
+        type_check_internal(module, context);
         std::ranges::copy(context.messages, std::back_inserter(result.messages));
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
     }

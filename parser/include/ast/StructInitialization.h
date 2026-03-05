@@ -40,11 +40,12 @@ namespace ast {
                                                       : "");
         }
 
-        [[nodiscard]] std::optional<Token> genericParam() const {
+        [[nodiscard]] const std::optional<Token>& genericParam() const {
             return m_genericParam;
         }
         std::unique_ptr<ASTNode> clone() override {
             std::vector<StructInitField> fieldsClone;
+            fieldsClone.reserve(m_fields.size());
             for (const auto &field: m_fields) {
                 fieldsClone.push_back(StructInitField{
                     .name = field.name,
@@ -56,7 +57,7 @@ namespace ast {
                                                                    std::move(fieldsClone));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 }

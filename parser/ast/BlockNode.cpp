@@ -20,13 +20,14 @@ namespace ast
     std::unique_ptr<BlockNode> BlockNode::cloneBlock() const
     {
         std::vector<std::unique_ptr<ASTNode>> statementsClone;
+        statementsClone.reserve(m_statements.size());
         for (const auto &statement: m_statements) {
             statementsClone.push_back(statement->clone());
         }
         auto cloneNode = std::make_unique<BlockNode>(expressionToken(), std::move(statementsClone));
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
-        return cloneNode;
+        return std::move(cloneNode);
     }
     std::unique_ptr<ASTNode> BlockNode::clone()
     {

@@ -199,17 +199,16 @@ struct string {
                     core::libc::memcpy(suffix.data, suffix_start, suffix.length as u64);
                     suffix.data[suffix.length] = 0 as u8; // Null-terminate
                 }
-                let mut result : string = concat(&prefix, new);
-
-                let mut final_result : string = concat(&result, &suffix);
+                let mut result : string = prefix.copy();
+                result.append(new);
+                result.append(&suffix);
 
 
                 // Free temporary strings
                 prefix.destroy();
-                //core::libc::free(suffix.data);
-                result.destroy();
 
-                return final_result;
+
+                return result;
 
             }
         }
@@ -258,38 +257,6 @@ struct string {
 }
 
 
-
-
-
-
-
-
-pub fn concat(a : &string, b : &string) : string {
-    if(a.length == 0) {
-        return b.copy();
-    }
-    if(b.length == 0) {
-        return a.copy();
-    }
-    let  new_length : i32 = a.length + b.length;
-    let mut new_data : *u8 = core::libc::malloc(new_length as u64 + 1  as u64);
-    if new_data == 0 as *u8 {
-        printf("Memory allocation failed in concat\n" as *u8);
-        let mut empty_str : string;
-        return empty_str;
-    }
-    let target : *u8 = new_data + a.length as *u8;
-    core::libc::memcpy(new_data, a.data, a.length as u64);
-    core::libc::memcpy(target, b.data, b.length as u64);
-    new_data[new_length] = 0 as u8; // Null-terminate
-    let mut new_str : string;
-    new_str.data = new_data;
-    new_str.length = new_length;
-    new_str.capacity = new_length + 1;
-    return new_str;
-}
-
-
 // Converts an integer to string
 pub fn char(value : i32) : u8 {
     return value as u8+ '0';
@@ -304,7 +271,7 @@ pub fn float_to_str(value : float) : string {
 pub fn double_to_str(value : double) : string {
     let mut whole : i32 = value as i32;
     let mut frac_part : double = abs(value  - (whole as double));
-    let mut resultx : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
+    let mut resultx : string = string::new(20);
     let mut whole_str : string = int_to_str(whole);
     resultx.append(whole_str.as_slice());
     resultx.append( '.' as u8 );
@@ -324,7 +291,7 @@ pub fn double_to_str(value : double) : string {
 }
 
 pub fn int_to_str(value : i32) : string {
-    let mut digits : string = string { data: core::libc::malloc(12 as u64), length: 0, capacity: 12 };
+    let mut digits : string = string::new(12); // Enough to hold -2,147,483,648 and null terminator
 
     if value == 0 {
         digits.append('0' as u8);

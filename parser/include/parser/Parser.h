@@ -5,11 +5,13 @@
 #ifndef ZEUS_LANG_PARSER_H
 #define ZEUS_LANG_PARSER_H
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 #include <ranges>
 #include <iostream>
 #include "../lexer/Lexer.h"
 #include "ast/ASTNode.h"
+#include "ast/UseModule.h"
 
 namespace ast {
     struct RawType;
@@ -55,7 +57,8 @@ namespace parser {
         std::string message;
 
         void msg(std::ostream &ostream, bool printColor) const;
-        int operator<(const ParserMessasge& other) const {
+
+        int operator<(const ParserMessasge &other) const {
             if (message != other.message) {
                 return message < other.message;
             }
@@ -74,14 +77,17 @@ namespace parser {
         std::string modName;
 
     public:
+        bool isTypeChecked = false;
         std::vector<std::shared_ptr<Module> > modules;
         std::vector<std::unique_ptr<ast::ASTNode> > nodes;
         std::vector<std::unique_ptr<ast::RawType> > externTypes;
         std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > functions;
 
-        std::vector<std::unique_ptr<ast::ASTNode> > useModuleNodes;
+        std::vector<std::unique_ptr<ast::UseModule> > useModuleNodes;
 
         std::optional<std::string> aliasName;
+        std::filesystem::path sourceFilePath;
+
         void setModulePath(const std::vector<Token> &pathTokens) {
             m_modulePath = pathTokens;
             modName = "";
@@ -89,11 +95,20 @@ namespace parser {
                 modName += ns.lexical() + "::";
             }
         }
-        const std::vector<Token>& modulePath() const {
+
+        [[nodiscard]] const std::vector<Token> &modulePath() const {
             return m_modulePath;
         }
 
-        [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
+        [[nodiscard]] bool containsSubModuleUse(const std::string &moduleName) const {
+            for (const auto &mod: useModuleNodes) {
+                if (mod->modulePathName() == moduleName) {
+                    return true;
+                }
+            }
+            return false;
+        }
+ [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
             for (const auto &mod: modules) {
                 if (!mod->m_modulePath.empty() && mod->m_modulePath.back().lexical() == moduleName) {
                     return true;
@@ -102,7 +117,7 @@ namespace parser {
             return false;
         }
 
-        [[nodiscard]] std::string modulePathName() const {
+        [[nodiscard]] const std::string &modulePathName() const {
             return modName;
         }
 
@@ -110,12 +125,16 @@ namespace parser {
             const std::string &path,
             const std::string &name) const;
 
-        std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > getNodeByToken(const Token &token) const;
+        [[nodiscard]] std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> >
+        getNodeByToken(const Token &token) const;
 
-         [[nodiscard]] std::vector<std::shared_ptr<Module>> findModulesByPathStart(const std::vector<Token> &pathTokens) const;
+        [[nodiscard]] std::vector<std::shared_ptr<Module> > findModulesByPathStart(
+            const std::vector<Token> &pathTokens) const;
+
         Module() = default;
+
         // Copy constructor
-        Module(const Module &other) ;
+        Module(const Module &other);
     };
 
 

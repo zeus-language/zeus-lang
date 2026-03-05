@@ -41,7 +41,7 @@ namespace ast {
                                                                 std::move(elementClones));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 }

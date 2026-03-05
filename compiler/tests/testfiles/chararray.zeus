@@ -6,7 +6,7 @@ fn main() : i32 {
     s[0] = 'h'; // Change 'H' to 'h'
     s[7] = 'w'; // Change 'W' to 'w'
 
-    println(s);
+    println(s as *u8); // Print the modified char array
 
     return 0;
 }

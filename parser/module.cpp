@@ -26,10 +26,11 @@ namespace modules {
         return buffer;
     }
 
-    void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories,ModuleCache& moduleCache, parser::ParseResult &result,
+    void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
+                       parser::ParseResult &result,
                        ast::UseModule *useModule) {
         std::string modulePath;
-        DBG_ASSERT(result.module ,"Resulting module must not be null");
+        DBG_ASSERT(result.module, "Resulting module must not be null");
         for (const auto &ns: useModule->modulePath()) {
             modulePath += ns.lexical() + "/";
         }
@@ -44,16 +45,15 @@ namespace modules {
                 continue;
             }
             if (moduleCache.containsModule(fullPath.string())) {
-                auto module = moduleCache.getModule(fullPath.string());
+                const auto module = moduleCache.getModule(fullPath.string());
                 module->setModulePath(useModule->modulePath());
                 module->aliasName = useModule->aliasName();
-                for (auto &function: module->functions) {
+                for (const auto &function: module->functions) {
                     function->setModulePath(useModule->modulePath());
                 }
                 result.module->modules.push_back(module);
                 moduleLoadedSuccessfully = true;
-
-            } else  if (!result.module->containsSubModule(modulePath)) {
+            } else if (!result.module->containsSubModule(modulePath)) {
                 auto moduleContent = read_file(fullPath);
                 if (!moduleContent) {
                     result.messages.push_back(parser::ParserMessasge{
@@ -66,7 +66,7 @@ namespace modules {
                 moduleLoadedSuccessfully = true;
                 auto moduleTokens = lexer::lex_file(fullPath.string(), moduleContent.value());
                 auto moduleResult = parser::parse_tokens(moduleTokens);
-                moduleResult.module->setModulePath( useModule->modulePath());
+                moduleResult.module->setModulePath(useModule->modulePath());
                 moduleResult.module->aliasName = useModule->aliasName();
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
@@ -75,10 +75,11 @@ namespace modules {
 
                 result.module->modules.push_back(moduleResult.module);
 
+
                 std::vector<ast::ASTNode *> nodesToDelete;
                 for (auto &node: moduleResult.module->useModuleNodes) {
                     if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
-                        useModuleFile(stdlibDirectories,moduleCache, moduleResult, subUseModule);
+                        useModuleFile(stdlibDirectories, moduleCache, moduleResult, subUseModule);
                     }
                 }
                 for (auto &function: moduleResult.module->functions) {
@@ -93,6 +94,7 @@ namespace modules {
                     // }
                 }
                 if (!moduleResult.hasError()) {
+                    moduleResult.module->sourceFilePath = fullPath;
                     moduleCache.addModule(fullPath.string(), moduleResult.module);
                 }
             }
@@ -112,21 +114,22 @@ namespace modules {
     }
 
     std::shared_ptr<parser::Module> ModuleCache::getModule(const std::string &path) const {
-            if (entries.contains(path)) {
-                const auto entry = entries.at(path);
-                // clone the module
-                return std::make_shared<parser::Module>(*entry);
-            }
-            return nullptr;
+        if (entries.contains(path)) {
+            const auto entry = entries.at(path);
+            // clone the module
+            return std::make_shared<parser::Module>(*entry);
+        }
+        return nullptr;
     }
 
     void ModuleCache::addModule(const std::string &path, const std::shared_ptr<parser::Module> &module) {
         entries[path] = std::make_shared<parser::Module>(*module);
     }
-    std::vector<std::shared_ptr<parser::Module>> ModuleCache::findModulesByPathStart(
+
+    std::vector<std::shared_ptr<parser::Module> > ModuleCache::findModulesByPathStart(
         const std::vector<Token> &pathTokens) const {
-        std::vector<std::shared_ptr<parser::Module>> result;
-        for (const auto &[path, mod]: entries) {
+        std::vector<std::shared_ptr<parser::Module> > result;
+        for (const auto &mod: entries | std::views::values) {
             bool matches = true;
             if (pathTokens.size() == 1 && mod->aliasName.has_value()) {
                 if (mod->aliasName.value() == pathTokens[0].lexical()) {
@@ -134,7 +137,7 @@ namespace modules {
                     continue;
                 }
             }
-            const auto& modulePath = mod->modulePath();
+            const auto &modulePath = mod->modulePath();
             if (modulePath.size() < pathTokens.size()) {
                 continue;
             }
@@ -152,13 +155,38 @@ namespace modules {
     }
 
     void include_modules(
-        const std::vector<std::filesystem::path> &stdlibDirectories,ModuleCache& moduleCache,
+        const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
         parser::ParseResult &result) {
+        if (!result.module->modulePathName().starts_with("core") and !result.module->modulePathName().
+            starts_with("std")) {
+            if (!result.module->containsSubModuleUse("std::io"))
+             {
+                 const SourceLocation location = result.module->modulePath().empty()
+                              ? SourceLocation{}
+                 : result.module->modulePath()[0].source_location;
+                auto path = std::vector<Token>{
+                    Token("std", Token::IDENTIFIER, location), Token("io", Token::IDENTIFIER, location)
+                };
+                result.module->useModuleNodes.
+                        push_back(std::make_unique<ast::UseModule>(std::move(path), std::nullopt));
+            }
+            if (!result.module->containsSubModuleUse("core::prelude"))
+            {
+                 const SourceLocation location = result.module->modulePath().empty()
+                              ? SourceLocation{}
+                 : result.module->modulePath()[0].source_location;
+                auto path = std::vector<Token>{
+                    Token("core", Token::IDENTIFIER, location), Token("prelude", Token::IDENTIFIER, location)
+                };
+                result.module->useModuleNodes.push_back(std::make_unique<ast::UseModule>(std::move(path), std::nullopt));
+            }
+        }
+
         for (auto &token: result.module->useModuleNodes) {
             if (const auto useModule = dynamic_cast<ast::UseModule *>(token.get())) {
                 parser::ParseResult moduleResult;
 
-                useModuleFile(stdlibDirectories,moduleCache, result, useModule);
+                useModuleFile(stdlibDirectories, moduleCache, result, useModule);
             }
         }
     }

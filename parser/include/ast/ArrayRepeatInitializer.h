@@ -42,7 +42,7 @@ namespace ast {
                                                                       std::move(values), std::move(counts));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include <utility>
+
 #include "ASTNode.h"
 #include "types/Annotation.h"
 
@@ -8,8 +10,8 @@ private :
     std::vector<std::shared_ptr<types::Annotation> > m_annotations;
 
 public:
-    explicit AnnotatedNode(const Token &token)
-        : ASTNode(token) {
+    explicit AnnotatedNode(Token token)
+        : ASTNode(std::move(token)) {
     }
 
     ~AnnotatedNode() override = default;

@@ -1,19 +1,63 @@
 use std::str;
-use core::libc;
-pub fn print(fmt: [u8], arg1 : &std::str::string) : void {
-    // A simple implementation of print that handles basic formatting
-    let formatted : string = string::from_slice(fmt);
 
-    let replaced : string = formatted.replace("{}",arg1);
-
-    printf(r"%s",replaced.as_c_str());
-    formatted.destroy();
-    replaced.destroy();
+pub fn print(fmt: [u8]) : void {
+    printf(fmt.data);
 }
-
-
-pub fn println2(fmt: [u8], arg1 : &std::str::string) : void {
-    print(fmt,arg1);
-    printf(r"\n");
+pub fn println(fmt: [u8]) : void {
+    printf(r"%s\n",fmt.data);
+}
+pub fn print(fmt: *u8) : void {
+    printf(fmt);
+}
+pub fn println(fmt: *u8) : void {
+    printf(r"%s\n",fmt);
+}
+pub fn print(fmt: i32) : void {
+    printf(r"%d",fmt);
+}
+pub fn println(value: i32) : void {
+    printf(r"%d\n",value);
+}
+pub fn print(fmt: u64) : void {
+    printf(r"%ld",fmt);
+}
+pub fn println(value: u64) : void {
+    printf(r"%ld\n",value);
+}
+pub fn print(fmt: i64) : void {
+    printf(r"%ld",fmt);
+}
+pub fn println(value: i64) : void {
+    printf(r"%ld\n",value);
+}
+pub fn print(fmt: double) : void {
+    printf(r"%f",fmt);
+}
+pub fn println(fmt: double) : void {
+    printf(r"%f\n",fmt);
+}
+pub fn print(fmt: float) : void {
+    printf(r"%f",fmt as double);
+}
+pub fn println(fmt: float) : void {
+    printf(r"%f\n",fmt as double);
+}
+pub fn print(fmt: u8) : void {
+    printf(r"%c",fmt);
+}
+pub fn println(fmt: u8) : void {
+    printf(r"%c\n",fmt);
+}
+pub fn print(s : &string) : void {
+    printf(r"%s",s.as_c_str());
+}
+pub fn println(s : &string) : void {
+    printf(r"%s\n",s.as_c_str());
+}
+pub fn print(s : string) : void {
+    printf(r"%s",s.as_c_str());
+}
+pub fn println(s : string) : void {
+    printf(r"%s\n",s.as_c_str());
 }
 

@@ -1,11 +1,11 @@
 
 
 @extern(libname="m", funcname="sqrtf")
-extern fn sqrt(x: float) : float;
+extern fn sqrtx(x: float) : float;
 
 fn main() : i32 {
     let x: float = 16.0f;
-    let y: float = sqrt(x);
+    let y: float = sqrtx(x);
     println(y);
     return 0;
 }

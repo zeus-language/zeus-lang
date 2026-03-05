@@ -34,7 +34,8 @@ namespace ast {
 
     std::unique_ptr<ASTNode> FunctionCallNode::clone() {
         std::vector<std::unique_ptr<ASTNode> > argClones;
-        for (auto &arg: m_args) {
+        argClones.reserve(m_args.size());
+        for (const auto &arg: m_args) {
             argClones.push_back(arg->clone());
         }
         auto cloneNode = std::make_unique<FunctionCallNode>(expressionToken(),
@@ -46,6 +47,6 @@ namespace ast {
         if (genericType()) {
             cloneNode->setGenericType(genericType().value());
         }
-        return cloneNode;
+        return std::move(cloneNode);
     }
 } // ast

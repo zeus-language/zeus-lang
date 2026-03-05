@@ -32,7 +32,7 @@ namespace  ast {
             m_operatorFunction = std::make_optional<ast::FunctionDefinitionBase*>(funcDef);
         }
 
-        [[nodiscard]] std::optional<ast::FunctionDefinitionBase*> operatorFunction() const  {
+        [[nodiscard]] const std::optional<ast::FunctionDefinitionBase*>& operatorFunction() const  {
             return m_operatorFunction;
         }
 

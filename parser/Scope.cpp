@@ -47,7 +47,7 @@ std::optional<types::Variable> types::Scope::findVariable(const std::string &nam
     return std::nullopt;
 }
 
-std::vector<std::shared_ptr<types::VariableType> > types::Scope::registeredTypes() {
+std::vector<std::shared_ptr<types::VariableType> > types::Scope::registeredTypes() const {
     auto types = m_typeRegistry.registeredTypes();
     if (m_parentScope != nullptr) {
         auto parentTypes = m_parentScope->registeredTypes();

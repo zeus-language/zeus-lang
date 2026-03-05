@@ -46,7 +46,7 @@ namespace ast {
             auto cloneNode = std::make_unique<ReturnStatement>(expressionToken(), std::move(returnValueClone));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

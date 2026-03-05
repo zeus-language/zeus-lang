@@ -281,6 +281,7 @@ namespace lexer
         {
             contentPtr = std::make_shared<std::string>(source_code);
             this->file_path = file_path;
+            tokens.reserve(contentPtr->size() / 4);
 
             for (start = 0; start < source_code.length(); start++)
             {
