@@ -16,7 +16,7 @@ namespace ast {
             m_accessNode(std::move(accessNode)) {
         }
 
-        [[nodiscard]] Token fieldName() const {
+        [[nodiscard]] const Token& fieldName() const {
             return expressionToken();
         }
 
@@ -43,7 +43,7 @@ namespace ast {
             if (result.has_value()) {
                 return result;
             }
-            auto ownToken = expressionToken();
+            const auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<ReferenceAccess *>(this)) : std::nullopt;
         }
 
@@ -52,7 +52,7 @@ namespace ast {
                                                                m_accessNode->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

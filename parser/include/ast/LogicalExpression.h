@@ -71,7 +71,7 @@ namespace ast {
                                                                  m_rhs->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 } // ast

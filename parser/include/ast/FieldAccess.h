@@ -63,7 +63,7 @@ namespace ast {
                 cloneNode->setExpressionType(expressionType().value());
             if (m_structType)
                 cloneNode->setStructType(m_structType.value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

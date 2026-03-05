@@ -46,6 +46,6 @@ namespace ast {
         if (genericType()) {
             cloneNode->setGenericType(genericType().value());
         }
-        return cloneNode;
+        return std::move(cloneNode);
     }
 } // ast

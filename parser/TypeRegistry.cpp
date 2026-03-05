@@ -19,7 +19,7 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::VariableType>("double", types::TypeKind::DOUBLE));
 }
 
-std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::registeredTypes() {
+const std::vector<std::shared_ptr<types::VariableType> >& types::TypeRegistry::registeredTypes() const {
     return m_types;
 }
 
@@ -52,8 +52,7 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPoi
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getReferenceType(
     const std::shared_ptr<VariableType> &base_type) {
-    return std::make_optional(
-        std::make_shared<types::ReferenceType>("&" + base_type->name(), base_type));
+    return std::make_shared<types::ReferenceType>("&" + base_type->name(), base_type);
 }
 
 

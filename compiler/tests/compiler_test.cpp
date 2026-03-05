@@ -7,10 +7,10 @@
 
 
 using namespace std::literals;
+static modules::ModuleCache moduleCache = modules::ModuleCache(true);
 
 class CompilerTest : public testing::TestWithParam<std::string> {
 protected:
-    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -18,7 +18,6 @@ public:
 
 class CompilerIOTest : public testing::TestWithParam<std::string> {
 protected:
-    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -26,7 +25,6 @@ public:
 
 class ProjectEulerTest : public testing::TestWithParam<std::string> {
 protected:
-    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -35,7 +33,6 @@ public:
 
 class CompilerTestError : public testing::TestWithParam<std::string> {
 protected:
-    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }
@@ -43,7 +40,6 @@ public:
 
 class WriteToStdErrTest : public testing::TestWithParam<std::string> {
 protected:
-    modules::ModuleCache moduleCache = modules::ModuleCache(true);
 public:
     static void SetUpTestSuite() {
     }

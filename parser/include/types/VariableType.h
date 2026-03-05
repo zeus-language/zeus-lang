@@ -88,7 +88,7 @@ namespace types {
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
 
         std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
     };
@@ -103,7 +103,7 @@ namespace types {
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
     };
 
 
@@ -120,7 +120,7 @@ namespace types {
 
         [[nodiscard]] size_t size() const { return m_size; }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
     };
 
     struct StructField {
@@ -168,7 +168,7 @@ namespace types {
             return 0;
         }
 
-        [[nodiscard]] std::optional<std::shared_ptr<VariableType> > genericParam() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<VariableType>>& genericParam() const {
             return m_genericParam;
         }
 
@@ -239,7 +239,7 @@ namespace types {
             return m_argumentTypes;
         }
 
-        [[nodiscard]] std::shared_ptr<VariableType> returnType() const {
+        [[nodiscard]] const std::shared_ptr<VariableType>& returnType() const {
             return m_returnType;
         }
     };

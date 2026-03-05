@@ -33,29 +33,22 @@ namespace ast {
         std::vector<Token> m_namespacePrefix;
         std::vector<std::unique_ptr<RawAnnotation> > m_rawAnnotations;
         VisibilityModifier m_visibilityModifier = VisibilityModifier::PRIVATE;
+        std::string m_modulePathName;
     public:
         [[nodiscard]] std::optional<RawType *> returnType() const {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
         }
 
-        void setModulePath(const std::vector<Token> &module_path) {
-            m_namespacePrefix = module_path;
-        }
+        void setModulePath(const std::vector<Token> &module_path);
 
         [[nodiscard]] std::vector<Token> modulePath() const {
             return m_namespacePrefix;
         }
 
-        [[nodiscard]] std::string modulePathName() const {
-            std::string name;
-            for (auto &ns: m_namespacePrefix) {
-                name += ns.lexical() + "::";
-            }
-            return name;
-        }
+        [[nodiscard]]const std::string& modulePathName() const ;
 
 
-        [[nodiscard]] std::string functionName() const;
+        [[nodiscard]]const  std::string& functionName() const;
 
 
         [[nodiscard]] FunctionArgument *getParam(const unsigned index) {

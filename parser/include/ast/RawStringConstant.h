@@ -33,7 +33,7 @@ namespace ast {
             auto cloneNode = std::make_unique<RawStringConstant>(expressionToken());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 } // ast

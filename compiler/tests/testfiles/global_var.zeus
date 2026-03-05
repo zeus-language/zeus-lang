@@ -6,10 +6,8 @@ let mut GLOBAL_FLOAT: float = 0.123f;
 
 
 fn print_global_var() :void{
-    let mut output : string = "Global int: ${GLOBAL_VAR}";
-    println(output.as_c_str());
-    let mut output2 :string = "Global float: ${GLOBAL_FLOAT}";
-    println(output2.as_c_str());
+    println("Global int: ${GLOBAL_VAR}");
+    println("Global float: ${GLOBAL_FLOAT}");
 }
 
 fn main() : i32 {

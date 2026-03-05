@@ -19,32 +19,38 @@ namespace ast {
     };
 
     struct RawType {
+    private:
+        std::string m_fullTypeName;
+    public:
         Token typeToken;
         std::vector<Token> namespaceElements;
         TypeModifier typeModifier = TypeModifier::NONE;
         std::optional<Token> genericParam = std::nullopt;
 
+        RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
+        std::optional<Token> genericParam)
+    : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
+      typeModifier(typeModifier), genericParam(std::move(genericParam)) {
+            m_fullTypeName= typeToken.lexical();
+            if (this->genericParam.has_value()) {
+                m_fullTypeName += "<" + this->genericParam.value().lexical() + ">";
+            }
+        }
 
         RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
-                std::optional<Token> genericParam)
-            : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
+                std::optional<Token> genericParam,std::string  fullTypeName)
+            : m_fullTypeName(std::move(fullTypeName)),typeToken(std::move(type_token)), namespaceElements(namespaceElements),
               typeModifier(typeModifier), genericParam(std::move(genericParam)) {
         }
 
         virtual ~RawType() = default;
 
-        [[nodiscard]] std::string fullTypeName() const {
-            std::string name;
-
-            name += typeToken.lexical();
-            if (genericParam.has_value()) {
-                name += "<" + genericParam.value().lexical() + ">";
-            }
-            return name;
+        [[nodiscard]] const std::string& fullTypeName() const {
+            return m_fullTypeName;
         }
 
         [[nodiscard]] virtual std::unique_ptr<RawType> clone() const {
-            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam);
+            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam,m_fullTypeName);
         }
     };
 
@@ -165,7 +171,7 @@ namespace ast {
                                                                        : std::nullopt);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

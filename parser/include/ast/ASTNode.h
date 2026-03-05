@@ -5,6 +5,7 @@
 #ifndef ZEUS_LANG_ASTNODE_H
 #define ZEUS_LANG_ASTNODE_H
 #include <optional>
+#include <utility>
 
 #include "lexer/Lexer.h"
 #include "types/VariableType.h"
@@ -15,7 +16,7 @@ namespace ast {
         std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
 
     protected:
-        explicit ASTNode(Token token) : m_token(std::move(token)) {
+        explicit ASTNode(Token  token) : m_token(std::move(token)) {
         }
 
     public:
@@ -34,7 +35,7 @@ namespace ast {
                 m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
             } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
                        m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
-                if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
+                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
                     if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
                         auto newBaseType = genericParam;
                         auto newPtrType = std::make_shared<types::PointerType>("*" + newBaseType->name(), newBaseType);
@@ -53,11 +54,11 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-        [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> >& expressionType() const {
             return m_expressionType;
         }
 
-        void setExpressionType(std::shared_ptr<types::VariableType> type) {
+        void setExpressionType(const std::shared_ptr<types::VariableType>& type) {
             m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
 
@@ -66,7 +67,7 @@ namespace ast {
         }
 
 
-        [[nodiscard]] Token expressionToken() const { return m_token; }
+        [[nodiscard]] const Token& expressionToken() const { return m_token; }
 
         [[nodiscard]] virtual std::optional<ASTNode *> getNodeByToken(const Token &token) const {
             if (m_token == token) {

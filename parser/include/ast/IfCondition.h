@@ -63,7 +63,7 @@ namespace ast {
                                                            std::move(ifBlock), std::move(elseBlock));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {

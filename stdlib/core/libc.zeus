@@ -4,7 +4,6 @@ extern pub fn malloc(size: u64) : *u8;
 extern pub fn realloc(ptr: *u8, size: u64) : *u8;
 extern pub fn free(ptr: *u8) : void;
 extern pub fn memcpy(dest: *u8, src: *u8, n: u64) : void;
-extern pub fn println(msg: *u8) : void;
 extern pub fn puts(msg: *u8) : i32;
 extern pub fn exit(code: i32) : void;
 

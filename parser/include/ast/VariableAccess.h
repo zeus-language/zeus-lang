@@ -38,7 +38,7 @@ namespace ast {
             cloneNode->setConstant(m_constant);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 } // ast

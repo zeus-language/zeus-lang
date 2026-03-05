@@ -20,7 +20,7 @@ namespace ast {
             auto cloneNode = std::make_unique<DeferStatement>(expressionToken(), m_deferredNode->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
-            return cloneNode;
+            return std::move(cloneNode);
         }
     };
 }

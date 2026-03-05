@@ -1737,7 +1737,7 @@ namespace parser {
             return std::make_unique<ast::FunctionCallNode>(nameToken, namespacePrefix, std::move(args), genericParam);
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseUseModule() {
+        std::optional<std::unique_ptr<ast::UseModule> > parseUseModule() {
             if (!canConsumeKeyWord("use")) {
                 return std::nullopt;
             }
@@ -2058,7 +2058,7 @@ namespace parser {
             if (func->expressionToken() == token) {
                 return std::make_pair(nullptr, func.get());
             }
-            if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(func.get())) {
+            if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(func.get())) {
                 for (auto &node: funcDef->block()->statements()) {
                     if (const auto result = node->getNodeByToken(token)) {
                         return std::make_pair(func.get(), result.value());
@@ -2101,22 +2101,27 @@ namespace parser {
         aliasName = other.aliasName;
         modName = other.modName;
         // Deep copy of nodes
+        nodes.reserve(other.nodes.size());
         for (const auto &node: other.nodes) {
             nodes.push_back(std::unique_ptr<ast::ASTNode>(node->clone()));
         }
         // Deep copy of externTypes
+        externTypes.reserve(other.externTypes.size());
         for (const auto &extType: other.externTypes) {
             externTypes.push_back(extType->clone());
         }
         // Deep copy of functions
+        functions.reserve(other.functions.size());
         for (const auto &func: other.functions) {
             functions.push_back(func->cloneFunction());
         }
         // Deep copy of useModuleNodes
+        useModuleNodes.reserve(other.useModuleNodes.size());
         for (const auto &useNode: other.useModuleNodes) {
-            useModuleNodes.push_back(useNode->clone());
+            useModuleNodes.push_back(useNode->cloneModule());
         }
         // Deep copy of sub-modules
+        modules.reserve(other.modules.size());
         for (const auto &mod: other.modules) {
             modules.push_back(std::make_shared<Module>(*mod));
         }

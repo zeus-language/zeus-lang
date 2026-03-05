@@ -1,5 +1,5 @@
 #pragma once
-#include <map>
+#include <unordered_map>
 #include <optional>
 #include <memory>
 #include <string>
@@ -17,10 +17,10 @@ namespace types {
     class Scope {
         std::shared_ptr<Scope> m_parentScope = nullptr;
         TypeRegistry m_typeRegistry;
-        std::map<std::string, std::optional<Variable> > currentVariables;
+        std::unordered_map<std::string, std::optional<Variable> > currentVariables;
 
     public:
-        explicit Scope(const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope) {
+        explicit Scope(const TypeRegistry& typeRegistry,const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope),            m_typeRegistry(typeRegistry) {
         }
 
         explicit Scope() : m_parentScope(nullptr) {
@@ -41,7 +41,7 @@ namespace types {
 
         std::shared_ptr<Scope> parentScope() { return m_parentScope; }
 
-        std::vector<std::shared_ptr<VariableType> > registeredTypes();
+        std::vector<std::shared_ptr<VariableType> > registeredTypes() const;
 
          [[nodiscard]] bool isGlobalScope() const;
     };

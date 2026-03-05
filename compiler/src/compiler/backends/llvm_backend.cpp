@@ -1739,56 +1739,8 @@ namespace llvm_backend {
 
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState) {
-        if (node->functionName() == "println") {
-            const auto printfFunc = llvmState.TheModule->getFunction("printf");
-            if (!printfFunc) {
-                return nullptr; // Error handling
-            }
-            std::vector<llvm::Value *> args;
-
-            assert(node->args().size() == 1 && "println expects exactly one argument");
-            for (const auto &arg: node->args()) {
-                auto value = codegen_base(arg.get(), llvmState);
-                assert(value != nullptr && "Failed to generate argument for println");
-                if (value->getType()->isIntegerTy(32)) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%d\n", "i32_format"));
-                } else if (value->getType()->isIntegerTy(8)) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%c\n", "char_format"));
-                } else if (value->getType()->isIntegerTy(64)) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%ld\n", "i64_format"));
-                } else if (value->getType()->isFloatingPointTy()) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%f\n", "double_format"));
-                } else if (value->getType()->isPointerTy() || value->getType()->isArrayTy()
-                ) {
-                    args.push_back(getOrCreateGlobalString(llvmState, "%s\n", "string_format"));
-                } else {
-                    assert(false && "Unsupported argument type for println");
-                    return nullptr;
-                }
-                auto argType = arg->expressionType();
-                std::string typeName;
-                if (argType) {
-                    typeName = argType.value()->rawTypeName();
-                }
-                if (value->getType()->isPointerTy() && typeName == "slice") {
-                    auto exprType = resolveLlvmType(arg->expressionType().value(), llvmState);
-                    const auto dataPtr = llvmState.Builder->CreateStructGEP(exprType, value, 1, "slice_data_ptr");
-                    auto loadedData = llvmState.Builder->CreateLoad(
-                        llvm::PointerType::getUnqual(llvm::Type::getInt8Ty(*llvmState.TheContext)),
-                        dataPtr,
-                        "load_slice_data_ptr");
-                    args.push_back(loadedData);
-                } else if (value->getType()->isFloatingPointTy()) {
-                    args.push_back(
-                        llvmState.Builder->CreateFPCast(value, llvmState.Builder->getDoubleTy(),
-                                                        "float_to_double"));
-                } else {
-                    args.push_back(value);
-                }
-            }
-            return llvmState.Builder->CreateCall(printfFunc, args, "printfCall");
-        } else if (node->functionName() == "sizeof") {
-            assert(node->args().size() == 0 && "sizeof expects exactly zero arguments");
+         if (node->functionName() == "sizeof") {
+            assert(node->args().empty() && "sizeof expects exactly zero arguments");
 
             const auto llvmType = resolveLlvmType(node->genericType().value(), llvmState);
             const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
@@ -1799,8 +1751,7 @@ namespace llvm_backend {
 
         auto functionCall = llvmState.TheModule->getFunction(node->functionName());
         if (!functionCall) {
-            auto functionDefinition = llvmState.findFunction(node->functionName());
-            if (functionDefinition) {
+            if (auto functionDefinition = llvmState.findFunction(node->functionName())) {
                 auto functionName = functionDefinition.value()->functionName();
                 auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
                 for (auto &annotation: external) {

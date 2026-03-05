@@ -14,9 +14,11 @@ namespace types {
     public:
         TypeRegistry();
 
-        ~TypeRegistry() = default;
+        virtual ~TypeRegistry() = default;
 
-        std::vector<std::shared_ptr<VariableType> > registeredTypes();
+
+
+        const std::vector<std::shared_ptr<VariableType> >& registeredTypes() const;
 
         static std::optional<std::shared_ptr<VariableType> > getSliceType(const std::shared_ptr<VariableType> &value);
 
@@ -32,7 +34,7 @@ namespace types {
         static std::optional<std::shared_ptr<VariableType> > getReferenceType(
             const std::shared_ptr<VariableType> &base_type);
 
-        TypeRegistry(const TypeRegistry &) = delete;
+        TypeRegistry(const TypeRegistry &) = default;
 
         TypeRegistry &operator=(const TypeRegistry &) = delete;
 
