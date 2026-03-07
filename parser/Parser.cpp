@@ -1655,17 +1655,15 @@ namespace parser {
             return true;
         }
 
-        bool isMethodCall() {
+        [[nodiscard]] bool isMethodCall() const {
             int lookaheadIndex = 0;
-            if (!canConsume(Token::IDENTIFIER))
-                return false;
-            lookaheadIndex++;
-            if (!canConsume(Token::DOT, lookaheadIndex))
-                return false;
-            lookaheadIndex++;
-            if (!canConsume(Token::IDENTIFIER, lookaheadIndex))
-                return false;
-            lookaheadIndex++;
+            while (canConsume(Token::IDENTIFIER, lookaheadIndex)) {
+                lookaheadIndex++;
+                if (!canConsume(Token::DOT, lookaheadIndex)) {
+                    break;
+                }
+                lookaheadIndex++;
+            }
             if (!canConsume(Token::LEFT_CURLY, lookaheadIndex)) {
                 return false;
             }

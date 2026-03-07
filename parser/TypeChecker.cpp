@@ -552,7 +552,7 @@ namespace types {
                 }
 
                 if (allParamsMatch) {
-                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and (!context.currentFunction->isMethod() or
+                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and ( !context.currentFunction->isMethod() or
                         context.currentFunction->parentStruct().value()->name() != structType->name())
                         ) {
                         context.messages.insert({
@@ -1740,6 +1740,7 @@ namespace types {
                                               });
         }
         bool hasReturnStatement = false;
+        auto oldFunction = context.currentFunction;
         context.currentFunction = node;
         for (auto &stmt: node->block()->statements()) {
             type_check_base(stmt.get(), context);
@@ -1789,7 +1790,7 @@ namespace types {
                 }
             }
         }
-        context.currentFunction = nullptr;
+        context.currentFunction = oldFunction;
         context.currentScope = context.currentScope->parentScope();
         if (node->functionName() == "main" and (!node->returnType() or node->returnType().value()->fullTypeName() !=
                                                 "i32")) {
