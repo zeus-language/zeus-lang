@@ -519,6 +519,11 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState) {
         const auto value = codegen_base(node->accessNode(), llvmState);
+        assert(value != nullptr && "Reference access base value is null");
+        if (!value->getType()->isPointerTy()) {
+            return getLoadStorePointerOperand(value);
+        }
+        assert(value->getType()->isPointerTy() && "Reference access base value is not pointer");
         return value;
     }
 
