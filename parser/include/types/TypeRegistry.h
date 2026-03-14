@@ -7,6 +7,15 @@
 
 
 namespace types {
+
+    enum class OsType {
+        WINDOWS = 0,
+        LINUX,
+        MACOS,
+        OTHER
+    };
+
+    std::shared_ptr<types::EnumType> createOstypeEnum();
     class TypeRegistry final {
     private:
         std::vector<std::shared_ptr<VariableType> > m_types;

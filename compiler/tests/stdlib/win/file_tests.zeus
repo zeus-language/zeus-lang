@@ -1,0 +1,18 @@
+use std::fs;
+
+fn main(): i32 {
+    let mut file : File = File::open("new_test_file.txt","w");
+
+    file.write("Hello World!\n");
+    file.write("Hello NextLine!\n");
+    file.close();
+    let mut file_read : File = File::open("new_test_file.txt","r");
+
+
+    let mut contents :string = string::new();
+    defer contents.destroy();
+    file_read.read_to_string(&contents);
+    file_read.close();
+    println("File Contents:\n${contents}");
+    return 0;
+}

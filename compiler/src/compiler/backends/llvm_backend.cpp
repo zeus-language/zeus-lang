@@ -374,7 +374,8 @@ namespace llvm_backend {
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::BlockNode *node, LLVMBackendState &llvmState);
- llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState);
 
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
@@ -519,11 +520,28 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState) {
         const auto value = codegen_base(node->accessNode(), llvmState);
+        assert(value != nullptr && "Reference access base value is null");
+        if (!value->getType()->isPointerTy()) {
+            return getLoadStorePointerOperand(value);
+        }
+        assert(value->getType()->isPointerTy() && "Reference access base value is not pointer");
         return value;
+    }
+
+    void createMemCpy(const LLVMBackendState &llvmState, llvm::Value *dest, llvm::Value *src, llvm::Type *fieldtype) {
+        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+        const size_t size = DL.getTypeAllocSize(fieldtype);
+
+        llvmState.Builder->CreateMemCpy(dest, llvm::MaybeAlign(), src, llvm::MaybeAlign(), size);
     }
 
     llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState) {
         const auto value = codegen_base(node->accessNode(), llvmState);
+        const auto resultType = resolveLlvmType(node->expressionType().value(), llvmState);
+        auto result = (!resultType->isVoidTy())
+                          ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
+                          : nullptr;
 
         const auto function = llvmState.Builder->GetInsertBlock()->getParent();
         llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "default", function);
@@ -531,7 +549,6 @@ namespace llvm_backend {
         llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "caseEnd", function);
         const auto switchInstruction = llvmState.Builder->CreateSwitch(value, defaultBlock,
                                                                        node->matchCases().size() + 1);
-
         for (const auto &[selectorNodes, expression]: node->matchCases()) {
             if (selectorNodes.at(0)->expressionToken().lexical() == "_")
                 continue;
@@ -541,7 +558,9 @@ namespace llvm_backend {
             }
             const auto selectorBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "case", function);
             llvmState.Builder->SetInsertPoint(selectorBlock);
-            codegen_base(expression.get(), llvmState);
+            const auto tmpResult = codegen_base(expression.get(), llvmState);
+            if (result != nullptr)
+                createMemCpy(llvmState, result, tmpResult, resultType);
             llvmState.Builder->CreateBr(endBlock);
             for (auto &selectorNode: selectorNodes) {
                 const auto selectorValue = codegen_base(selectorNode.get(), llvmState);
@@ -581,7 +600,9 @@ namespace llvm_backend {
 
                 // In range block
                 llvmState.Builder->SetInsertPoint(inRangeBlock);
-                codegen_base(expression.get(), llvmState);
+                const auto tmpResult = codegen_base(expression.get(), llvmState);
+                if (result != nullptr)
+                    createMemCpy(llvmState, result, tmpResult, resultType);
                 llvmState.Builder->CreateBr(endBlock);
 
                 // Not in range block
@@ -593,14 +614,16 @@ namespace llvm_backend {
 
         for (const auto &[selectorNode, expression]: node->matchCases()) {
             if (selectorNode.at(0)->expressionToken().lexical() == "_") {
-                codegen_base(expression.get(), llvmState);
+                const auto tmpResult = codegen_base(expression.get(), llvmState);
+                if (result != nullptr)
+                    createMemCpy(llvmState, result, tmpResult, resultType);
             }
         }
         llvmState.Builder->CreateBr(endBlock);
 
         llvmState.Builder->SetInsertPoint(endBlock);
 
-        return nullptr;
+        return result;
     }
 
     llvm::Value *codegen(const ast::FieldAssignment *node, LLVMBackendState &llvmState) {
@@ -1739,7 +1762,7 @@ namespace llvm_backend {
 
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState) {
-         if (node->functionName() == "sizeof") {
+        if (node->functionName() == "sizeof") {
             assert(node->args().empty() && "sizeof expects exactly zero arguments");
 
             const auto llvmType = resolveLlvmType(node->genericType().value(), llvmState);

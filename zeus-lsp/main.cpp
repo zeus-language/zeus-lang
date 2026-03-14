@@ -44,8 +44,8 @@ int main(int args, char **argv) {
     } else if (options.stdlibDirectories.empty()) {
         options.stdlibDirectories.push_back(std::filesystem::current_path() / "stdlib");
     }
-
-    LanguageServer language_server(options);
+    env::Environment env = env::buildEnvironment();
+    LanguageServer language_server(options, env);
     language_server.handleRequest();
 
     return 0;

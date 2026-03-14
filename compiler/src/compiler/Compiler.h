@@ -3,6 +3,7 @@
 
 #include <ast/ASTNode.h>
 #include "CompilerOptions.h"
+#include "Environment.h"
 #include "parser/module.h"
 
 
@@ -13,7 +14,6 @@ namespace compiler {
                  const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
                  const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes);
 
-    void parse_and_compile(const compiler::CompilerOptions &options,modules::ModuleCache& moduleCache, const std::filesystem::path &inputPath,
-                           std::ostream &errorStream,
-                           std::ostream &outputStream);
+    void parse_and_compile(const compiler::CompilerOptions &options,const env::Environment &environment,modules::ModuleCache& moduleCache, const std::filesystem::path &inputPath,
+                           std::ostream &errorStream, std::ostream &outputStream);
 }
