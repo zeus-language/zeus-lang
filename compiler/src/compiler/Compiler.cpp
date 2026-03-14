@@ -62,11 +62,12 @@ namespace compiler {
         return nodes;
     }
 
-    void parse_and_compile(const compiler::CompilerOptions &options
-        ,modules::ModuleCache& moduleCache
-        , const std::filesystem::path &inputPath,
-                           std::ostream &errorStream,
-                           std::ostream &outputStream) {
+    void parse_and_compile(const compiler::CompilerOptions &options,
+                            const env::Environment &environment,
+                            modules::ModuleCache& moduleCache,
+                            const std::filesystem::path &inputPath,
+                            std::ostream &errorStream,
+                            std::ostream &outputStream) {
         const auto content = read_file(inputPath);
         const auto tokens = lexer::lex_file(inputPath.string(), content.value());
 
@@ -77,7 +78,7 @@ namespace compiler {
             message.msg(errorStream, options.colorOutput);
         }
         types::TypeCheckResult typeCheckResult;
-        types::type_check(result.module, typeCheckResult);
+        types::type_check(result.module,environment, typeCheckResult);
         for (auto &mod : result.module->modules) {
             moduleCache.addModule(mod->sourceFilePath.string(), mod);
         }

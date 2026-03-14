@@ -544,6 +544,8 @@ namespace parser {
                 result = std::move(varAccess.value());
             } else if (auto arrayInit = parseArrayInitializer(allowInit)) {
                 result = std::move(arrayInit.value());
+            } else if (auto matchExpression = parseMatchExpression()) {
+                return std::move(matchExpression.value());
             }
 
             if (result) {
@@ -1265,7 +1267,7 @@ namespace parser {
             };
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseMatchStatement() {
+        std::optional<std::unique_ptr<ast::ASTNode> > parseMatchExpression() {
             Token name = current();
             if (!canConsumeKeyWord("match")) {
                 return std::nullopt;
@@ -1336,7 +1338,7 @@ namespace parser {
                 return std::move(whileLoop.value());
             } else if (auto forLoop = parseForLoop()) {
                 return std::move(forLoop.value());
-            } else if (auto matchStatement = parseMatchStatement()) {
+            } else if (auto matchStatement = parseMatchExpression()) {
                 return std::move(matchStatement.value());
             } else {
                 return std::nullopt;
@@ -1375,7 +1377,7 @@ namespace parser {
                     m_blockNodes.push_back(std::move(breakStmt.value()));
                 } else if (auto continueStmt = parseContinue()) {
                     m_blockNodes.push_back(std::move(continueStmt.value()));
-                } else if (auto matchStatement = parseMatchStatement()) {
+                } else if (auto matchStatement = parseMatchExpression()) {
                     m_blockNodes.push_back(std::move(matchStatement.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{

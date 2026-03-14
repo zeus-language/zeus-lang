@@ -74,8 +74,9 @@ int main(int args, char **argv) {
   }
   options.stdlibDirectories.push_back(file_path.parent_path() / "stdlib");
   options.stdlibDirectories.push_back(file_path.parent_path() );
+  env::Environment env = env::buildEnvironment();
   modules::ModuleCache moduleCache(true);
-  compiler::parse_and_compile(options,moduleCache, file_path, std::cerr, std::cout);
+  compiler::parse_and_compile(options,env,moduleCache, file_path, std::cerr, std::cout);
 
 
   return 0;

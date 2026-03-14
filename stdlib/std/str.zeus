@@ -109,6 +109,17 @@ struct string {
         self.data[self.length] = 0 as u8; // Null-terminate
     }
 
+    pub fn append(self : mut &string, other : *u8) : void {
+        let other_length : i32 = core::libc::strlen(other) as i32;
+        let new_length : i32 = self.length + other_length as i32 ;
+        self.increase_capacity(new_length);
+        // Append the new data
+        let _target : *u8 = self.data + self.length as *u8;
+        core::libc::memcpy(_target, other, other_length as u64);
+        self.length = new_length;
+        self.data[self.length] = 0 as u8; // Null-terminate
+    }
+
     pub fn as_slice(self : &string) : [u8] {
         let mut slice : [u8];
         slice.data = self.data;

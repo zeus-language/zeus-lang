@@ -43,6 +43,12 @@ namespace ast {
               typeModifier(typeModifier), genericParam(std::move(genericParam)) {
         }
 
+        RawType(Token type_token, const TypeModifier typeModifier)
+            :typeToken(std::move(type_token)),typeModifier(typeModifier){
+            m_fullTypeName= typeToken.lexical();
+
+        }
+
         virtual ~RawType() = default;
 
         [[nodiscard]] const std::string& fullTypeName() const {

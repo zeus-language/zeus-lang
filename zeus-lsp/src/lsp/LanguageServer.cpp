@@ -82,12 +82,13 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
 
 static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
     const std::vector<std::filesystem::path> &rtlDirectories,
-    modules::ModuleCache& moduleCache,
+    const env::Environment &env,
+    modules::ModuleCache &moduleCache,
     const lsp::Uri &uri,
     const std::string &text) {
     std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
 
-    const  std::filesystem::path file_path(uri.path());
+    const std::filesystem::path file_path(uri.path());
     const std::filesystem::path parentDir = file_path.parent_path();
     const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
     auto result = parser::parse_tokens(tokens);
@@ -98,14 +99,13 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
         }
     }
     includeDirs.push_back(parentDir);
-    for (auto &tmpDir : includeDirs) {
+    for (auto &tmpDir: includeDirs) {
         std::cerr << "Warning: Include directory '" << tmpDir.string() << "' !\n";
-
     }
-    modules::include_modules(includeDirs,moduleCache, result);
+    modules::include_modules(includeDirs, moduleCache, result);
 
     types::TypeCheckResult type_check_result;
-    types::type_check(result.module, type_check_result);
+    types::type_check(result.module, env, type_check_result);
 
     if (result.messages.empty() && type_check_result.messages.empty()) {
         errorsMap[std::string(uri.path())] = {};
@@ -227,7 +227,8 @@ void processMultiLineToken(const Token &token, const int tokenType,
     }
 }
 
-LanguageServer::LanguageServer(lsp::LspOptions options) : m_options(std::move(options)), m_moduleCache(true) {
+LanguageServer::LanguageServer(lsp::LspOptions options, const env::Environment &env) : m_options(std::move(options)),
+    m_env(env), m_moduleCache(true) {
 }
 
 void LanguageServer::handleRequest() {
@@ -300,10 +301,11 @@ void LanguageServer::handleRequest() {
                         // compute diagnostics asynchronously using a detached thread and send PublishDiagnostics
                         std::ignore = std::async(std::launch::async,
                                                  [ uri = std::move(uri), text = std::move(text), &messageHandler, rtl =
-                                                     this->m_options.stdlibDirectories, &cache = m_moduleCache
-                                                     ]() {
+                                                     this->m_options.stdlibDirectories, &cache = m_moduleCache,
+                                                     &env = this->m_env
+                                                 ]() {
                                                      const auto messages =
-                                                             collectDiagnostics(rtl,cache, uri, text);
+                                                             collectDiagnostics(rtl, env, cache, uri, text);
 
                                                      for (const auto &file: messages | std::views::keys) {
                                                          const auto diagnostics = buildDiagnosticsFromMessages(
@@ -329,13 +331,14 @@ void LanguageServer::handleRequest() {
                                 params.contentChanges.front()).text;
                         }
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
-                        auto* cache = &m_moduleCache;
+                        auto *cache = &m_moduleCache;
                         // async diagnostics
                         std::ignore = std::async(std::launch::async,
                                                  [ uri = uri, text = std::move(text), &messageHandler, rtl = this->
-                                                     m_options.stdlibDirectories,  cache]() {
+                                                     m_options.stdlibDirectories, cache,
+                                                     &env = this->m_env]() {
                                                      const auto messages =
-                                                             collectDiagnostics(rtl,*cache, uri, text);
+                                                             collectDiagnostics(rtl, env, *cache, uri, text);
                                                      for (const auto &file: messages | std::views::keys) {
                                                          const auto diagnostics = buildDiagnosticsFromMessages(
                                                              messages, file);
@@ -368,15 +371,15 @@ void LanguageServer::handleRequest() {
                         const std::string text = m_openDocuments.at(uri.toString()).text;
 
                         try {
-                            const auto messages = collectDiagnostics(this->m_options.stdlibDirectories,m_moduleCache, uri,
-                                                                     text);
+                            const auto messages = collectDiagnostics(this->m_options.stdlibDirectories, this->m_env,
+                                                                     m_moduleCache, uri, text);
                             const auto diagnostics = buildDiagnosticsFromMessages(
                                 messages, std::string(uri.path()));
                             auto fullDiagnosticsReport = lsp::RelatedFullDocumentDiagnosticReport{};
                             fullDiagnosticsReport.items = diagnostics;
                             std::cerr << "Found " << diagnostics.size() << " diagnostics\n";
                             diagnosticsReport = fullDiagnosticsReport;
-                        }catch (const std::exception &e) {
+                        } catch (const std::exception &e) {
                             std::cerr << "EXCEPTION: " << e.what() << std::endl;
                         }
                         return diagnosticsReport;
@@ -389,8 +392,8 @@ void LanguageServer::handleRequest() {
                             // content changes: for Full sync the first change contains whole text
                             std::string text;
                             text = m_openDocuments.at(uri.toString()).text;
-                            const auto messages = collectDiagnostics(this->m_options.stdlibDirectories,m_moduleCache, uri,
-                                                                     text);
+                            const auto messages = collectDiagnostics(this->m_options.stdlibDirectories, this->m_env,
+                                                                     m_moduleCache, uri, text);
                             const auto diagnostics = buildDiagnosticsFromMessages(
                                 messages, std::string(uri.path()));
                             auto report = lsp::WorkspaceFullDocumentDiagnosticReport{
@@ -437,7 +440,7 @@ void LanguageServer::handleRequest() {
                 std::cerr << "LSP Exception code: " << e.code() << "\n";
                 if (e.data())
                     std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
-            }catch (const std::exception &e) {
+            } catch (const std::exception &e) {
                 std::cerr << "EXCEPTION: " << e.what() << std::endl;
             }
         }
@@ -448,24 +451,24 @@ void LanguageServer::handleRequest() {
             std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
     } catch (const std::exception &e) {
         std::cerr << "LSP ERROR: " << e.what() << std::endl;
-
     }
 }
 
-bool tokenInRange(const Token &token,const size_t line,const size_t character) {
+bool tokenInRange(const Token &token, const size_t line, const size_t character) {
     return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
            character + 1 <= token.source_location.col + token.source_location.num_bytes;
 }
+
 void addToCompletionListIfMatches(lsp::CompletionItem item,
                                   lsp::CompletionList &completionList) {
     const auto containsItem = std::ranges::find(completionList.items, item.label,
-                                               &lsp::CompletionItem::label);
+                                                &lsp::CompletionItem::label);
     if (containsItem == completionList.items.end()) {
         completionList.items.push_back(std::move(item));
     }
 }
 
-void addCompletionItemForModule(const parser::Module * module, const char * token,  lsp::CompletionList & completions) {
+void addCompletionItemForModule(const parser::Module *module, const char *token, lsp::CompletionList &completions) {
     auto moduleName = module->modulePath().back().lexical();
     if (module->aliasName.has_value()) {
         moduleName = module->aliasName.value();
@@ -479,9 +482,10 @@ void addCompletionItemForModule(const parser::Module * module, const char * toke
         item.detail = "Module " + moduleName;
         addToCompletionListIfMatches(std::move(item), completions);
     }
-
 }
-void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,const std::string& nsPrefix, const std::string& token,
+
+void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, const std::string &nsPrefix,
+                                  const std::string &token,
                                   lsp::CompletionList &completions) {
     const auto definedName = function->functionName();
     if (definedName.find(token) != std::string::npos) {
@@ -501,23 +505,21 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function,co
         if (auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(function)) {
             if (funcDef->isMethod()) {
                 item.kind = lsp::CompletionItemKind::Method;
-            } else
-            {
+            } else {
                 item.kind = lsp::CompletionItemKind::Function;
             }
-        } else
-        {
+        } else {
             item.kind = lsp::CompletionItemKind::Function;
         }
 
-        item.detail = nsPrefix+function->functionSignature(false);
+        item.detail = nsPrefix + function->functionSignature(false);
         addToCompletionListIfMatches(std::move(item), completions);
     }
 }
 
 
-
-bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList, std::optional<Token> foundToken,const parser::ParseResult& parseResult)  {
+bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList,
+                          std::optional<Token> foundToken, const parser::ParseResult &parseResult) {
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
         auto [parent, node] = resultPair.value();
         if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
@@ -601,28 +603,30 @@ bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result
     return false;
 }
 
-std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std::optional<Token> &foundToken,bool& isUseCompletion)  {
+std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std::optional<Token> &foundToken,
+                                                 bool &isUseCompletion) {
     std::vector<Token> pathTokens;
     while (true) {
         pathTokens.push_back(foundToken.value());
-        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(),foundToken.value());
+        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
         if (previousTokenIt != tokens.rend()) {
             std::optional<Token> previousToken = std::nullopt;
             for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
-                if ( it->type != Token::LINE_COMMENT &&
-                     it->type != Token::BLOCK_COMMENT &&
-                     it->type != Token::NS_SEPARATOR) {
+                if (it->type != Token::LINE_COMMENT &&
+                    it->type != Token::BLOCK_COMMENT &&
+                    it->type != Token::NS_SEPARATOR) {
                     previousToken = *it;
                     break;
                 }
             }
 
             if (previousToken.has_value()) {
-                if (previousToken->type != Token::Type::IDENTIFIER && previousToken->type != Token::Type::NS_SEPARATOR) {
+                if (previousToken->type != Token::Type::IDENTIFIER && previousToken->type !=
+                    Token::Type::NS_SEPARATOR) {
                     if (previousToken->type == Token::Type::KEYWORD &&
                         previousToken->lexical() == "use") {
                         isUseCompletion = true;
-                        std::cerr<< "Found use statement for completion\n";
+                        std::cerr << "Found use statement for completion\n";
                     }
                     break;
                 }
@@ -639,11 +643,11 @@ std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std:
 }
 
 lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
-    const lsp::requests::TextDocument_Completion::Params &params)  {
+    const lsp::requests::TextDocument_Completion::Params &params) {
     auto result = lsp::requests::TextDocument_Completion::Result();
 
     const auto uri = params.textDocument.uri.toString();
-    const auto& [_, text] = m_openDocuments.at(uri);
+    const auto &[_, text] = m_openDocuments.at(uri);
 
     auto completionList = lsp::CompletionList{
         .isIncomplete = true,
@@ -665,16 +669,16 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     }
     auto parseResult = parser::parse_tokens(tokens);
 
-    modules::include_modules(this->m_options.stdlibDirectories,m_moduleCache, parseResult);
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
-    types::type_check(parseResult.module, typeCheckResult);
+    types::type_check(parseResult.module, this->m_env, typeCheckResult);
     if (foundToken->type == Token::NS_SEPARATOR) {
         // handle member completions
-        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(),foundToken.value());
+        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
         if (previousTokenIt != tokens.rend()) {
             std::optional<Token> previousToken = std::nullopt;
             for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
-                if ( it->type != Token::LINE_COMMENT &&
+                if (it->type != Token::LINE_COMMENT &&
                     it->type != Token::BLOCK_COMMENT) {
                     previousToken = *it;
                     break;
@@ -682,7 +686,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
             }
             if (previousToken.has_value()) {
                 std::cerr << "Found previous token for namespace separator: " << previousToken->lexical()
-                          << "\n";
+                        << "\n";
                 foundToken = previousToken;
             } else {
                 std::cerr << "No previous token found for namespace separator\n";
@@ -695,23 +699,21 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
         bool isUseCompletion = false;
 
         std::vector<Token> pathTokens = build_path_from_token_reverse(tokens, foundToken, isUseCompletion);
-        std::cerr<< "is use completion: " << isUseCompletion << "\n";
+        std::cerr << "is use completion: " << isUseCompletion << "\n";
 
         auto completionResult = parseResult.module->findModulesByPathStart(
             pathTokens);
         for (const auto &mod: completionResult) {
-
             addCompletionItemForModule(mod.get(), "", completionList);
             if (!isUseCompletion) {
                 for (const auto &function: mod->functions) {
-                    addCompletionItemForFunction(function.get(),mod->modulePathName(), "", completionList);
+                    addCompletionItemForFunction(function.get(), mod->modulePathName(), "", completionList);
                 }
             }
         }
         if (isUseCompletion) {
             completionResult = m_moduleCache.findModulesByPathStart(pathTokens);
             for (const auto &mod: completionResult) {
-
                 addCompletionItemForModule(mod.get(), "", completionList);
             }
         }
@@ -721,14 +723,15 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
 
     if (findMemberCompletion(result, completionList, foundToken, parseResult)) return result;
     for (auto &function: parseResult.module->functions) {
-        addCompletionItemForFunction(function.get(),"", foundToken.value().lexical(), completionList);
+        addCompletionItemForFunction(function.get(), "", foundToken.value().lexical(), completionList);
     }
     for (auto &importModule: parseResult.module->modules) {
         for (auto &function: importModule->functions) {
-            addCompletionItemForFunction(function.get(),importModule->modulePathName(), foundToken.value().lexical(), completionList);
+            addCompletionItemForFunction(function.get(), importModule->modulePathName(), foundToken.value().lexical(),
+                                         completionList);
         }
     }
-    for (const auto& keyword: lexer::keywords()) {
+    for (const auto &keyword: lexer::keywords()) {
         if (auto containsName = keyword.find(foundToken.value().lexical()); containsName != std::string::npos) {
             lsp::CompletionItem item;
             item.label = keyword;
@@ -762,9 +765,9 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
-    modules::include_modules(this->m_options.stdlibDirectories,m_moduleCache, parseResult);
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
-    types::type_check(parseResult.module, typeCheckResult);
+    types::type_check(parseResult.module, this->m_env, typeCheckResult);
 
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
         std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
@@ -820,7 +823,8 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 return result;
             if (const auto &[module, func] = funcResult.value(); func) {
                 if (func->functionName() == funcName) {
-                    std::cerr << "Found function definition for " << funcName <<"\n"<<func->expressionToken().source_location.filename<< "\n";
+                    std::cerr << "Found function definition for " << funcName << "\n" << func->expressionToken().
+                            source_location.filename << "\n";
                     lsp::Location location;
                     location.uri = toUri(func->expressionToken().source_location.filename);
                     location.range.start.line = static_cast<int>(

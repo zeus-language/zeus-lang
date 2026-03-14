@@ -16,3 +16,5 @@ extern type FILE;
 extern pub fn fopen(filename: *u8, mode: *u8) : *FILE;
 extern pub fn fclose(file: *FILE) : i32;
 extern pub fn fgets(buf: *u8, size: i32, file: *FILE) : *u8;
+extern pub fn fputs(s: *u8, file: *FILE) : i32;
+extern pub fn remove(filename : *u8) : i32;

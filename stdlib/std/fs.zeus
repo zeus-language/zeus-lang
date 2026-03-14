@@ -1,0 +1,105 @@
+use core::libc;
+use std::str;
+
+pub fn path_separator() : [u8] {
+    return match target_os {
+        ostype::WINDOWS => "\\",
+        _ => "/",
+    };
+}
+
+
+struct Path {
+    path : string,
+
+    pub fn new(path : string) : Path {
+        return Path { path : path };
+    }
+
+    pub fn path(self: &Path) : &string {
+        return &self.path;
+    }
+
+    pub fn new(path : [u8]) : Path {
+        let path_str : string = string::from_slice(path);
+        let p : Path =  Path { path : path_str };
+        return p;
+    }
+
+    pub fn append(self : mut &Path,content : [u8]) : void {
+        self.path.append(path_separator());
+        self.path.append(content);
+    }
+
+    pub fn append(self: mut &Path,content : string) : void {
+        self.path.append(path_separator());
+        self.path.append(content);
+    }
+
+    pub fn delete(self: &Path) : void {
+        remove(self.as_c_str());
+    }
+
+    pub fn as_c_str(self: &Path) : *u8 {
+        return self.path.as_c_str();
+    }
+
+    pub fn exists(self: &Path) : bool{
+        let fp : *FILE = fopen(self.as_c_str(), r"r" as *u8);
+        let mut is_exist : bool = false;
+        if (fp != null as *FILE)
+        {
+            is_exist = true;
+            fclose(fp); // close the file
+        }
+        return is_exist;
+    }
+
+    pub fn destroy(self: mut &Path) : void {
+        self.path.destroy();
+    }
+}
+
+struct File {
+    ptr : *FILE,
+    path : Path,
+
+    pub fn open(path_slice : [u8], mode : [u8]) : File {
+        let path : Path =Path::new(path_slice);
+        return File::open(path, mode);
+    }
+
+    pub fn open(path : Path, mode : [u8]) : File {
+        let fp : *FILE = fopen(path.as_c_str(), mode.data);
+        return File { ptr : fp, path : path };
+    }
+
+    pub fn write(self: &File, content : [u8]) : void {
+        if (self.ptr != null as *FILE)
+        {
+            fputs(content.data, self.ptr);
+        }
+    }
+    pub fn write(self: &File, content : string) : void {
+        if (self.ptr != null as *FILE)
+        {
+            fputs(content.as_c_str(), self.ptr);
+        }
+    }
+
+    pub fn read_to_string(self: &File,result :mut &string) : void {
+        let mut buffer : [u8; 256] = [0 as u8; 256];
+        while fgets(buffer as *u8, 256, self.ptr) != 0 as *u8 {
+            result.append(buffer as *u8);
+        }
+    }
+
+    pub fn close(self: &File) : void {
+        if (self.ptr != null as *FILE)
+        {
+            fclose(self.ptr);
+        }
+        self.path.destroy();
+    }
+
+}
