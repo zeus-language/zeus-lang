@@ -24,5 +24,12 @@ namespace ast {
         [[nodiscard]] Token variantName() const {
             return m_variantName;
         }
+
+        std::unique_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_unique<EnumAccess>(expressionToken(), m_variantName);
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return std::move(cloneNode);
+        }
     };
 }

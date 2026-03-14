@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 
+#include "Environment.h"
 #include "parser/Parser.h"
 
 namespace types {
@@ -14,5 +15,5 @@ namespace types {
         }
     };
 
-    void type_check(const std::shared_ptr<parser::Module> &module, TypeCheckResult &result);
+    void type_check(const std::shared_ptr<parser::Module> &module,const env::Environment& environment, TypeCheckResult &result);
 }

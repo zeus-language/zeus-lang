@@ -1,0 +1,24 @@
+use std::fs;
+
+fn main() : i32 {
+    println(path_separator());
+    let  path : Path = Path::new("test\\file.txt");
+    defer path.destroy();
+
+    let mut path2 : Path = Path::new("C:\\tmp");
+    defer path2.destroy();
+    path2.append("file.txt");
+
+    if(path.exists() == false)
+    {
+        println("File does not exist, creating file...");
+    }
+
+    if(not path2.exists())
+    {
+        println("File does not exist, creating file...");
+        println(path2.path());
+    }
+
+    return 0;
+}

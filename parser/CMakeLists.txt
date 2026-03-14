@@ -6,6 +6,7 @@ add_library(${PROJECT_NAME} STATIC
         Parser.cpp
         TypeRegistry.cpp
         TypeChecker.cpp
+        Environment.cpp
         ast/ASTNode.cpp
         ast/FunctionCallNode.cpp
         ast/ReturnStatement.cpp

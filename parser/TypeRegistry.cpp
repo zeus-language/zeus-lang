@@ -3,8 +3,17 @@
 #include <algorithm>
 
 #include "ast/FunctionDefinition.h"
-#include "ast/VariableDeclaration.h"
-#include "lexer/Lexer.h"
+
+std::shared_ptr<types::EnumType> types::createOstypeEnum(){
+    std::vector<types::EnumVariant> variants = {
+        {"WINDOWS", static_cast<int>( types::OsType::WINDOWS)},
+        {"LINUX", static_cast<int>( types::OsType::LINUX)},
+        {"MACOS", static_cast<int>( types::OsType::MACOS)},
+        {"OTHER", static_cast<int>( types::OsType::OTHER)}
+    };
+    static auto ostype =  std::make_shared<types::EnumType>("ostype", variants);
+    return ostype;
+}
 
 types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("i32", 4, true));
@@ -17,6 +26,7 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
     registerType(std::make_shared<types::VariableType>("double", types::TypeKind::DOUBLE));
+    registerType(createOstypeEnum());
 }
 
 const std::vector<std::shared_ptr<types::VariableType> >& types::TypeRegistry::registeredTypes() const {
