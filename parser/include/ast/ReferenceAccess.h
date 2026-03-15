@@ -12,11 +12,12 @@ namespace ast {
         std::unique_ptr<ASTNode> m_accessNode;
 
     public:
-        explicit ReferenceAccess(Token name, std::unique_ptr<ASTNode> accessNode) : ASTNode(std::move(name),NodeType::REFERENCE_ACCESS),
+        explicit ReferenceAccess(Token name, std::unique_ptr<ASTNode> accessNode) : ASTNode(std::move(name),
+                NodeType::REFERENCE_ACCESS),
             m_accessNode(std::move(accessNode)) {
         }
 
-        [[nodiscard]] const Token& fieldName() const {
+        [[nodiscard]] const Token &fieldName() const {
             return expressionToken();
         }
 
@@ -39,8 +40,7 @@ namespace ast {
         ReferenceAccess &operator=(const ReferenceAccess &) = delete;
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            auto result = m_accessNode->getNodeByToken(token);
-            if (result.has_value()) {
+            if (const auto result = m_accessNode->getNodeByToken(token); result.has_value()) {
                 return result;
             }
             const auto ownToken = expressionToken();

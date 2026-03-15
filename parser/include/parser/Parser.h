@@ -11,6 +11,7 @@
 #include <iostream>
 #include "../lexer/Lexer.h"
 #include "ast/ASTNode.h"
+#include "ast/FieldAccess.h"
 #include "ast/UseModule.h"
 
 namespace ast {
@@ -108,7 +109,8 @@ namespace parser {
             }
             return false;
         }
- [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
+
+        [[nodiscard]] bool containsSubModule(const std::string &moduleName) const {
             for (const auto &mod: modules) {
                 if (!mod->m_modulePath.empty() && mod->m_modulePath.back().lexical() == moduleName) {
                     return true;
@@ -130,6 +132,9 @@ namespace parser {
 
         [[nodiscard]] std::vector<std::shared_ptr<Module> > findModulesByPathStart(
             const std::vector<Token> &pathTokens) const;
+
+        [[nodiscard]] std::optional<ast::ASTNode *> getDeclarationByType(
+            const std::shared_ptr<types::VariableType> &type);
 
         Module() = default;
 

@@ -9,6 +9,7 @@
 
 #include "lexer/Lexer.h"
 #include "types/VariableType.h"
+
 namespace ast {
     enum class NodeType {
         RETURN,
@@ -17,6 +18,7 @@ namespace ast {
         VARIABLE_ACCESS,
         FUNCTION_DEFINITION,
         FUNCTION_CALL,
+        METHOD_CALL,
         IF_STATEMENT,
         WHILE_LOOP,
         FOR_LOOP,
@@ -47,9 +49,10 @@ namespace ast {
         std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
 
     protected:
-        explicit ASTNode(Token  token,NodeType nodeType) : m_token(std::move(token)), m_nodeType(nodeType) {
+        explicit ASTNode(Token token, NodeType nodeType) : m_token(std::move(token)), m_nodeType(nodeType) {
         }
-        explicit ASTNode(Token  token) : m_token(std::move(token)) {
+
+        explicit ASTNode(Token token) : m_token(std::move(token)) {
         }
 
     public:
@@ -87,11 +90,11 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> >& expressionType() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > &expressionType() const {
             return m_expressionType;
         }
 
-        void setExpressionType(const std::shared_ptr<types::VariableType>& type) {
+        void setExpressionType(const std::shared_ptr<types::VariableType> &type) {
             m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
         }
 
@@ -100,7 +103,7 @@ namespace ast {
         }
 
 
-        [[nodiscard]] const Token& expressionToken() const { return m_token; }
+        [[nodiscard]] const Token &expressionToken() const { return m_token; }
 
         [[nodiscard]] virtual std::optional<ASTNode *> getNodeByToken(const Token &token) const {
             if (m_token == token) {
@@ -108,6 +111,7 @@ namespace ast {
             }
             return std::nullopt;
         }
+
         [[nodiscard]] NodeType nodeType() const { return m_nodeType; }
     };
 } // ast

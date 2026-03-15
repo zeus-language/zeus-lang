@@ -193,8 +193,7 @@ namespace parser {
                                                        std::nullopt);
             auto tempString = std::make_unique<ast::VariableDeclaration>(tempToken, std::move(type),
                                                                          constant, std::nullopt);
-            m_blockNodes.push_back(std::move(tempString));
-            {
+            m_blockNodes.push_back(std::move(tempString)); {
                 auto stringConstant = std::make_unique<ast::StringConstant>(stringToken);
                 auto args = std::vector<std::unique_ptr<ast::ASTNode> >();
                 args.push_back(std::move(stringConstant));
@@ -213,12 +212,13 @@ namespace parser {
                 auto accessNode = std::make_unique<ast::VariableAccess>(tempToken);
                 auto instanceNode = std::make_unique<ast::ReferenceAccess>(accessNode->expressionToken(),
                                                                            std::move(accessNode));
-                auto destroyCallNode = std::make_unique<ast::MethodCallNode>(std::move(destroyToken), std::move(instanceNode),
-                                                          std::move(args));
+                auto destroyCallNode = std::make_unique<ast::MethodCallNode>(
+                    std::move(destroyToken), std::move(instanceNode),
+                    std::move(args));
 
                 m_blockNodes.push_back(
                     std::make_unique<ast::DeferStatement>(stringToken, std::move(destroyCallNode))
-                    );
+                );
             }
             while (canConsume(Token::INTERPOLATION_START) || canConsume(Token::INTERPOLATED_STRING)) {
                 const auto partToken = current();
@@ -1305,9 +1305,9 @@ namespace parser {
             if (auto deferedStatement = tryParseDeferableStatement()) {
                 statement = std::move(deferedStatement.value());
             } else {
-                if (auto block = tryParseBlock()){
+                if (auto block = tryParseBlock()) {
                     statement = std::move(block.value());
-                }else {
+                } else {
                     m_messages.push_back(ParserMessasge{
                         .token = deferToken,
                         .message = "expected block after 'defer' statement!"
@@ -1346,7 +1346,7 @@ namespace parser {
         }
 
         std::unique_ptr<ast::BlockNode> parseBlock() {
-            Token& token = current();
+            Token &token = current();
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::unique_ptr<ast::ASTNode> > nodes;
             std::vector<std::unique_ptr<ast::ASTNode> > oldBLockNodes = std::move(m_blockNodes);
@@ -2050,8 +2050,28 @@ namespace parser {
     std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > Module::getNodeByToken(
         const Token &token) const {
         for (auto &node: nodes) {
-            if (node->expressionToken() == token) {
-                return std::make_pair(nullptr, node.get());
+            if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
+                if (structDecl->expressionType()) {
+                    auto structType = std::dynamic_pointer_cast<
+                        types::StructType>(structDecl->expressionType().value());
+                    for (auto &method: structType->methods()) {
+                        for (auto &innerNode: method->block()->statements()) {
+                            if (const auto result = innerNode->getNodeByToken(token)) {
+                                return std::make_pair(method.get(), result.value());
+                            }
+                        }
+                    }
+                }
+                for (const auto &method: structDecl->methods()) {
+                    for (auto &innerNode: method->block()->statements()) {
+                        if (const auto result = innerNode->getNodeByToken(token)) {
+                            return std::make_pair(method.get(), result.value());
+                        }
+                    }
+                }
+            }
+            if (auto result = node->getNodeByToken(token)) {
+                return std::make_pair(node.get(), result.value());
             }
         }
         for (auto &func: functions) {
@@ -2094,6 +2114,26 @@ namespace parser {
             }
         }
         return result;
+    }
+
+    std::optional<ast::ASTNode *> Module::getDeclarationByType(const std::shared_ptr<types::VariableType> &type) {
+        for (const auto &module: modules) {
+            if (const auto result = module->getDeclarationByType(type)) {
+                return result;
+            }
+        }
+        for (const auto &node: nodes) {
+            if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
+                if (structDecl->expressionType() && structDecl->expressionType().value() == type) {
+                    return node.get();
+                }
+            } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
+                if (enumDecl->expressionType() && enumDecl->expressionType().value() == type) {
+                    return node.get();
+                }
+            }
+        }
+        return std::nullopt;
     }
 
     Module::Module(const Module &other) {

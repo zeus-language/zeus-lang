@@ -39,8 +39,26 @@ namespace ast {
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
         std::vector<std::unique_ptr<ast::FunctionDefinition> > &methods() { return m_methods; }
 
-        [[nodiscard]] const std::optional<Token>& genericParam() const { return m_genericParam; }
+        [[nodiscard]] const std::optional<Token> &genericParam() const { return m_genericParam; }
+
         std::unique_ptr<ASTNode> clone() override;
+
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+            if (expressionToken() == token) {
+                return const_cast<StructDeclaration *>(this);
+            }
+            for (const auto &field: m_fields) {
+                if (field.name == token) {
+                    return const_cast<StructDeclaration *>(this);
+                }
+            }
+            for (const auto &method: m_methods) {
+                if (const auto result = method->getNodeByToken(token)) {
+                    return result;
+                }
+            }
+            return std::nullopt;
+        }
     };
 
     inline std::unique_ptr<ASTNode> StructDeclaration::clone() {
@@ -55,12 +73,12 @@ namespace ast {
         std::vector<std::unique_ptr<ast::FunctionDefinition> > methodsClone;
         methodsClone.reserve(m_methods.size());
         for (const auto &method: m_methods) {
-            methodsClone.push_back( method->cloneFunction2());
+            methodsClone.push_back(method->cloneFunction2());
         }
         auto cloneNode = std::make_unique<StructDeclaration>(expressionToken(),
-                                                            std::move(fieldsClone),
-                                                            std::move(methodsClone),
-                                                            m_genericParam);
+                                                             std::move(fieldsClone),
+                                                             std::move(methodsClone),
+                                                             m_genericParam);
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);

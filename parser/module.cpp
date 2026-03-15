@@ -123,6 +123,8 @@ namespace modules {
     }
 
     void ModuleCache::addModule(const std::string &path, const std::shared_ptr<parser::Module> &module) {
+        if (!isEnabled)
+            return;
         entries[path] = std::make_shared<parser::Module>(*module);
     }
 
@@ -159,26 +161,25 @@ namespace modules {
         parser::ParseResult &result) {
         if (!result.module->modulePathName().starts_with("core") and !result.module->modulePathName().
             starts_with("std")) {
-            if (!result.module->containsSubModuleUse("std::io"))
-             {
-                 const SourceLocation location = result.module->modulePath().empty()
-                              ? SourceLocation{}
-                 : result.module->modulePath()[0].source_location;
+            if (!result.module->containsSubModuleUse("std::io")) {
+                const SourceLocation location = result.module->modulePath().empty()
+                                                    ? SourceLocation{}
+                                                    : result.module->modulePath()[0].source_location;
                 auto path = std::vector<Token>{
                     Token("std", Token::IDENTIFIER, location), Token("io", Token::IDENTIFIER, location)
                 };
                 result.module->useModuleNodes.
                         push_back(std::make_unique<ast::UseModule>(std::move(path), std::nullopt));
             }
-            if (!result.module->containsSubModuleUse("core::prelude"))
-            {
-                 const SourceLocation location = result.module->modulePath().empty()
-                              ? SourceLocation{}
-                 : result.module->modulePath()[0].source_location;
+            if (!result.module->containsSubModuleUse("core::prelude")) {
+                const SourceLocation location = result.module->modulePath().empty()
+                                                    ? SourceLocation{}
+                                                    : result.module->modulePath()[0].source_location;
                 auto path = std::vector<Token>{
                     Token("core", Token::IDENTIFIER, location), Token("prelude", Token::IDENTIFIER, location)
                 };
-                result.module->useModuleNodes.push_back(std::make_unique<ast::UseModule>(std::move(path), std::nullopt));
+                result.module->useModuleNodes.
+                        push_back(std::make_unique<ast::UseModule>(std::move(path), std::nullopt));
             }
         }
 

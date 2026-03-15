@@ -12,7 +12,7 @@ namespace ast {
         bool m_constant = false;
 
     public:
-        explicit VariableAccess(Token name) : ASTNode(std::move(name)) {
+        explicit VariableAccess(Token name) : ASTNode(std::move(name), ast::NodeType::VARIABLE_ACCESS) {
         }
 
         ~VariableAccess() override = default;
