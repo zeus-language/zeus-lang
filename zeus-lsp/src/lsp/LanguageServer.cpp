@@ -884,6 +884,25 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 bool methodFound = false;
                 for (const auto &method: structType->methods()) {
                     if (method->functionName() == funcName) {
+                        bool allParamsMatch = true;
+                        for (size_t i = 1; i < method->args().size(); ++i) {
+                            if (!method->args()[i].type) {
+                                allParamsMatch = false;
+                                break;
+                            }
+                            if (methodCall->args()[i - 1]->expressionType() == nullptr || !methodCall->args()[i - 1]->
+                                expressionType() ||
+                                methodCall->args()[i - 1]->expressionType().value()->name() !=
+                                method->args()[i].type.value()->name()) {
+                                allParamsMatch = false;
+                                break;
+                            }
+                        }
+                        if (!allParamsMatch) {
+                            continue;
+                        }
+
+
                         std::cerr << "Found method definition for " << funcName << " in struct " << structType->name()
                                 << "\n";
                         lsp::Location location;
