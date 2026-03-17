@@ -112,14 +112,14 @@ jobs:
         run: find $RUNNER_WORKSPACE
         shell: bash
       - name: version linux
-        run: echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/VERSION.TXT)" >> $GITHUB_OUTPUT
+        run: echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/parser/VERSION.TXT)" >> $GITHUB_OUTPUT
         id: version-linux
         if: matrix.triplet == 'x64-linux'
       - name: version windows
         working-directory: build
         run: |
           cd ${{ env.CMAKE_BUILD_DIR }}
-          echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/VERSION.TXT)" >> $Env:GITHUB_OUTPUT
+          echo "version=$(cat ${{ env.CMAKE_BUILD_DIR }}/parser/VERSION.TXT)" >> $Env:GITHUB_OUTPUT
         id: version-windows
         if: matrix.os == 'windows-latest'
       - name: Build Packages Linux

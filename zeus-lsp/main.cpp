@@ -5,6 +5,7 @@
 
 #include "lexer/Lexer.h"
 #include "lsp/LanguageServer.h"
+#include "config.h"
 
 void printHelp(const std::string &program) {
     std::cout << "Usage: " + program + " [options] \n";
@@ -25,8 +26,8 @@ int main(int args, char **argv) {
 
     if (argList.size() == 2) {
         if (argList[1] == "--version"sv || argList[1] == "-v"sv) {
-            // std::cout << "Version: " << WIRTHX_VERSION_MAJOR << "." << WIRTHX_VERSION_MINOR << "."
-            //     << WIRTHX_VERSION_PATCH << "\n";
+            std::cout << "Version: " << ZEUS_VERSION_MAJOR << "." << ZEUS_VERSION_MINOR << "."
+                    << ZEUS_VERSION_PATCH << "\n";
             return 0;
         }
         if (argList[1] == "--help"sv || argList[1] == "-h"sv) {
