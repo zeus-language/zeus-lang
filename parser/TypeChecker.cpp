@@ -551,8 +551,35 @@ namespace types {
                         break;
                     }
                 }
+                auto selfArg = method->args()[0];
+                if (!selfArg.isConstant) {
+                    if (node->instanceNode()->constant()) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Mutability mismatch for 'self' argument in method '" + node->functionName() +
+                            "': expected 'mutable', but got 'immutable'."
+                        });
+                    }
+                }
 
                 if (allParamsMatch) {
+                    for (size_t i = 1; i < method->args().size(); ++i) {
+                        const auto &arg = method->args()[i];
+                        const auto &argNode = node->args()[i - 1];
+                        if (!arg.isConstant && argNode->constant()) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                argNode->expressionToken(),
+                                "Mutability mismatch for argument " + arg.name.lexical() + " in method '" +
+                                node->functionName() + "': expected '" +
+                                (arg.isConstant ? "immutable" : "mutable") + "', but got '" +
+                                (argNode->constant() ? "immutable" : "mutable") + "'."
+                            });
+                        }
+                    }
+
+
                     if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
                         (!context.currentFunction->isMethod() or
                          context.currentFunction->parentStruct().value()->name() != structType->name())
@@ -1389,6 +1416,21 @@ namespace types {
             if (!argsMatch) {
                 continue;
             }
+            for (size_t i = 0; i < funcDef->args().size(); ++i) {
+                const auto &arg = funcDef->args()[i];
+                const auto &argNode = node->args()[i];
+                if (!arg.isConstant && argNode->constant()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        argNode->expressionToken(),
+                        "Mutability mismatch for argument " + arg.name.lexical() + " in function '" +
+                        node->functionName() + "': expected '" +
+                        (arg.isConstant ? "immutable" : "mutable") + "', but got '" +
+                        (argNode->constant() ? "immutable" : "mutable") + "'."
+                    });
+                }
+            }
+
             if (funcDef->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
                 funcDef->modulePath() != context.currentFunction->modulePath()) {
                 context.messages.insert({

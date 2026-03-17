@@ -4,7 +4,7 @@ use core::libc as libc;
 use std::str;
 
 fn main() : i32 {
-    let  hello : std::str::string = string::from_c_str(r"Hello, World!" as *u8);
+    let mut hello : std::str::string = string::from_c_str(r"Hello, World!" as *u8);
     defer hello.destroy();
     println("String: ${hello}");
     printf(r"length: %d\n" as *u8, hello.length());

@@ -1,0 +1,3 @@
+FILENAME:17:20: error: Mutability mismatch for argument target in method 'moveTo': expected 'mutable', but got 'immutable'.
+    source.moveTo(&target);
+                   ^-----

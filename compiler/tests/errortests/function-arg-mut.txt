@@ -1,0 +1,3 @@
+FILENAME:14:10: error: Mutability mismatch for argument s in function 'set': expected 'mutable', but got 'immutable'.
+    set(&s);
+         ^

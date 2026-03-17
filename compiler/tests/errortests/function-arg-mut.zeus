@@ -1,0 +1,16 @@
+
+struct TestStruct {
+    pub field1: i32,
+    pub field2: i32,
+}
+
+fn set(s:mut & TestStruct) : void {
+    s.field1 = 10;
+    s.field2 = 20;
+}
+
+fn main() : i32 {
+    let s : TestStruct = TestStruct { field1: 0, field2: 0 };
+    set(&s);
+    return 0;
+}

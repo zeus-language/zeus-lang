@@ -94,7 +94,7 @@ struct File {
         }
     }
 
-    pub fn close(self: &File) : void {
+    pub fn close(self: mut &File) : void {
         if (self.ptr != null as *FILE)
         {
             fclose(self.ptr);
