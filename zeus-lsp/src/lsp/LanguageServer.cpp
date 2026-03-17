@@ -773,63 +773,21 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
-    modules::ModuleCache moduleCache(false);
-    modules::include_modules(this->m_options.stdlibDirectories, moduleCache, parseResult);
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
-    // for (auto &mod: parseResult.module->modules) {
-    //     moduleCache.addModule(mod->sourceFilePath.string(), mod);
-    // }
+    for (auto &mod: parseResult.module->modules) {
+        m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    }
     for (auto &msg: typeCheckResult.messages) {
         msg.msg(std::cerr, true);
     }
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
         std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
+
         auto [parent, node] = resultPair.value();
-        if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
-            auto varName = varAccess->expressionToken();
-            if (parent) {
-                if (auto function = dynamic_cast<ast::FunctionDefinition *>(parent)) {
-                    if (auto varDefinition = function->getVariableDefinition(varName)) {
-                        std::cerr << "Found variable definition for " << varName.lexical() << "\n";
-                        lsp::Location location;
-                        location.uri = toUri(
-                            varDefinition.value()->expressionToken().source_location.filename);
-                        location.range.start.line = static_cast<int>(
-                                                        varDefinition.value()->expressionToken().source_location.row) -
-                                                    1;
-                        location.range.start.character = static_cast<int>(
-                                                             varDefinition.value()->expressionToken().source_location.
-                                                             col) - 1;
-                        location.range.end.line = static_cast<int>(
-                                                      varDefinition.value()->expressionToken().source_location.row) - 1;
-                        location.range.end.character = static_cast<int>(
-                                                           varDefinition.value()->expressionToken().source_location.col
-                                                           +
-                                                           varDefinition.value()->expressionToken().source_location.
-                                                           num_bytes) - 1;
-                        result.emplace(std::move(location));
-                    }
-                    for (const auto &param: function->args()) {
-                        if (param.name.lexical() == varName.lexical()) {
-                            std::cerr << "Found argument definition for " << varName.lexical() << "\n";
-                            lsp::Location location;
-                            location.uri = toUri(param.name.source_location.filename);
-                            location.range.start.line = static_cast<int>(
-                                                            param.name.source_location.row) - 1;
-                            location.range.start.character = static_cast<int>(
-                                                                 param.name.source_location.col) - 1;
-                            location.range.end.line = static_cast<int>(
-                                                          param.name.source_location.row) - 1;
-                            location.range.end.character = static_cast<int>(
-                                                               param.name.source_location.col +
-                                                               param.name.source_location.num_bytes) - 1;
-                            result.emplace(std::move(location));
-                        }
-                    }
-                }
-            }
-        } else if (auto funcCall = dynamic_cast<const ast::FunctionCallNode *>(node)) {
+        std::cerr << "nodetype: " << magic_enum::enum_name(node->nodeType()) << "\n";
+        if (auto funcCall = dynamic_cast<const ast::FunctionCallNode *>(node)) {
             auto funcName = funcCall->functionName();
             std::cerr << "Found function " << funcName << "\n";
             auto funcResult = parseResult.module->findFunctionsByName(funcCall->modulePathName(), funcName);
@@ -979,6 +937,56 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 }
                 // if (methodFound)
                 //     return result;
+            }
+        } else {
+            auto varName = node->expressionToken();
+            if (parent) {
+                if (auto function = dynamic_cast<ast::FunctionDefinition *>(parent)) {
+                    if (auto varDefinition = function->getVariableDefinition(varName)) {
+                        std::cerr << "Found variable definition for " << varName.lexical() << "\n";
+                        lsp::Location location;
+                        location.uri = toUri(
+                            varDefinition.value()->expressionToken().source_location.filename);
+                        location.range.start.line = static_cast<int>(
+                                                        varDefinition.value()->expressionToken().
+                                                        source_location
+                                                        .row) -
+                                                    1;
+                        location.range.start.character = static_cast<int>(
+                                                             varDefinition.value()->expressionToken().
+                                                             source_location.
+                                                             col) - 1;
+                        location.range.end.line = static_cast<int>(
+                                                      varDefinition.value()->expressionToken().
+                                                      source_location.
+                                                      row) - 1;
+                        location.range.end.character = static_cast<int>(
+                                                           varDefinition.value()->expressionToken().
+                                                           source_location.col
+                                                           +
+                                                           varDefinition.value()->expressionToken().
+                                                           source_location.
+                                                           num_bytes) - 1;
+                        result.emplace(std::move(location));
+                    }
+                    for (const auto &param: function->args()) {
+                        if (param.name.lexical() == varName.lexical()) {
+                            std::cerr << "Found argument definition for " << varName.lexical() << "\n";
+                            lsp::Location location;
+                            location.uri = toUri(param.name.source_location.filename);
+                            location.range.start.line = static_cast<int>(
+                                                            param.name.source_location.row) - 1;
+                            location.range.start.character = static_cast<int>(
+                                                                 param.name.source_location.col) - 1;
+                            location.range.end.line = static_cast<int>(
+                                                          param.name.source_location.row) - 1;
+                            location.range.end.character = static_cast<int>(
+                                                               param.name.source_location.col +
+                                                               param.name.source_location.num_bytes) - 1;
+                            result.emplace(std::move(location));
+                        }
+                    }
+                }
             }
         }
     }

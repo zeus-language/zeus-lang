@@ -4,7 +4,10 @@
 
 #include "ast/BlockNode.h"
 
+#include "ast/ForLoop.h"
+#include "ast/IfCondition.h"
 #include "ast/VariableDeclaration.h"
+#include "ast/WhileLoop.h"
 
 namespace ast {
     BlockNode::BlockNode(const Token &token, std::vector<std::unique_ptr<ASTNode> > statements)
@@ -47,7 +50,32 @@ namespace ast {
                 if (decl->expressionToken().lexical() == name) {
                     return std::make_optional<ASTNode *>(decl);
                 }
+            } else if (auto forLoop = dynamic_cast<ForLoop *>(stmt.get())) {
+                if (forLoop->iteratorToken().lexical() == name) {
+                    return std::make_optional<ASTNode *>(forLoop);
+                }
+                if (const auto result = forLoop->block()->getVariableDefinition(name)) {
+                    return result;
+                }
+            } else if (const auto block = dynamic_cast<BlockNode *>(stmt.get())) {
+                if (const auto result = block->getVariableDefinition(name)) {
+                    return result;
+                }
+            } else if (const auto whileLoop = dynamic_cast<WhileLoop *>(stmt.get())) {
+                if (const auto result = whileLoop->block()->getVariableDefinition(name)) {
+                    return result;
+                }
+            } else if (const auto ifCond = dynamic_cast<IfCondition *>(stmt.get())) {
+                if (const auto result = ifCond->ifBlock()->getVariableDefinition(name)) {
+                    return result;
+                }
+                if (const auto elseBlock = ifCond->elseBlock()) {
+                    if (const auto result = elseBlock.value()->getVariableDefinition(name)) {
+                        return result;
+                    }
+                }
             }
+
             // TODO nested check
         }
         return std::nullopt;

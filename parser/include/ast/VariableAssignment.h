@@ -32,22 +32,9 @@ namespace ast {
 
         VariableAssignment &operator=(const VariableAssignment &) = delete;
 
-        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            auto result = m_expression->getNodeByToken(token);
-            if (result.has_value()) {
-                return result;
-            }
-            auto ownToken = expressionToken();
-            return ownToken == token ? std::make_optional(const_cast<VariableAssignment *>(this)) : std::nullopt;
-        }
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<VariableAssignment>(expressionToken(),
-                                                                  m_expression->clone());
-            if (expressionType())
-                cloneNode->setExpressionType(expressionType().value());
-            return std::move(cloneNode);
-        }
+        std::unique_ptr<ASTNode> clone() override;
     };
 } // ast
 

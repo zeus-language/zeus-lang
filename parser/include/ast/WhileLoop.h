@@ -3,21 +3,21 @@
 
 namespace ast {
     class WhileLoop final : public ASTNode {
-        std::unique_ptr<BlockNode>  m_block;
+        std::unique_ptr<BlockNode> m_block;
         std::unique_ptr<ASTNode> m_condition;
 
     public:
         WhileLoop(Token whileToken, std::unique_ptr<ASTNode> condition,
-                  std::unique_ptr<BlockNode> block) : ASTNode(std::move(whileToken)),
-                                                                  m_condition(std::move(condition)),
-                                                                  m_block(std::move(block)) {
+                  std::unique_ptr<BlockNode> block) : ASTNode(std::move(whileToken), NodeType::WHILE_LOOP),
+                                                      m_block(std::move(block)),
+                                                      m_condition(std::move(condition)) {
         }
 
         ~WhileLoop() override = default;
 
         [[nodiscard]] ASTNode *condition() const { return m_condition.get(); }
 
-        [[nodiscard]] BlockNode* block() const { return m_block.get(); }
+        [[nodiscard]] BlockNode *block() const { return m_block.get(); }
 
         WhileLoop(WhileLoop &&) = default;
 
@@ -32,7 +32,7 @@ namespace ast {
             if (result.has_value()) {
                 return result;
             }
-            return  m_block->getNodeByToken(token);
+            return m_block->getNodeByToken(token);
         }
 
         std::unique_ptr<ASTNode> clone() override {
