@@ -1,6 +1,20 @@
 project("parser")
 set(CMAKE_CXX_STANDARD 20)
 
+set(ZEUS_VERSION_MAJOR 0)
+set(ZEUS_VERSION_MINOR 1)
+set(ZEUS_VERSION_PATCH 0)
+add_compile_definitions(WIRTHX_PATH="${WIRTHX_PATH}")
+
+file(WRITE "${PROJECT_BINARY_DIR}/VERSION.TXT" "${WIRTHX_VERSION_MAJOR}.${WIRTHX_VERSION_MINOR}.${WIRTHX_VERSION_PATCH}")
+
+# configure a header file to pass some of the CMake settings
+# to the source code
+configure_file(
+        "${PROJECT_SOURCE_DIR}/config.h.in"
+        "${PROJECT_BINARY_DIR}/config.h"
+)
+
 add_library(${PROJECT_NAME} STATIC
         Lexer.cpp
         Parser.cpp
@@ -31,10 +45,9 @@ add_library(${PROJECT_NAME} STATIC
         include/types/Annotation.h
         ast/AnnotatedNode.cpp
         include/ast/AnnotatedNode.h
-
 )
 target_sources(${PROJECT_NAME} PRIVATE
 )
 
 
-target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_include_directories(${PROJECT_NAME} PUBLIC include "${PROJECT_BINARY_DIR}")

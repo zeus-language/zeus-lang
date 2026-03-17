@@ -4,6 +4,7 @@
 
 #include "LanguageServer.h"
 
+#include <config.h>
 #include <lsp/connection.h>
 #include <lsp/io/standardio.h>
 #include <lsp/messagehandler.h>
@@ -282,8 +283,9 @@ void LanguageServer::handleRequest() {
                         .range = false,
                         .full = true
                     };
-
-                    result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = "0.1"};
+                    auto version = std::to_string(ZEUS_VERSION_MAJOR) + "." + std::to_string(ZEUS_VERSION_MINOR) + "." +
+                                   std::to_string(ZEUS_VERSION_PATCH);
+                    result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = version};
 
                     return lsp::requests::Initialize::Result{
                         .capabilities = result.capabilities, .serverInfo = result.serverInfo
