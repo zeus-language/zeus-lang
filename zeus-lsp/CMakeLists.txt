@@ -6,14 +6,14 @@ include(../cmake/CPM.cmake)
 CPMAddPackage(
         NAME lsp
         GIT_REPOSITORY "https://github.com/leon-bckl/lsp-framework"
-        GIT_TAG "1.3.0"
+        GIT_TAG "1.3.1"
 )
 file(GLOB SRC
         src/lsp/CompilerOptions.cpp
         src/lsp/LanguageServer.cpp
 )
 
-find_package(lsp 1.3.0 EXACT REQUIRED)
+find_package(lsp 1.3.1 EXACT REQUIRED)
 
 
 add_executable(${PROJECT_NAME} main.cpp ${SRC})

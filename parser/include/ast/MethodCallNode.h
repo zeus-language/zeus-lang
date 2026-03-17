@@ -13,7 +13,8 @@ namespace ast {
 
     public:
         explicit MethodCallNode(Token functionName, std::unique_ptr<ASTNode> instanceNode,
-                                std::vector<std::unique_ptr<ASTNode> > args) : ASTNode(std::move(functionName)),
+                                std::vector<std::unique_ptr<ASTNode> > args) : ASTNode(std::move(functionName),
+                                                                                   ast::NodeType::METHOD_CALL),
                                                                                m_instanceNode(std::move(instanceNode)),
                                                                                m_args(std::move(args)) {
         }
@@ -66,6 +67,9 @@ namespace ast {
                 if (auto result = arg->getNodeByToken(token); result.has_value()) {
                     return result;
                 }
+            }
+            if (const auto result = instanceNode()->getNodeByToken(token); result.has_value()) {
+                return result;
             }
             const auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<MethodCallNode *>(this)) : std::nullopt;

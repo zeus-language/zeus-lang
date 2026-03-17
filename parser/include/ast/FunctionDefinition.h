@@ -21,6 +21,7 @@ namespace ast {
         FunctionArgument(Token name, std::unique_ptr<RawType> type, const bool isConstant)
             : name(std::move(name)), rawType(std::move(type)), isConstant(isConstant) {
         }
+
         FunctionArgument(const FunctionArgument &other)
             : name(other.name), rawType(other.rawType->clone()), isConstant(other.isConstant), type(other.type) {
         }
@@ -34,6 +35,7 @@ namespace ast {
         std::vector<std::unique_ptr<RawAnnotation> > m_rawAnnotations;
         VisibilityModifier m_visibilityModifier = VisibilityModifier::PRIVATE;
         std::string m_modulePathName;
+
     public:
         [[nodiscard]] std::optional<RawType *> returnType() const {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
@@ -45,10 +47,10 @@ namespace ast {
             return m_namespacePrefix;
         }
 
-        [[nodiscard]]const std::string& modulePathName() const ;
+        [[nodiscard]] const std::string &modulePathName() const;
 
 
-        [[nodiscard]]const  std::string& functionName() const;
+        [[nodiscard]] const std::string &functionName() const;
 
 
         [[nodiscard]] FunctionArgument *getParam(const unsigned index) {
@@ -58,7 +60,8 @@ namespace ast {
             return &m_args[index];
         }
 
-        [[nodiscard]] const std::vector<FunctionArgument> &args()const ;
+        [[nodiscard]] const std::vector<FunctionArgument> &args() const;
+
         std::vector<FunctionArgument> &args();
 
         [[nodiscard]] std::shared_ptr<types::VariableType> asFunctionType() const;
@@ -67,7 +70,7 @@ namespace ast {
             return m_rawAnnotations;
         }
 
-        explicit FunctionDefinitionBase(const Token& functionName, std::vector<FunctionArgument> args,
+        explicit FunctionDefinitionBase(const Token &functionName, std::vector<FunctionArgument> args,
                                         std::optional<std::unique_ptr<RawType> > returnType,
                                         std::vector<std::unique_ptr<RawAnnotation> > annotations,
                                         const VisibilityModifier visibilityModifier) : AnnotatedNode(
@@ -91,15 +94,16 @@ namespace ast {
     class FunctionDefinition final : public FunctionDefinitionBase {
         std::unique_ptr<BlockNode> m_blockNode;
         std::optional<Token> genericParam;
-        std::optional<types::VariableType*> m_parentStruct = std::nullopt;
+        std::optional<types::VariableType *> m_parentStruct = std::nullopt;
+
     public:
-        explicit FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
+        explicit FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
                                     std::optional<std::unique_ptr<RawType> > returnType,
                                     std::unique_ptr<BlockNode> blockNode,
                                     std::optional<Token> genericParam,
                                     std::vector<std::unique_ptr<RawAnnotation> > annotations,
-                                        const VisibilityModifier visibilityModifier
-                                        );
+                                    const VisibilityModifier visibilityModifier
+        );
 
         ~FunctionDefinition() override = default;
 
@@ -120,17 +124,22 @@ namespace ast {
         [[nodiscard]] std::optional<Token> getGenericParam() const {
             return genericParam;
         }
+
         std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
+
         std::unique_ptr<ast::FunctionDefinition> cloneFunction2();
 
-        [[nodiscard]] bool isMethod() const ;
-        [[nodiscard]] std::optional<types::VariableType*> parentStruct() const {
+        [[nodiscard]] bool isMethod() const;
+
+        [[nodiscard]] std::optional<types::VariableType *> parentStruct() const {
             return m_parentStruct;
         }
 
-        void setParentStruct(types::VariableType* structType) {
+        void setParentStruct(types::VariableType *structType) {
             m_parentStruct = std::make_optional(structType);
         }
+
+        std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
     };
 } // ast
 

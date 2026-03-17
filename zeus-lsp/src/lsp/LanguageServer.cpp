@@ -17,8 +17,11 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/MethodCallNode.h"
+#include "ast/ReferenceAccess.h"
+#include "ast/StructDeclaration.h"
 #include "ast/VariableAccess.h"
 #include "lexer/Lexer.h"
+#include "magic_enum/magic_enum.hpp"
 #include "parser/module.h"
 #include "parser/Parser.h"
 #include "types/TypeChecker.h"
@@ -106,7 +109,9 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, env, type_check_result);
-
+    for (auto &mod: result.module->modules) {
+        moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    }
     if (result.messages.empty() && type_check_result.messages.empty()) {
         errorsMap[std::string(uri.path())] = {};
     } else {
@@ -672,6 +677,9 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
+    for (auto &mod: parseResult.module->modules) {
+        m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    }
     if (foundToken->type == Token::NS_SEPARATOR) {
         // handle member completions
         auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
@@ -768,54 +776,18 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
     modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
-
+    for (auto &mod: parseResult.module->modules) {
+        m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    }
+    for (auto &msg: typeCheckResult.messages) {
+        msg.msg(std::cerr, true);
+    }
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
         std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
+
         auto [parent, node] = resultPair.value();
-        if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
-            auto varName = varAccess->expressionToken();
-            if (parent) {
-                if (auto function = dynamic_cast<ast::FunctionDefinition *>(parent)) {
-                    if (auto varDefinition = function->getVariableDefinition(varName)) {
-                        std::cerr << "Found variable definition for " << varName.lexical() << "\n";
-                        lsp::Location location;
-                        location.uri = toUri(
-                            varDefinition.value()->expressionToken().source_location.filename);
-                        location.range.start.line = static_cast<int>(
-                                                        varDefinition.value()->expressionToken().source_location.row) -
-                                                    1;
-                        location.range.start.character = static_cast<int>(
-                                                             varDefinition.value()->expressionToken().source_location.
-                                                             col) - 1;
-                        location.range.end.line = static_cast<int>(
-                                                      varDefinition.value()->expressionToken().source_location.row) - 1;
-                        location.range.end.character = static_cast<int>(
-                                                           varDefinition.value()->expressionToken().source_location.col
-                                                           +
-                                                           varDefinition.value()->expressionToken().source_location.
-                                                           num_bytes) - 1;
-                        result.emplace(std::move(location));
-                    }
-                    for (const auto &param: function->args()) {
-                        if (param.name.lexical() == varName.lexical()) {
-                            std::cerr << "Found argument definition for " << varName.lexical() << "\n";
-                            lsp::Location location;
-                            location.uri = toUri(param.name.source_location.filename);
-                            location.range.start.line = static_cast<int>(
-                                                            param.name.source_location.row) - 1;
-                            location.range.start.character = static_cast<int>(
-                                                                 param.name.source_location.col) - 1;
-                            location.range.end.line = static_cast<int>(
-                                                          param.name.source_location.row) - 1;
-                            location.range.end.character = static_cast<int>(
-                                                               param.name.source_location.col +
-                                                               param.name.source_location.num_bytes) - 1;
-                            result.emplace(std::move(location));
-                        }
-                    }
-                }
-            }
-        } else if (auto funcCall = dynamic_cast<const ast::FunctionCallNode *>(node)) {
+        std::cerr << "nodetype: " << magic_enum::enum_name(node->nodeType()) << "\n";
+        if (auto funcCall = dynamic_cast<const ast::FunctionCallNode *>(node)) {
             auto funcName = funcCall->functionName();
             std::cerr << "Found function " << funcName << "\n";
             auto funcResult = parseResult.module->findFunctionsByName(funcCall->modulePathName(), funcName);
@@ -839,11 +811,28 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                     result.emplace(std::move(location));
                 }
             }
-        } else if (auto methodCall = dynamic_cast<const ast::MethodCallNode *>(node)) {
+        } else if (auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
             auto funcName = methodCall->functionName();
             auto instanceType = methodCall->instanceNode()->expressionType();
+            if (methodCall->instanceNode()->nodeType() == ast::NodeType::REFERENCE_ACCESS) {
+                auto refAccess = dynamic_cast<const ast::ReferenceAccess *>(methodCall->instanceNode());
+                instanceType = refAccess->accessNode()->expressionType();
+                if (instanceType.has_value()) {
+                    std::cerr << "Method call instance type: " << instanceType.value()->name() << "\n";
+                }
+                if (!instanceType) {
+                    std::cerr << "Reference access node has no type information\n";
+                    std::cerr << "NodeType: " << magic_enum::enum_name(refAccess->accessNode()->nodeType()) << "\n";
+
+                    return result;
+                }
+            }
             if (!instanceType) {
                 std::cerr << "Method call instance has no type information\n";
+                std::cerr << "NodeType: " << magic_enum::enum_name(methodCall->instanceNode()->nodeType()) << "\n";
+                if (instanceType.has_value()) {
+                    std::cerr << "Method call instance type: " << instanceType.value()->name() << "\n";
+                }
                 return result;
             }
             if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
@@ -853,6 +842,25 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 bool methodFound = false;
                 for (const auto &method: structType->methods()) {
                     if (method->functionName() == funcName) {
+                        bool allParamsMatch = true;
+                        for (size_t i = 1; i < method->args().size(); ++i) {
+                            if (!method->args()[i].type) {
+                                allParamsMatch = false;
+                                break;
+                            }
+                            if (methodCall->args()[i - 1]->expressionType() == nullptr || !methodCall->args()[i - 1]->
+                                expressionType() ||
+                                methodCall->args()[i - 1]->expressionType().value()->name() !=
+                                method->args()[i].type.value()->name()) {
+                                allParamsMatch = false;
+                                break;
+                            }
+                        }
+                        if (!allParamsMatch) {
+                            continue;
+                        }
+
+
                         std::cerr << "Found method definition for " << funcName << " in struct " << structType->name()
                                 << "\n";
                         lsp::Location location;
@@ -870,12 +878,115 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                                                            method->expressionToken().source_location.
                                                            num_bytes) - 1;
                         result.emplace(std::move(location));
-                        methodFound = true;
-                        break;
+                        // methodFound = true;
+                        // break;
                     }
                 }
-                if (methodFound)
-                    return result;
+                // if (methodFound)
+                //     return result;
+            }
+        } else if (auto fieldAccess = dynamic_cast<ast::FieldAccess *>(node)) {
+            auto fieldName = fieldAccess->fieldName().lexical();
+            if (!fieldAccess->structType()) {
+                std::cerr << "Method call instance has no type information\n";
+                std::cerr << "NodeType: " << magic_enum::enum_name(methodCall->instanceNode()->nodeType()) << "\n";
+
+                return result;
+            }
+            std::shared_ptr<types::VariableType> type = fieldAccess->structType().value();
+
+            if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(fieldAccess->structType().value())) {
+                type = refType->baseType();
+            }
+            auto typeDecl = parseResult.module->getDeclarationByType(type);
+            ast::StructDeclaration *structDecl = nullptr;
+            if (typeDecl) {
+                if (auto _structDecl = dynamic_cast<ast::StructDeclaration *>(typeDecl.value())) {
+                    structDecl = _structDecl;
+                }
+            } else {
+                std::cerr << "No type declaration found for field access struct type: " << fieldAccess->structType().
+                        value()->name() << "\n";
+                return result;
+            }
+            if (structDecl) {
+                bool methodFound = false;
+                for (const auto &field: structDecl->fields()) {
+                    if (field.name.lexical() == fieldName) {
+                        std::cerr << "Found field declaration for " << fieldName << " in struct " << structDecl->
+                                expressionToken().lexical()
+                                << "\n";
+                        lsp::Location location;
+                        location.uri = toUri(
+                            field.name.source_location.filename);
+                        location.range.start.line = static_cast<int>(
+                                                        field.name.source_location.row) - 1;
+                        location.range.start.character = static_cast<int>(
+                                                             field.name.source_location.col) - 1;
+                        location.range.end.line = static_cast<int>(
+                                                      field.name.source_location.row) - 1;
+                        location.range.end.character = static_cast<int>(
+                                                           field.name.source_location.col
+                                                           +
+                                                           field.name.source_location.
+                                                           num_bytes) - 1;
+                        result.emplace(std::move(location));
+                        // methodFound = true;
+                        // break;
+                    }
+                }
+                // if (methodFound)
+                //     return result;
+            }
+        } else {
+            auto varName = node->expressionToken();
+            if (parent) {
+                if (auto function = dynamic_cast<ast::FunctionDefinition *>(parent)) {
+                    if (auto varDefinition = function->getVariableDefinition(varName)) {
+                        std::cerr << "Found variable definition for " << varName.lexical() << "\n";
+                        lsp::Location location;
+                        location.uri = toUri(
+                            varDefinition.value()->expressionToken().source_location.filename);
+                        location.range.start.line = static_cast<int>(
+                                                        varDefinition.value()->expressionToken().
+                                                        source_location
+                                                        .row) -
+                                                    1;
+                        location.range.start.character = static_cast<int>(
+                                                             varDefinition.value()->expressionToken().
+                                                             source_location.
+                                                             col) - 1;
+                        location.range.end.line = static_cast<int>(
+                                                      varDefinition.value()->expressionToken().
+                                                      source_location.
+                                                      row) - 1;
+                        location.range.end.character = static_cast<int>(
+                                                           varDefinition.value()->expressionToken().
+                                                           source_location.col
+                                                           +
+                                                           varDefinition.value()->expressionToken().
+                                                           source_location.
+                                                           num_bytes) - 1;
+                        result.emplace(std::move(location));
+                    }
+                    for (const auto &param: function->args()) {
+                        if (param.name.lexical() == varName.lexical()) {
+                            std::cerr << "Found argument definition for " << varName.lexical() << "\n";
+                            lsp::Location location;
+                            location.uri = toUri(param.name.source_location.filename);
+                            location.range.start.line = static_cast<int>(
+                                                            param.name.source_location.row) - 1;
+                            location.range.start.character = static_cast<int>(
+                                                                 param.name.source_location.col) - 1;
+                            location.range.end.line = static_cast<int>(
+                                                          param.name.source_location.row) - 1;
+                            location.range.end.character = static_cast<int>(
+                                                               param.name.source_location.col +
+                                                               param.name.source_location.num_bytes) - 1;
+                            result.emplace(std::move(location));
+                        }
+                    }
+                }
             }
         }
     }

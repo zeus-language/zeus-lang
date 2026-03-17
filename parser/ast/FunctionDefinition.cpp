@@ -4,31 +4,41 @@
 
 #include "ast/FunctionDefinition.h"
 
+#include "ast/ReferenceAccess.h"
+
 namespace ast {
-    FunctionDefinition::FunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
+    FunctionDefinition::FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
                                            std::optional<std::unique_ptr<RawType> > returnType,
                                            std::unique_ptr<BlockNode> blockNode,
                                            std::optional<Token> genericParam,
                                            std::vector<std::unique_ptr<RawAnnotation> > annotations,
-                                        const VisibilityModifier visibilityModifier)
+                                           const VisibilityModifier visibilityModifier)
         : FunctionDefinitionBase(functionName, std::move(args), std::move(returnType),
-                                 std::move(annotations),visibilityModifier),
+                                 std::move(annotations), visibilityModifier),
           m_blockNode(std::move(blockNode)), genericParam(std::move(genericParam)) {
     }
 
     std::optional<ASTNode *> FunctionDefinition::getVariableDefinition(const Token &token) const {
-        return block()->getNodeByToken(token);
+        if (auto accessNode = m_blockNode->getVariableDefinition(token.lexical()); accessNode.has_value()) {
+            return accessNode;
+        }
+
+        for (const auto &arg: args()) {
+            if (arg.name == token) {
+                return std::make_optional<ASTNode *>(const_cast<FunctionDefinition *>(this));
+            }
+        }
+        return std::nullopt;
     }
 
     std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
         return cloneFunction2();
     }
 
-    std::unique_ptr<ast::FunctionDefinition> FunctionDefinition::cloneFunction2()
-    {
+    std::unique_ptr<ast::FunctionDefinition> FunctionDefinition::cloneFunction2() {
         auto returnTypeClone = returnType().has_value()
-                                 ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
-                                 : std::nullopt;
+                                   ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                   : std::nullopt;
         auto block = m_blockNode->cloneBlock();
         std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
         for (const auto &annotation: rawAnnotations()) {
@@ -47,12 +57,27 @@ namespace ast {
         return std::move(cloneNode);
     }
 
-    bool FunctionDefinition::isMethod() const{
+    bool FunctionDefinition::isMethod() const {
         return m_parentStruct.has_value();
     }
 
+    std::optional<ASTNode *> FunctionDefinition::getNodeByToken(const Token &token) const {
+        if (auto result = FunctionDefinitionBase::getNodeByToken(token)) {
+            return result;
+        }
+        for (const auto &arg: args()) {
+            if (arg.name == token) {
+                return std::make_optional<ASTNode *>(const_cast<FunctionDefinition *>(this));
+            }
+        }
+        if (auto result = block()->getNodeByToken(token)) {
+            return result;
+        }
+        return std::nullopt;
+    }
+
     void FunctionDefinitionBase::setModulePath(const std::vector<Token> &module_path) {
-            m_namespacePrefix = module_path;
+        m_namespacePrefix = module_path;
 
         m_modulePathName = "";
         for (auto &ns: m_namespacePrefix) {
@@ -60,19 +85,19 @@ namespace ast {
         }
     }
 
-    const std::string& FunctionDefinitionBase::modulePathName() const {
+    const std::string &FunctionDefinitionBase::modulePathName() const {
         return m_modulePathName;
     }
 
-    const std::string& FunctionDefinitionBase::functionName() const {
+    const std::string &FunctionDefinitionBase::functionName() const {
         return m_functionName;
     }
 
-    const std::vector<FunctionArgument> &FunctionDefinitionBase::args() const{
+    const std::vector<FunctionArgument> &FunctionDefinitionBase::args() const {
         return m_args;
     }
 
-    std::vector<FunctionArgument> & FunctionDefinitionBase::args() {
+    std::vector<FunctionArgument> &FunctionDefinitionBase::args() {
         return m_args;
     }
 

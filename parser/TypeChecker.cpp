@@ -1737,7 +1737,7 @@ namespace types {
                                               });
         }
         bool hasReturnStatement = false;
-        auto oldFunction = context.currentFunction;
+        const auto oldFunction = context.currentFunction;
         context.currentFunction = node;
         for (auto &stmt: node->block()->statements()) {
             type_check_base(stmt.get(), context);
@@ -1872,23 +1872,28 @@ namespace types {
         }
     }
 
-    std::unique_ptr<ast::ASTNode> generateInitialValueForType(const env::ValueType& value,const std::shared_ptr<types::VariableType>& type) {
+    std::unique_ptr<ast::ASTNode> generateInitialValueForType(const env::ValueType &value,
+                                                              const std::shared_ptr<types::VariableType> &type) {
         if (auto enumType = std::dynamic_pointer_cast<types::EnumType>(type)) {
             if (!enumType->variants().empty()) {
                 auto v = std::get<int64_t>(value);
                 // Initialize with the first variant of the enum
                 return std::make_unique<ast::EnumAccess>(Token(enumType->name(), Token::IDENTIFIER, SourceLocation{})
-                    ,Token(enumType->variants()[v].name, Token::IDENTIFIER, SourceLocation{}));
+                                                         , Token(enumType->variants()[v].name, Token::IDENTIFIER,
+                                                                 SourceLocation{}));
             }
         }
         if (std::holds_alternative<int64_t>(value)) {
-            return std::make_unique<ast::NumberConstant>(Token(std::to_string(std::get<int64_t>(value)), Token::NUMBER, SourceLocation{}),
-                                                          ast::NumberType::INTEGER);
+            return std::make_unique<ast::NumberConstant>(
+                Token(std::to_string(std::get<int64_t>(value)), Token::NUMBER, SourceLocation{}),
+                ast::NumberType::INTEGER);
         } else if (std::holds_alternative<double>(value)) {
-            return std::make_unique<ast::NumberConstant>(Token(std::to_string(std::get<int64_t>(value)), Token::NUMBER, SourceLocation{}),
-                                                          ast::NumberType::FLOAT);
+            return std::make_unique<ast::NumberConstant>(
+                Token(std::to_string(std::get<int64_t>(value)), Token::NUMBER, SourceLocation{}),
+                ast::NumberType::FLOAT);
         } else if (std::holds_alternative<std::string>(value)) {
-            return std::make_unique<ast::StringConstant>(Token(std::get<std::string>(value), Token::STRING, SourceLocation{}));
+            return std::make_unique<ast::StringConstant>(Token(std::get<std::string>(value), Token::STRING,
+                                                               SourceLocation{}));
         }
         // For other types, we can return a default-constructed value or null
         return nullptr;
@@ -1904,15 +1909,15 @@ namespace types {
             Token varTypeToken(var.type->name(), Token::IDENTIFIER, sourceLocation);
             context.module->nodes.push_back(std::make_unique<ast::VariableDeclaration>(
                 varToken,
-                std::make_unique<ast::RawType>(varTypeToken,ast::TypeModifier::NONE),
+                std::make_unique<ast::RawType>(varTypeToken, ast::TypeModifier::NONE),
                 true,
-                generateInitialValueForType(var.value,var.type)
+                generateInitialValueForType(var.value, var.type)
             ));
             type_check_base(context.module->nodes.back().get(), context);
         }
     }
 
-    void type_check_internal(const std::shared_ptr<parser::Module> &module,  const env::Environment &environment,
+    void type_check_internal(const std::shared_ptr<parser::Module> &module, const env::Environment &environment,
                              Context &context) {
         // if (module->isTypeChecked) {
         //     return;
@@ -1960,7 +1965,7 @@ namespace types {
                 }
                 std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
                 methods.reserve(structDecl->methods().size());
-                for (auto &method: structDecl->methods()) {
+                for (const auto &method: structDecl->methods()) {
                     methods.push_back(method->cloneFunction2());
                 }
                 //structDecl->methods().clear();
@@ -1975,8 +1980,9 @@ namespace types {
                     method->setParentStruct(type.get());
                 }
                 for (const auto &method: type->methods()) {
-                    type_check_base(method.get(), context);
+                    type_check_funcdef(method.get(), context);
                 }
+                structDecl->setExpressionType(type);
                 context.currentScope = context.currentScope->parentScope();
             } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
                 std::vector<EnumVariant> enumVariants;
