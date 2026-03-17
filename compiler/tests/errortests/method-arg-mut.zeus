@@ -1,0 +1,19 @@
+
+struct TestStruct {
+    pub field1: i32,
+    pub field2: i32,
+
+    pub fn moveTo(source : &TestStruct, target: mut &TestStruct) : void {
+        target.field1 = source.field1 + 10;
+        target.field2 = source.field2 + 20;
+    }
+}
+
+
+
+fn main() : i32 {
+    let source : TestStruct = TestStruct { field1: 0, field2: 0 };
+    let target : TestStruct = TestStruct { field1: 0, field2: 0 };
+    source.moveTo(&target);
+    return 0;
+}

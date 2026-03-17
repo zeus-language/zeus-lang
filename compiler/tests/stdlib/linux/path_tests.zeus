@@ -2,14 +2,14 @@ use std::fs;
 
 fn main() : i32 {
     println(path_separator());
-    let  path : Path = Path::new("test/file.txt");
+    let mut path : Path = Path::new("test/file.txt");
     defer path.destroy();
 
     let mut path2 : Path = Path::new("/tmp");
     defer path2.destroy();
     path2.append("file.txt");
 
-    let tmp : Path = Path::new("/tmp");
+    let mut tmp : Path = Path::new("/tmp");
     defer tmp.destroy();
 
     if(path.exists() == false)

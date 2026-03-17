@@ -307,7 +307,9 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                          testing::Values("returntype","constmodification","typeerror_operator","unclosed_string",
                              "temp_reference","global_mut_slice","nested_returns","assign-float-to-double",
                              "private_fields","private_function",
-                             "fail-decl-in-blocks","defer-noarg"));
+                             "fail-decl-in-blocks","defer-noarg",
+                             "function-arg-mut","method-arg-mut","method-self-mut"
+                         ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

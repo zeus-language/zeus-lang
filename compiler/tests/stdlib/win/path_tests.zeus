@@ -2,7 +2,7 @@ use std::fs;
 
 fn main() : i32 {
     println(path_separator());
-    let  path : Path = Path::new("test\\file.txt");
+    let mut path : Path = Path::new("test\\file.txt");
     defer path.destroy();
 
     let mut path2 : Path = Path::new("C:\\tmp");

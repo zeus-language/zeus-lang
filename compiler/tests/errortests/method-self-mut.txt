@@ -1,0 +1,3 @@
+FILENAME:16:7: error: Mutability mismatch for 'self' argument in method 'set': expected 'mutable', but got 'immutable'.
+    s.set();
+      ^--
