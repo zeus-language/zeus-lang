@@ -3,10 +3,10 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(ZEUS_VERSION_MAJOR 0)
 set(ZEUS_VERSION_MINOR 1)
-set(ZEUS_VERSION_PATCH 1)
-add_compile_definitions(WIRTHX_PATH="${WIRTHX_PATH}")
+set(ZEUS_VERSION_PATCH 2)
+add_compile_definitions(ZEUS_PATH="${ZEUS_PATH}")
 
-file(WRITE "${PROJECT_BINARY_DIR}/VERSION.TXT" "${WIRTHX_VERSION_MAJOR}.${WIRTHX_VERSION_MINOR}.${WIRTHX_VERSION_PATCH}")
+file(WRITE "${PROJECT_BINARY_DIR}/VERSION.TXT" "${ZEUS_VERSION_MAJOR}.${ZEUS_VERSION_MINOR}.${ZEUS_VERSION_PATCH}")
 
 # configure a header file to pass some of the CMake settings
 # to the source code
