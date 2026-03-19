@@ -1,0 +1,23 @@
+
+struct Test {
+    a: i32,
+    b: float,
+}
+
+fn main() : i32{
+    let x = 5;
+    let y = 3.14f;
+    let z = "hello";
+
+    let t = Test { a: x, b: y };
+
+    println("x: ${x}");
+    println("y: ${y}");
+    println("z: ${z}");
+    let sum = x + 10;
+    let printmsg = "x + 10: ${sum}";
+    println(printmsg);
+
+    //println("Test struct: a=${t.a}, b=${t.b}");
+    return 0;
+}

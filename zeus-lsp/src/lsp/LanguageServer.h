@@ -33,6 +33,12 @@ class LanguageServer {
     [[nodiscard]] lsp::requests::TextDocument_Completion::Result findCompletions(
         const lsp::requests::TextDocument_Completion::Params &params);
 
+    [[nodiscard]] lsp::requests::TextDocument_SemanticTokens_Full::Result semanticTokensFull(
+        const lsp::requests::TextDocument_SemanticTokens_Full::Params &&params);
+
+    [[nodiscard]] lsp::TextDocument_InlayHintResult resolveInlayHints(
+        const lsp::requests::TextDocument_InlayHint::Params &&params);
+
 public:
     explicit LanguageServer(lsp::LspOptions options, const env::Environment &env);
 

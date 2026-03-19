@@ -20,7 +20,9 @@ namespace types {
         std::unordered_map<std::string, std::optional<Variable> > currentVariables;
 
     public:
-        explicit Scope(const TypeRegistry& typeRegistry,const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope),            m_typeRegistry(typeRegistry) {
+        explicit Scope(const TypeRegistry &typeRegistry,
+                       const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope),
+                                                                    m_typeRegistry(typeRegistry) {
         }
 
         explicit Scope() : m_parentScope(nullptr) {
@@ -37,12 +39,15 @@ namespace types {
 
         void addVariable(const std::string &name, const Variable &var);
 
-        [[nodiscard]] std::optional<Variable> findVariable(const std::string &name,bool includeParent = true) const;
+        [[nodiscard]] std::optional<Variable> findVariable(const std::string &name, bool includeParent = true) const;
 
         std::shared_ptr<Scope> parentScope() { return m_parentScope; }
 
         std::vector<std::shared_ptr<VariableType> > registeredTypes() const;
 
-         [[nodiscard]] bool isGlobalScope() const;
+        [[nodiscard]] bool isGlobalScope() const;
+
+        std::optional<std::shared_ptr<types::VariableType> >
+        getSliceType(const std::shared_ptr<VariableType> &baseType);
     };
 }

@@ -7,7 +7,6 @@
 
 
 namespace types {
-
     enum class OsType {
         WINDOWS = 0,
         LINUX,
@@ -16,6 +15,7 @@ namespace types {
     };
 
     std::shared_ptr<types::EnumType> createOstypeEnum();
+
     class TypeRegistry final {
     private:
         std::vector<std::shared_ptr<VariableType> > m_types;
@@ -26,10 +26,9 @@ namespace types {
         virtual ~TypeRegistry() = default;
 
 
+        const std::vector<std::shared_ptr<VariableType> > &registeredTypes() const;
 
-        const std::vector<std::shared_ptr<VariableType> >& registeredTypes() const;
-
-        static std::optional<std::shared_ptr<VariableType> > getSliceType(const std::shared_ptr<VariableType> &value);
+        std::optional<std::shared_ptr<VariableType> > getSliceType(const std::shared_ptr<VariableType> &value);
 
         static std::optional<std::shared_ptr<VariableType> > getRangeType(
             const std::optional<std::shared_ptr<types::VariableType> >::value_type &value);

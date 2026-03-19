@@ -41,6 +41,11 @@ static lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType 
     return lsp::DiagnosticSeverity::Information;
 }
 
+constexpr bool tokenInRange(const Token &token, const size_t line, const size_t character) {
+    return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
+           character + 1 <= token.source_location.col + token.source_location.num_bytes;
+}
+
 lsp::Uri toUri(const std::string &filePath) {
     if (filePath.starts_with("file:")) {
         return lsp::Uri::parse(filePath);
@@ -103,9 +108,7 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
         }
     }
     includeDirs.push_back(parentDir);
-    for (auto &tmpDir: includeDirs) {
-        std::cerr << "Warning: Include directory '" << tmpDir.string() << "' !\n";
-    }
+
     modules::include_modules(includeDirs, moduleCache, result);
 
     types::TypeCheckResult type_check_result;
@@ -283,6 +286,9 @@ void LanguageServer::handleRequest() {
                         .range = false,
                         .full = true
                     };
+                    result.capabilities.inlayHintProvider = lsp::InlayHintOptions{
+                        .resolveProvider = true
+                    };
                     auto version = std::to_string(ZEUS_VERSION_MAJOR) + "." + std::to_string(ZEUS_VERSION_MINOR) + "." +
                                    std::to_string(ZEUS_VERSION_PATCH);
                     result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = version};
@@ -373,7 +379,6 @@ void LanguageServer::handleRequest() {
                     [&](lsp::requests::TextDocument_Diagnostic::Params &&params) {
                         auto diagnosticsReport = lsp::requests::TextDocument_Diagnostic::Result();
                         const auto &uri = params.textDocument.uri;
-                        std::cerr << "Diagnostics requested for uri: " << uri.toString() << "\n";
                         // content changes: for Full sync the first change contains whole text
                         const std::string text = m_openDocuments.at(uri.toString()).text;
 
@@ -417,25 +422,11 @@ void LanguageServer::handleRequest() {
                         return findCompletions(item);
                     }).add<lsp::requests::TextDocument_SemanticTokens_Full>(
                     [&](lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
-                        auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
-                        const auto uri = params.textDocument.uri.toString();
-                        const auto [documentUri, text] = m_openDocuments.at(uri);
-                        const auto tokens = lexer::lex_file(uri, text, false);
-                        auto semanticTokens = lsp::SemanticTokens{
-                            .data = std::vector<uint32_t>{}
-                        };
-                        size_t lastRow = 0;
-                        size_t lastCol = 0;
-                        for (const auto &token: tokens) {
-                            if (auto tokenType = mapTokenType(token.type)) {
-                                // Use helper function to properly handle multi-line tokens
-                                // (especially block comments that span multiple lines)
-                                processMultiLineToken(token, tokenType.value(), semanticTokens.data,
-                                                      lastRow, lastCol);
-                            }
-                        }
-                        result.emplace(semanticTokens);
-                        return result;
+                        return semanticTokensFull(std::move(params));
+                    })
+                .add<lsp::requests::TextDocument_InlayHint>(
+                    [&](lsp::requests::TextDocument_InlayHint::Params &&params) {
+                        return resolveInlayHints(std::move(params));
                     });
 
         // Main loop
@@ -461,10 +452,96 @@ void LanguageServer::handleRequest() {
     }
 }
 
-bool tokenInRange(const Token &token, const size_t line, const size_t character) {
-    return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
-           character + 1 <= token.source_location.col + token.source_location.num_bytes;
+lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semanticTokensFull(const
+    lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
+    auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+    const auto uri = params.textDocument.uri.toString();
+    const auto [documentUri, text] = m_openDocuments.at(uri);
+    const auto tokens = lexer::lex_file(uri, text, false);
+    auto semanticTokens = lsp::SemanticTokens{
+        .data = std::vector<uint32_t>{}
+    };
+    size_t lastRow = 0;
+    size_t lastCol = 0;
+    for (const auto &token: tokens) {
+        if (auto tokenType = mapTokenType(token.type)) {
+            // Use helper function to properly handle multi-line tokens
+            // (especially block comments that span multiple lines)
+            processMultiLineToken(token, tokenType.value(), semanticTokens.data,
+                                  lastRow, lastCol);
+        }
+    }
+    result.emplace(semanticTokens);
+    return result;
 }
+
+void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::vector<lsp::InlayHint> &hints);
+
+void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHint> &hints) {
+    switch (node->nodeType()) {
+        case ast::NodeType::FUNCTION_DEFINITION: {
+            const auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(node);
+            resolveInlayHintsForFunction(funcDef, hints);
+            break;
+        }
+        case ast::NodeType::VARIABLE_DECLARATION: {
+            const auto varDecl = dynamic_cast<const ast::VariableDeclaration *>(node);
+            if (!varDecl->type().has_value()) {
+                lsp::InlayHint hint;
+                hint.position.line = static_cast<uint32_t>(varDecl->expressionToken().source_location.row - 1);
+                hint.position.character = static_cast<uint32_t>(varDecl->expressionToken().source_location.col
+                                                                + varDecl->expressionToken().source_location.num_bytes -
+                                                                1
+                );
+                if (varDecl->expressionType()) {
+                    hint.label = ":" + varDecl->expressionType().value()->name();
+                } else {
+                    hint.label = ":unknown";
+                }
+                hint.kind = lsp::InlayHintKind::Type;
+                hints.push_back(std::move(hint));
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::vector<lsp::InlayHint> &hints) {
+    for (const auto &node: funcDef->block()->statements()) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+}
+
+lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
+    const lsp::requests::TextDocument_InlayHint::Params &&params) {
+    auto result = lsp::TextDocument_InlayHintResult();
+    auto hints = lsp::Array<lsp::InlayHint>();
+    const auto uri = params.textDocument.uri.toString();
+    const auto &[_, text] = m_openDocuments.at(uri);
+
+
+    const auto tokens = lexer::lex_file(uri, text);
+
+    auto parseResult = parser::parse_tokens(tokens);
+
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
+    types::TypeCheckResult typeCheckResult;
+    types::type_check(parseResult.module, this->m_env, typeCheckResult);
+    for (auto &mod: parseResult.module->modules) {
+        m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    }
+    for (const auto &node: parseResult.module->nodes) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+    for (const auto &node: parseResult.module->functions) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+    result = hints;
+    return result;
+}
+
 
 void addToCompletionListIfMatches(lsp::CompletionItem item,
                                   lsp::CompletionList &completionList) {

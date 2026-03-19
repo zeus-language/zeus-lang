@@ -35,7 +35,7 @@ void types::Scope::addVariable(const std::string &name, const Variable &var) {
     currentVariables[name] = var;
 }
 
-std::optional<types::Variable> types::Scope::findVariable(const std::string &name,bool includeParent) const {
+std::optional<types::Variable> types::Scope::findVariable(const std::string &name, bool includeParent) const {
     if (const auto it = currentVariables.find(name); it != currentVariables.end()) {
         return it->second;
     }
@@ -60,7 +60,11 @@ std::vector<std::shared_ptr<types::VariableType> > types::Scope::registeredTypes
     return types;
 }
 
-bool types::Scope::isGlobalScope() const
-{
+bool types::Scope::isGlobalScope() const {
     return m_parentScope == nullptr;
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::Scope::getSliceType(
+    const std::shared_ptr<VariableType> &baseType) {
+    return m_typeRegistry.getSliceType(baseType);
 }

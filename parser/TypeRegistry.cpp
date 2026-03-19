@@ -4,14 +4,14 @@
 
 #include "ast/FunctionDefinition.h"
 
-std::shared_ptr<types::EnumType> types::createOstypeEnum(){
+std::shared_ptr<types::EnumType> types::createOstypeEnum() {
     std::vector<types::EnumVariant> variants = {
-        {"WINDOWS", static_cast<int>( types::OsType::WINDOWS)},
-        {"LINUX", static_cast<int>( types::OsType::LINUX)},
-        {"MACOS", static_cast<int>( types::OsType::MACOS)},
-        {"OTHER", static_cast<int>( types::OsType::OTHER)}
+        {"WINDOWS", static_cast<int>(types::OsType::WINDOWS)},
+        {"LINUX", static_cast<int>(types::OsType::LINUX)},
+        {"MACOS", static_cast<int>(types::OsType::MACOS)},
+        {"OTHER", static_cast<int>(types::OsType::OTHER)}
     };
-    static auto ostype =  std::make_shared<types::EnumType>("ostype", variants);
+    static auto ostype = std::make_shared<types::EnumType>("ostype", variants);
     return ostype;
 }
 
@@ -29,12 +29,16 @@ types::TypeRegistry::TypeRegistry() {
     registerType(createOstypeEnum());
 }
 
-const std::vector<std::shared_ptr<types::VariableType> >& types::TypeRegistry::registeredTypes() const {
+const std::vector<std::shared_ptr<types::VariableType> > &types::TypeRegistry::registeredTypes() const {
     return m_types;
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSliceType(
     const std::shared_ptr<VariableType> &value) {
+    auto typeName = "[" + value->name() + "]";
+    if (auto foundType = getTypeByName(typeName, false)) {
+        return foundType;
+    }
     std::vector<StructField> fields = {
         {
             .type = std::make_shared<types::IntegerType>("u64", 8, false),
@@ -49,8 +53,9 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSli
 
     };
     std::optional<std::shared_ptr<VariableType> > genericParam;
-    auto slice = std::make_shared<types::StructType>("slice", fields, std::move(methods),
+    auto slice = std::make_shared<types::StructType>(typeName, fields, std::move(methods),
                                                      std::nullopt);
+    registerType(slice);
     return std::make_optional(slice);
 }
 
