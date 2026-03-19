@@ -3,6 +3,13 @@ struct Test {
     a: i32,
     b: float,
 }
+let global_var = 42;
+
+fn create_test() : Test {
+    let x = 5;
+    let y = 3.14f;
+    return Test { a: x, b: y };
+}
 
 fn main() : i32{
     let x = 5;
@@ -10,6 +17,7 @@ fn main() : i32{
     let z = "hello";
 
     let t = Test { a: x, b: y };
+    let t2 = create_test();
 
     println("x: ${x}");
     println("y: ${y}");

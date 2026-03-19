@@ -116,6 +116,7 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
     for (auto &mod: result.module->modules) {
         moduleCache.addModule(mod->sourceFilePath.string(), mod);
     }
+    moduleCache.addModule(file_path.string(), result.module);
     if (result.messages.empty() && type_check_result.messages.empty()) {
         errorsMap[std::string(uri.path())] = {};
     } else {
@@ -519,23 +520,22 @@ lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
     auto result = lsp::TextDocument_InlayHintResult();
     auto hints = lsp::Array<lsp::InlayHint>();
     const auto uri = params.textDocument.uri.toString();
-    const auto &[_, text] = m_openDocuments.at(uri);
 
+    auto path = std::string(params.textDocument.uri.path());
 
-    const auto tokens = lexer::lex_file(uri, text);
-
-    auto parseResult = parser::parse_tokens(tokens);
-
-    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
-    types::TypeCheckResult typeCheckResult;
-    types::type_check(parseResult.module, this->m_env, typeCheckResult);
-    for (auto &mod: parseResult.module->modules) {
-        m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
+    auto module = m_moduleCache.getModule(path);
+    if (!module) {
+        std::cerr << "Could not find module for path: " << path << "\n";
+        for (auto name: m_moduleCache.modulePaths()) {
+            std::cerr << "Module in cache: " << name << "\n";
+        }
+        return result;
     }
-    for (const auto &node: parseResult.module->nodes) {
+
+    for (const auto &node: module->nodes) {
         resolveInlayHintForNode(node.get(), hints);
     }
-    for (const auto &node: parseResult.module->functions) {
+    for (const auto &node: module->functions) {
         resolveInlayHintForNode(node.get(), hints);
     }
     result = hints;
