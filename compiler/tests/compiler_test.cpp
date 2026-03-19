@@ -298,7 +298,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
                              "functionpointer","externannotation","stringslice", "convert2string","convertfromstring",
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
-                             "global_var","new-string"));
+                             "global_var","new-string","var-type-infer"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
@@ -308,7 +308,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "temp_reference","global_mut_slice","nested_returns","assign-float-to-double",
                              "private_fields","private_function",
                              "fail-decl-in-blocks","defer-noarg",
-                             "function-arg-mut","method-arg-mut","method-self-mut"
+                             "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,

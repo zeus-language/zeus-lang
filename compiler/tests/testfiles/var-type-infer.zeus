@@ -17,7 +17,5 @@ fn main() : i32{
     let sum = x + 10;
     let printmsg = "x + 10: ${sum}";
     println(printmsg);
-
-    //println("Test struct: a=${t.a}, b=${t.b}");
     return 0;
 }
