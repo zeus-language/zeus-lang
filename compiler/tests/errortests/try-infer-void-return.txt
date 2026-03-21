@@ -1,0 +1,3 @@
+FILENAME:7:9: error: Variable 'x' cannot be of type 'void'.
+    let x = do_stuff();
+        ^

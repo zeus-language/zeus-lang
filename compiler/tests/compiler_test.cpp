@@ -308,7 +308,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "temp_reference","global_mut_slice","nested_returns","assign-float-to-double",
                              "private_fields","private_function",
                              "fail-decl-in-blocks","defer-noarg",
-                             "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered"
+                             "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
+                             "try-infer-void-return"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,

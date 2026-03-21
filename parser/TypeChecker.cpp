@@ -1630,7 +1630,7 @@ namespace types {
     void type_check(ast::VariableDeclaration *node, Context &context) {
         if (node->expressionType())
             return;
-        auto isToBeInfered = !node->type().has_value();
+        const auto isToBeInfered = !node->type().has_value();
         if (isToBeInfered && !node->initialValue().has_value()) {
             context.messages.insert({
                 parser::OutputType::ERROR,
@@ -1639,7 +1639,8 @@ namespace types {
                 "' without an initial value."
             });
             return;
-        } else if (isToBeInfered) {
+        }
+        if (isToBeInfered) {
             type_check_base(node->initialValue().value(), context);
             if (!node->initialValue().value()->expressionType()) {
                 context.messages.insert({
@@ -1647,6 +1648,14 @@ namespace types {
                     node->initialValue().value()->expressionToken(),
                     "Could not determine type of initial value for variable '" + node->expressionToken().
                     lexical() + "'."
+                });
+                return;
+            }
+            if (node->initialValue().value()->expressionType().value()->name() == "void") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Variable '" + node->expressionToken().lexical() + "' cannot be of type 'void'."
                 });
                 return;
             }
@@ -1661,6 +1670,14 @@ namespace types {
                     expressionToken().
                     lexical() +
                     "'."
+                });
+                return;
+            }
+            if (varType.value()->name() == "void") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Variable '" + node->expressionToken().lexical() + "' cannot be of type 'void'."
                 });
                 return;
             }
