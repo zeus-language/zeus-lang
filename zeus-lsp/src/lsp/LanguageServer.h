@@ -30,6 +30,11 @@ class LanguageServer {
     lsp::requests::TextDocument_Definition::Result findDefinition(
         const lsp::requests::TextDocument_Definition::Params &params);
 
+    lsp::requests::TextDocument_Completion::Result findCompletionsForMembers(
+        lsp::requests::TextDocument_Completion::Result &result,
+        lsp::CompletionList completionList, std::vector<Token> tokens,
+        std::optional<Token> &foundToken, parser::ParseResult parseResult) const;
+
     [[nodiscard]] lsp::requests::TextDocument_Completion::Result findCompletions(
         const lsp::requests::TextDocument_Completion::Params &params);
 

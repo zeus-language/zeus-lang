@@ -29,7 +29,7 @@
 
 using namespace std::string_view_literals;
 
-static lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType output) {
+constexpr lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType output) {
     switch (output) {
         case parser::OutputType::ERROR:
             return lsp::DiagnosticSeverity::Error;
@@ -54,7 +54,7 @@ lsp::Uri toUri(const std::string &filePath) {
 }
 
 static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
-    const std::map<std::string, std::vector<parser::ParserMessasge> > &messages,
+    const std::unordered_map<std::string, std::vector<parser::ParserMessasge> > &messages,
     const std::string &targetUri) {
     std::vector<lsp::Diagnostic> diagnostics;
 
@@ -89,17 +89,17 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
 }
 
 
-static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
+static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
     const std::vector<std::filesystem::path> &rtlDirectories,
     const env::Environment &env,
     modules::ModuleCache &moduleCache,
     const lsp::Uri &uri,
     const std::string &text) {
-    std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
-
+    std::unordered_map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
     const std::filesystem::path file_path(uri.path());
     const std::filesystem::path parentDir = file_path.parent_path();
     const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
+
     auto result = parser::parse_tokens(tokens);
     std::vector<std::filesystem::path> includeDirs;
     for (auto &dir: rtlDirectories) {
@@ -113,6 +113,7 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, env, type_check_result);
+
     for (auto &mod: result.module->modules) {
         moduleCache.addModule(mod->sourceFilePath.string(), mod);
     }
@@ -726,6 +727,57 @@ std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std:
     return pathTokens;
 }
 
+lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletionsForMembers(
+    lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList,
+    std::vector<Token> tokens, std::optional<Token> &foundToken, parser::ParseResult parseResult) const {
+    auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
+    if (previousTokenIt != tokens.rend()) {
+        std::optional<Token> previousToken = std::nullopt;
+        for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
+            if (it->type != Token::LINE_COMMENT &&
+                it->type != Token::BLOCK_COMMENT) {
+                previousToken = *it;
+                break;
+            }
+        }
+        if (previousToken.has_value()) {
+            std::cerr << "Found previous token for namespace separator: " << previousToken->lexical()
+                    << "\n";
+            foundToken = previousToken;
+        } else {
+            std::cerr << "No previous token found for namespace separator\n";
+
+            return result;
+        }
+    } else {
+        std::cerr << "No previous token found for namespace separator\n";
+        return result;
+    }
+    bool isUseCompletion = false;
+
+    std::vector<Token> pathTokens = build_path_from_token_reverse(tokens, foundToken, isUseCompletion);
+    std::cerr << "is use completion: " << isUseCompletion << "\n";
+
+    auto completionResult = parseResult.module->findModulesByPathStart(
+        pathTokens);
+    for (const auto &mod: completionResult) {
+        addCompletionItemForModule(mod.get(), "", completionList);
+        if (!isUseCompletion) {
+            for (const auto &function: mod->functions) {
+                addCompletionItemForFunction(function.get(), mod->modulePathName(), "", completionList);
+            }
+        }
+    }
+    if (isUseCompletion) {
+        completionResult = m_moduleCache.findModulesByPathStart(pathTokens);
+        for (const auto &mod: completionResult) {
+            addCompletionItemForModule(mod.get(), "", completionList);
+        }
+    }
+    result = completionList;
+    return result;
+}
+
 lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     const lsp::requests::TextDocument_Completion::Params &params) {
     auto result = lsp::requests::TextDocument_Completion::Result();
@@ -761,50 +813,8 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     }
     if (foundToken->type == Token::NS_SEPARATOR) {
         // handle member completions
-        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
-        if (previousTokenIt != tokens.rend()) {
-            std::optional<Token> previousToken = std::nullopt;
-            for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
-                if (it->type != Token::LINE_COMMENT &&
-                    it->type != Token::BLOCK_COMMENT) {
-                    previousToken = *it;
-                    break;
-                }
-            }
-            if (previousToken.has_value()) {
-                std::cerr << "Found previous token for namespace separator: " << previousToken->lexical()
-                        << "\n";
-                foundToken = previousToken;
-            } else {
-                std::cerr << "No previous token found for namespace separator\n";
-                return result;
-            }
-        } else {
-            std::cerr << "No previous token found for namespace separator\n";
-            return result;
-        }
-        bool isUseCompletion = false;
 
-        std::vector<Token> pathTokens = build_path_from_token_reverse(tokens, foundToken, isUseCompletion);
-        std::cerr << "is use completion: " << isUseCompletion << "\n";
-
-        auto completionResult = parseResult.module->findModulesByPathStart(
-            pathTokens);
-        for (const auto &mod: completionResult) {
-            addCompletionItemForModule(mod.get(), "", completionList);
-            if (!isUseCompletion) {
-                for (const auto &function: mod->functions) {
-                    addCompletionItemForFunction(function.get(), mod->modulePathName(), "", completionList);
-                }
-            }
-        }
-        if (isUseCompletion) {
-            completionResult = m_moduleCache.findModulesByPathStart(pathTokens);
-            for (const auto &mod: completionResult) {
-                addCompletionItemForModule(mod.get(), "", completionList);
-            }
-        }
-        result = completionList;
+        result = findCompletionsForMembers(result, completionList, tokens, foundToken, parseResult);
         return result;
     }
 
@@ -826,6 +836,37 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
             completionList.items.push_back(std::move(item));
         }
     }
+    if (auto nodeResult = parseResult.module->getNodeByToken(foundToken.value())) {
+        auto [parent,node] = nodeResult.value();
+        if (auto parentFunction = dynamic_cast<ast::FunctionDefinition *>(parent)) {
+            for (const auto &stmt: parentFunction->block()->statements()) {
+                switch (stmt->nodeType()) {
+                    case ast::NodeType::VARIABLE_DECLARATION: {
+                        auto varDecl = dynamic_cast<ast::VariableDeclaration *>(stmt.get());
+                        auto definedName = varDecl->expressionToken().lexical();
+                        auto containsName = definedName.find(foundToken.value().lexical());
+                        if (containsName != std::string::npos) {
+                            lsp::CompletionItem item;
+                            item.label = definedName;
+                            item.kind = (varDecl->constant())
+                                            ? lsp::CompletionItemKind::Constant
+                                            : lsp::CompletionItemKind::Variable;
+                            if (varDecl->expressionType()) {
+                                item.detail = varDecl->expressionType().value()->name();
+                            } else {
+                                item.detail = "Unknown type";
+                            }
+                            completionList.items.push_back(std::move(item));
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
 
     std::cerr << "Found token: " << foundToken.value().lexical() << "\n";
     std::cerr << "Providing " << completionList.items.size() << " completion items\n";
