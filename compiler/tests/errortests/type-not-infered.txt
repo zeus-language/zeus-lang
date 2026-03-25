@@ -1,0 +1,12 @@
+FILENAME:3:9: error: Cannot infer type for variable 'x' without an initial value.
+    let x;
+        ^
+FILENAME:4:18: error: Could not determine type of initial value for variable 'y'.
+    let y = 3.14 * x;
+                 ^
+FILENAME:4:18: error: Could not determine types of operands in binary expression.
+    let y = 3.14 * x;
+                 ^
+FILENAME:4:20: error: Variable 'x' is not declared in this scope.
+    let y = 3.14 * x;
+                   ^

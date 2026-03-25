@@ -1,0 +1,9 @@
+
+fn do_stuff() : void {
+    println("Doing stuff...");
+}
+
+fn main() : i32 {
+    let x = do_stuff();
+    return 0;
+}

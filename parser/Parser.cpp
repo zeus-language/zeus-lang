@@ -1096,15 +1096,16 @@ namespace parser {
             }
             Token &nameToken = current();
             consume(Token::Type::IDENTIFIER);
-
-            consume(Token::Type::COLON);
-            auto type = parseRawType();
-            if (!type) {
-                m_messages.push_back(ParserMessasge{
-                    .token = current(),
-                    .message = "expected type after ':' in variable declaration!"
-                });
-                return std::nullopt;
+            std::optional<std::unique_ptr<ast::RawType> > type = std::nullopt;
+            if (tryConsume(Token::Type::COLON)) {
+                type = parseRawType();
+                if (!type) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected type after ':' in variable declaration!"
+                    });
+                    return std::nullopt;
+                }
             }
 
 
@@ -1116,7 +1117,7 @@ namespace parser {
                 consume(Token::Type::SEMICOLON);
             }
 
-            return std::make_unique<ast::VariableDeclaration>(std::move(nameToken), std::move(type.value()),
+            return std::make_unique<ast::VariableDeclaration>(std::move(nameToken), std::move(type),
                                                               constant,
                                                               std::move(value));
         }

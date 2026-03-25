@@ -14,6 +14,10 @@ public:
         : ASTNode(std::move(token)) {
     }
 
+    explicit AnnotatedNode(Token token, const ast::NodeType nodeType)
+        : ASTNode(std::move(token), nodeType) {
+    }
+
     ~AnnotatedNode() override = default;
 
     void addAnnotation(const std::shared_ptr<types::Annotation> &annotation) {
@@ -32,6 +36,7 @@ public:
         }
         return false;
     }
+
     template<typename T>
     [[nodiscard]] bool hasAnnotation() const {
         for (const auto &annotation: m_annotations) {
@@ -41,6 +46,7 @@ public:
         }
         return false;
     }
+
     template<typename T>
     std::vector<std::shared_ptr<T> > getAnnotationsOfType() const {
         std::vector<std::shared_ptr<T> > result;

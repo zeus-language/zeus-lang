@@ -156,6 +156,14 @@ namespace modules {
         return result;
     }
 
+    std::vector<std::string> ModuleCache::modulePaths() const {
+        std::vector<std::string> result;
+        for (const auto &path: entries | std::views::keys) {
+            result.push_back(path);
+        }
+        return result;
+    }
+
     void include_modules(
         const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
         parser::ParseResult &result) {

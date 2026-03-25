@@ -107,7 +107,7 @@ namespace types {
         } else if (auto sliceType = dynamic_cast<ast::SliceRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(sliceType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
-            auto type = types::TypeRegistry::getSliceType(baseType.value());
+            auto type = currentScope->getSliceType(baseType.value());
             if (rawType->typeModifier == ast::TypeModifier::POINTER) {
                 if (!type) return std::nullopt;
                 return types::TypeRegistry::getPointerType(type.value());
@@ -309,7 +309,8 @@ namespace types {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
         node->setExpressionType(
-            types::TypeRegistry::getSliceType(u8Type).value());
+            context.currentScope->getSliceType(u8Type).value()
+        );
     }
 
     void type_check(ast::RawStringConstant *node, const Context &context) {
@@ -1629,19 +1630,59 @@ namespace types {
     void type_check(ast::VariableDeclaration *node, Context &context) {
         if (node->expressionType())
             return;
-        const auto varType = resolveFromRawType(node->type(), context.currentScope, true);
-        if (!varType) {
+        const auto isToBeInfered = !node->type().has_value();
+        if (isToBeInfered && !node->initialValue().has_value()) {
             context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
-                "Unknown type '" + node->type()->fullTypeName() + "' for variable '" + node->expressionToken().
-                lexical() +
-                "'."
+                "Cannot infer type for variable '" + node->expressionToken().lexical() +
+                "' without an initial value."
             });
             return;
         }
-        node->setExpressionType(varType.value());
-
+        if (isToBeInfered) {
+            type_check_base(node->initialValue().value(), context);
+            if (!node->initialValue().value()->expressionType()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->initialValue().value()->expressionToken(),
+                    "Could not determine type of initial value for variable '" + node->expressionToken().
+                    lexical() + "'."
+                });
+                return;
+            }
+            if (node->initialValue().value()->expressionType().value()->name() == "void") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Variable '" + node->expressionToken().lexical() + "' cannot be of type 'void'."
+                });
+                return;
+            }
+            node->setExpressionType(node->initialValue().value()->expressionType().value());
+        } else {
+            const auto varType = resolveFromRawType(node->type().value(), context.currentScope, true);
+            if (!varType) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + node->type().value()->fullTypeName() + "' for variable '" + node->
+                    expressionToken().
+                    lexical() +
+                    "'."
+                });
+                return;
+            }
+            if (varType.value()->name() == "void") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Variable '" + node->expressionToken().lexical() + "' cannot be of type 'void'."
+                });
+                return;
+            }
+            node->setExpressionType(varType.value());
+        }
         const auto varName = node->expressionToken().lexical();
         if (context.currentScope->findVariable(varName)) {
             context.messages.insert({
@@ -1651,6 +1692,7 @@ namespace types {
             });
             return;
         }
+        const auto varType = node->expressionType();
         context.currentScope->addVariable(varName,
                                           Variable{
                                               varName, varType.value_or(nullptr),
@@ -1684,7 +1726,7 @@ namespace types {
 
         if (context.currentScope->isGlobalScope() && !node->constant() && varType) {
             if (const auto slice = dynamic_cast<types::StructType *>(varType.value().get())) {
-                if (slice->name() == "slice") {
+                if (slice->name() == "[u8]") {
                     // global string slices must be constant
                     context.messages.insert({
                         parser::OutputType::ERROR,

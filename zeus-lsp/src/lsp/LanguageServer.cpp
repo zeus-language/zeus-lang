@@ -29,7 +29,7 @@
 
 using namespace std::string_view_literals;
 
-static lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType output) {
+constexpr lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType output) {
     switch (output) {
         case parser::OutputType::ERROR:
             return lsp::DiagnosticSeverity::Error;
@@ -41,6 +41,11 @@ static lsp::DiagnosticSeverity mapOutputTypeToSeverity(const parser::OutputType 
     return lsp::DiagnosticSeverity::Information;
 }
 
+constexpr bool tokenInRange(const Token &token, const size_t line, const size_t character) {
+    return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
+           character + 1 <= token.source_location.col + token.source_location.num_bytes;
+}
+
 lsp::Uri toUri(const std::string &filePath) {
     if (filePath.starts_with("file:")) {
         return lsp::Uri::parse(filePath);
@@ -49,7 +54,7 @@ lsp::Uri toUri(const std::string &filePath) {
 }
 
 static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
-    const std::map<std::string, std::vector<parser::ParserMessasge> > &messages,
+    const std::unordered_map<std::string, std::vector<parser::ParserMessasge> > &messages,
     const std::string &targetUri) {
     std::vector<lsp::Diagnostic> diagnostics;
 
@@ -84,17 +89,17 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
 }
 
 
-static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
+static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
     const std::vector<std::filesystem::path> &rtlDirectories,
     const env::Environment &env,
     modules::ModuleCache &moduleCache,
     const lsp::Uri &uri,
     const std::string &text) {
-    std::map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
-
+    std::unordered_map<std::string, std::vector<parser::ParserMessasge> > errorsMap;
     const std::filesystem::path file_path(uri.path());
     const std::filesystem::path parentDir = file_path.parent_path();
     const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
+
     auto result = parser::parse_tokens(tokens);
     std::vector<std::filesystem::path> includeDirs;
     for (auto &dir: rtlDirectories) {
@@ -103,16 +108,16 @@ static std::map<std::string, std::vector<parser::ParserMessasge> > collectDiagno
         }
     }
     includeDirs.push_back(parentDir);
-    for (auto &tmpDir: includeDirs) {
-        std::cerr << "Warning: Include directory '" << tmpDir.string() << "' !\n";
-    }
+
     modules::include_modules(includeDirs, moduleCache, result);
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, env, type_check_result);
+
     for (auto &mod: result.module->modules) {
         moduleCache.addModule(mod->sourceFilePath.string(), mod);
     }
+    moduleCache.addModule(file_path.string(), result.module);
     if (result.messages.empty() && type_check_result.messages.empty()) {
         errorsMap[std::string(uri.path())] = {};
     } else {
@@ -283,6 +288,9 @@ void LanguageServer::handleRequest() {
                         .range = false,
                         .full = true
                     };
+                    result.capabilities.inlayHintProvider = lsp::InlayHintOptions{
+                        .resolveProvider = true
+                    };
                     auto version = std::to_string(ZEUS_VERSION_MAJOR) + "." + std::to_string(ZEUS_VERSION_MINOR) + "." +
                                    std::to_string(ZEUS_VERSION_PATCH);
                     result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = version};
@@ -373,7 +381,6 @@ void LanguageServer::handleRequest() {
                     [&](lsp::requests::TextDocument_Diagnostic::Params &&params) {
                         auto diagnosticsReport = lsp::requests::TextDocument_Diagnostic::Result();
                         const auto &uri = params.textDocument.uri;
-                        std::cerr << "Diagnostics requested for uri: " << uri.toString() << "\n";
                         // content changes: for Full sync the first change contains whole text
                         const std::string text = m_openDocuments.at(uri.toString()).text;
 
@@ -417,25 +424,11 @@ void LanguageServer::handleRequest() {
                         return findCompletions(item);
                     }).add<lsp::requests::TextDocument_SemanticTokens_Full>(
                     [&](lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
-                        auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
-                        const auto uri = params.textDocument.uri.toString();
-                        const auto [documentUri, text] = m_openDocuments.at(uri);
-                        const auto tokens = lexer::lex_file(uri, text, false);
-                        auto semanticTokens = lsp::SemanticTokens{
-                            .data = std::vector<uint32_t>{}
-                        };
-                        size_t lastRow = 0;
-                        size_t lastCol = 0;
-                        for (const auto &token: tokens) {
-                            if (auto tokenType = mapTokenType(token.type)) {
-                                // Use helper function to properly handle multi-line tokens
-                                // (especially block comments that span multiple lines)
-                                processMultiLineToken(token, tokenType.value(), semanticTokens.data,
-                                                      lastRow, lastCol);
-                            }
-                        }
-                        result.emplace(semanticTokens);
-                        return result;
+                        return semanticTokensFull(std::move(params));
+                    })
+                .add<lsp::requests::TextDocument_InlayHint>(
+                    [&](lsp::requests::TextDocument_InlayHint::Params &&params) {
+                        return resolveInlayHints(std::move(params));
                     });
 
         // Main loop
@@ -461,10 +454,95 @@ void LanguageServer::handleRequest() {
     }
 }
 
-bool tokenInRange(const Token &token, const size_t line, const size_t character) {
-    return token.source_location.row == line + 1 && character + 1 >= token.source_location.col &&
-           character + 1 <= token.source_location.col + token.source_location.num_bytes;
+lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semanticTokensFull(const
+    lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
+    auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+    const auto uri = params.textDocument.uri.toString();
+    const auto [documentUri, text] = m_openDocuments.at(uri);
+    const auto tokens = lexer::lex_file(uri, text, false);
+    auto semanticTokens = lsp::SemanticTokens{
+        .data = std::vector<uint32_t>{}
+    };
+    size_t lastRow = 0;
+    size_t lastCol = 0;
+    for (const auto &token: tokens) {
+        if (auto tokenType = mapTokenType(token.type)) {
+            // Use helper function to properly handle multi-line tokens
+            // (especially block comments that span multiple lines)
+            processMultiLineToken(token, tokenType.value(), semanticTokens.data,
+                                  lastRow, lastCol);
+        }
+    }
+    result.emplace(semanticTokens);
+    return result;
 }
+
+void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::vector<lsp::InlayHint> &hints);
+
+void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHint> &hints) {
+    switch (node->nodeType()) {
+        case ast::NodeType::FUNCTION_DEFINITION: {
+            const auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(node);
+            resolveInlayHintsForFunction(funcDef, hints);
+            break;
+        }
+        case ast::NodeType::VARIABLE_DECLARATION: {
+            const auto varDecl = dynamic_cast<const ast::VariableDeclaration *>(node);
+            if (!varDecl->type().has_value()) {
+                lsp::InlayHint hint;
+                hint.position.line = static_cast<uint32_t>(varDecl->expressionToken().source_location.row - 1);
+                hint.position.character = static_cast<uint32_t>(varDecl->expressionToken().source_location.col
+                                                                + varDecl->expressionToken().source_location.num_bytes -
+                                                                1
+                );
+                if (varDecl->expressionType()) {
+                    hint.label = ":" + varDecl->expressionType().value()->name();
+                } else {
+                    hint.label = ":unknown";
+                }
+                hint.kind = lsp::InlayHintKind::Type;
+                hints.push_back(std::move(hint));
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::vector<lsp::InlayHint> &hints) {
+    for (const auto &node: funcDef->block()->statements()) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+}
+
+lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
+    const lsp::requests::TextDocument_InlayHint::Params &&params) {
+    auto result = lsp::TextDocument_InlayHintResult();
+    auto hints = lsp::Array<lsp::InlayHint>();
+    const auto uri = params.textDocument.uri.toString();
+
+    auto path = std::string(params.textDocument.uri.path());
+
+    auto module = m_moduleCache.getModule(path);
+    if (!module) {
+        std::cerr << "Could not find module for path: " << path << "\n";
+        for (auto name: m_moduleCache.modulePaths()) {
+            std::cerr << "Module in cache: " << name << "\n";
+        }
+        return result;
+    }
+
+    for (const auto &node: module->nodes) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+    for (const auto &node: module->functions) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+    result = hints;
+    return result;
+}
+
 
 void addToCompletionListIfMatches(lsp::CompletionItem item,
                                   lsp::CompletionList &completionList) {
@@ -649,6 +727,57 @@ std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std:
     return pathTokens;
 }
 
+lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletionsForMembers(
+    lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList,
+    std::vector<Token> tokens, std::optional<Token> &foundToken, parser::ParseResult parseResult) const {
+    auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
+    if (previousTokenIt != tokens.rend()) {
+        std::optional<Token> previousToken = std::nullopt;
+        for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
+            if (it->type != Token::LINE_COMMENT &&
+                it->type != Token::BLOCK_COMMENT) {
+                previousToken = *it;
+                break;
+            }
+        }
+        if (previousToken.has_value()) {
+            std::cerr << "Found previous token for namespace separator: " << previousToken->lexical()
+                    << "\n";
+            foundToken = previousToken;
+        } else {
+            std::cerr << "No previous token found for namespace separator\n";
+
+            return result;
+        }
+    } else {
+        std::cerr << "No previous token found for namespace separator\n";
+        return result;
+    }
+    bool isUseCompletion = false;
+
+    std::vector<Token> pathTokens = build_path_from_token_reverse(tokens, foundToken, isUseCompletion);
+    std::cerr << "is use completion: " << isUseCompletion << "\n";
+
+    auto completionResult = parseResult.module->findModulesByPathStart(
+        pathTokens);
+    for (const auto &mod: completionResult) {
+        addCompletionItemForModule(mod.get(), "", completionList);
+        if (!isUseCompletion) {
+            for (const auto &function: mod->functions) {
+                addCompletionItemForFunction(function.get(), mod->modulePathName(), "", completionList);
+            }
+        }
+    }
+    if (isUseCompletion) {
+        completionResult = m_moduleCache.findModulesByPathStart(pathTokens);
+        for (const auto &mod: completionResult) {
+            addCompletionItemForModule(mod.get(), "", completionList);
+        }
+    }
+    result = completionList;
+    return result;
+}
+
 lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     const lsp::requests::TextDocument_Completion::Params &params) {
     auto result = lsp::requests::TextDocument_Completion::Result();
@@ -684,50 +813,8 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     }
     if (foundToken->type == Token::NS_SEPARATOR) {
         // handle member completions
-        auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
-        if (previousTokenIt != tokens.rend()) {
-            std::optional<Token> previousToken = std::nullopt;
-            for (auto it = previousTokenIt + 1; it != tokens.rend(); ++it) {
-                if (it->type != Token::LINE_COMMENT &&
-                    it->type != Token::BLOCK_COMMENT) {
-                    previousToken = *it;
-                    break;
-                }
-            }
-            if (previousToken.has_value()) {
-                std::cerr << "Found previous token for namespace separator: " << previousToken->lexical()
-                        << "\n";
-                foundToken = previousToken;
-            } else {
-                std::cerr << "No previous token found for namespace separator\n";
-                return result;
-            }
-        } else {
-            std::cerr << "No previous token found for namespace separator\n";
-            return result;
-        }
-        bool isUseCompletion = false;
 
-        std::vector<Token> pathTokens = build_path_from_token_reverse(tokens, foundToken, isUseCompletion);
-        std::cerr << "is use completion: " << isUseCompletion << "\n";
-
-        auto completionResult = parseResult.module->findModulesByPathStart(
-            pathTokens);
-        for (const auto &mod: completionResult) {
-            addCompletionItemForModule(mod.get(), "", completionList);
-            if (!isUseCompletion) {
-                for (const auto &function: mod->functions) {
-                    addCompletionItemForFunction(function.get(), mod->modulePathName(), "", completionList);
-                }
-            }
-        }
-        if (isUseCompletion) {
-            completionResult = m_moduleCache.findModulesByPathStart(pathTokens);
-            for (const auto &mod: completionResult) {
-                addCompletionItemForModule(mod.get(), "", completionList);
-            }
-        }
-        result = completionList;
+        result = findCompletionsForMembers(result, completionList, tokens, foundToken, parseResult);
         return result;
     }
 
@@ -749,6 +836,37 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
             completionList.items.push_back(std::move(item));
         }
     }
+    if (auto nodeResult = parseResult.module->getNodeByToken(foundToken.value())) {
+        auto [parent,node] = nodeResult.value();
+        if (auto parentFunction = dynamic_cast<ast::FunctionDefinition *>(parent)) {
+            for (const auto &stmt: parentFunction->block()->statements()) {
+                switch (stmt->nodeType()) {
+                    case ast::NodeType::VARIABLE_DECLARATION: {
+                        auto varDecl = dynamic_cast<ast::VariableDeclaration *>(stmt.get());
+                        auto definedName = varDecl->expressionToken().lexical();
+                        auto containsName = definedName.find(foundToken.value().lexical());
+                        if (containsName != std::string::npos) {
+                            lsp::CompletionItem item;
+                            item.label = definedName;
+                            item.kind = (varDecl->constant())
+                                            ? lsp::CompletionItemKind::Constant
+                                            : lsp::CompletionItemKind::Variable;
+                            if (varDecl->expressionType()) {
+                                item.detail = varDecl->expressionType().value()->name();
+                            } else {
+                                item.detail = "Unknown type";
+                            }
+                            completionList.items.push_back(std::move(item));
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
 
     std::cerr << "Found token: " << foundToken.value().lexical() << "\n";
     std::cerr << "Providing " << completionList.items.size() << " completion items\n";

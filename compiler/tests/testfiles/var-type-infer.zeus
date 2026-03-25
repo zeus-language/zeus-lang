@@ -1,0 +1,29 @@
+
+struct Test {
+    a: i32,
+    b: float,
+}
+let global_var = 42;
+
+fn create_test() : Test {
+    let x = 5;
+    let y = 3.14f;
+    return Test { a: x, b: y };
+}
+
+fn main() : i32{
+    let x = 5;
+    let y = 3.14f;
+    let z = "hello";
+
+    let t = Test { a: x, b: y };
+    let t2 = create_test();
+
+    println("x: ${x}");
+    println("y: ${y}");
+    println("z: ${z}");
+    let sum = x + 10;
+    let printmsg = "x + 10: ${sum}";
+    println(printmsg);
+    return 0;
+}

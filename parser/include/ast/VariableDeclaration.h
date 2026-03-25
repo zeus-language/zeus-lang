@@ -21,6 +21,7 @@ namespace ast {
     struct RawType {
     private:
         std::string m_fullTypeName;
+
     public:
         Token typeToken;
         std::vector<Token> namespaceElements;
@@ -28,35 +29,35 @@ namespace ast {
         std::optional<Token> genericParam = std::nullopt;
 
         RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
-        std::optional<Token> genericParam)
-    : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
-      typeModifier(typeModifier), genericParam(std::move(genericParam)) {
-            m_fullTypeName= typeToken.lexical();
+                std::optional<Token> genericParam)
+            : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
+              typeModifier(typeModifier), genericParam(std::move(genericParam)) {
+            m_fullTypeName = typeToken.lexical();
             if (this->genericParam.has_value()) {
                 m_fullTypeName += "<" + this->genericParam.value().lexical() + ">";
             }
         }
 
         RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
-                std::optional<Token> genericParam,std::string  fullTypeName)
-            : m_fullTypeName(std::move(fullTypeName)),typeToken(std::move(type_token)), namespaceElements(namespaceElements),
+                std::optional<Token> genericParam, std::string fullTypeName)
+            : m_fullTypeName(std::move(fullTypeName)), typeToken(std::move(type_token)),
+              namespaceElements(namespaceElements),
               typeModifier(typeModifier), genericParam(std::move(genericParam)) {
         }
 
         RawType(Token type_token, const TypeModifier typeModifier)
-            :typeToken(std::move(type_token)),typeModifier(typeModifier){
-            m_fullTypeName= typeToken.lexical();
-
+            : typeToken(std::move(type_token)), typeModifier(typeModifier) {
+            m_fullTypeName = typeToken.lexical();
         }
 
         virtual ~RawType() = default;
 
-        [[nodiscard]] const std::string& fullTypeName() const {
+        [[nodiscard]] const std::string &fullTypeName() const {
             return m_fullTypeName;
         }
 
         [[nodiscard]] virtual std::unique_ptr<RawType> clone() const {
-            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam,m_fullTypeName);
+            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam, m_fullTypeName);
         }
     };
 
@@ -134,20 +135,20 @@ namespace ast {
 
     class VariableDeclaration final : public ASTNode {
     private:
-        std::unique_ptr<RawType> m_type;
+        std::optional<std::unique_ptr<RawType> > m_type;
 
         bool m_constant;
         std::optional<std::unique_ptr<ASTNode> > m_initialValue;
 
     public:
-        explicit VariableDeclaration(Token name, std::unique_ptr<RawType> type, bool constant,
+        explicit VariableDeclaration(Token name, std::optional<std::unique_ptr<RawType> > type, bool constant,
                                      std::optional<std::unique_ptr<ASTNode> > initialValue);
 
         ~VariableDeclaration() override = default;
 
         [[nodiscard]] std::optional<ASTNode *> initialValue() const;
 
-        [[nodiscard]] RawType *type() const;
+        [[nodiscard]] std::optional<RawType *> type() const;
 
         [[nodiscard]] bool constant() const override;
 
@@ -167,18 +168,7 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<VariableDeclaration>(expressionToken(),
-                                                                   m_type->clone(),
-                                                                   m_constant,
-                                                                   m_initialValue.has_value()
-                                                                       ? std::make_optional<std::unique_ptr<ASTNode> >(
-                                                                           m_initialValue.value()->clone())
-                                                                       : std::nullopt);
-            if (expressionType())
-                cloneNode->setExpressionType(expressionType().value());
-            return std::move(cloneNode);
-        }
+        std::unique_ptr<ASTNode> clone() override;
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
             ASTNode::makeNonGeneric(genericParam);

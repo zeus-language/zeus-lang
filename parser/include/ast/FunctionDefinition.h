@@ -74,7 +74,7 @@ namespace ast {
                                         std::optional<std::unique_ptr<RawType> > returnType,
                                         std::vector<std::unique_ptr<RawAnnotation> > annotations,
                                         const VisibilityModifier visibilityModifier) : AnnotatedNode(
-                functionName),
+                functionName, ast::NodeType::FUNCTION_DEFINITION),
             m_functionName(expressionToken().lexical()),
             m_args(std::move(args)),
             m_returnType(std::move(returnType)),
