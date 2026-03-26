@@ -116,6 +116,39 @@ namespace parser {
             return std::nullopt;
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseHexNumber() {
+            if (!canConsume(Token::HEX_NUMBER)) {
+                return std::nullopt;
+            }
+            Token numberToken = current();
+            consume(Token::HEX_NUMBER);
+            return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::HEX_NUMBER);
+
+            return std::nullopt;
+        }
+ std::optional<std::unique_ptr<ast::ASTNode> > parseOctNumber() {
+            if (!canConsume(Token::OCT_NUMBER)) {
+                return std::nullopt;
+            }
+            Token numberToken = current();
+            consume(Token::OCT_NUMBER);
+            return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::OCT_NUMBER);
+
+            return std::nullopt;
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseBinNumber() {
+            if (!canConsume(Token::BIN_NUMBER)) {
+                return std::nullopt;
+            }
+            Token numberToken = current();
+            consume(Token::BIN_NUMBER);
+            return std::make_unique<ast::NumberConstant>(numberToken, ast::NumberType::BIN_NUMBER);
+
+            return std::nullopt;
+        }
+
+
         std::optional<std::unique_ptr<ast::ASTNode> > parseFloatNumber() {
             if (!canConsume(Token::FLOAT_NUMBER)) {
                 return std::nullopt;
@@ -518,6 +551,12 @@ namespace parser {
 
             if (auto number = parseNumber()) {
                 result = std::move(number.value());
+            } else if (auto octNumber = parseOctNumber()) {
+                result = std::move(octNumber.value());
+            } else if (auto hexNumber = parseHexNumber()) {
+                result = std::move(hexNumber.value());
+            } else if (auto binNumber = parseBinNumber()) {
+                result = std::move(binNumber.value());
             } else if (auto floatNumber = parseFloatNumber()) {
                 result = std::move(floatNumber.value());
             } else if (auto string = parseString()) {

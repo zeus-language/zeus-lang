@@ -19,8 +19,8 @@ struct SourceLocation {
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
     [[nodiscard]] size_t lineStart() const { return source->rfind('\n', byte_offset) + 1; }
-    [[nodiscard]] size_t lineEnd() const
-    {
+
+    [[nodiscard]] size_t lineEnd() const {
 #ifdef _WIN32
         return source->find('\r', byte_offset);
 #else
@@ -42,10 +42,14 @@ struct SourceLocation {
 struct Token {
 private:
     std::string m_lexical;
+
 public:
     enum Type {
         IDENTIFIER,
         NUMBER,
+        HEX_NUMBER,
+        OCT_NUMBER,
+        BIN_NUMBER,
         FLOAT_NUMBER,
         STRING,
         UNCLOSED_STRING,
@@ -90,7 +94,8 @@ public:
 
     SourceLocation source_location;
 
-    Token(std::string lexical, const Type type, SourceLocation source_location) :m_lexical(std::move(lexical)), type(type), source_location(std::move(source_location)) {
+    Token(std::string lexical, const Type type, SourceLocation source_location) : m_lexical(std::move(lexical)),
+        type(type), source_location(std::move(source_location)) {
     }
 
     Token(const Type type, SourceLocation source_location) : type(type), source_location(std::move(source_location)) {
