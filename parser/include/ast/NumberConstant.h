@@ -18,10 +18,13 @@ namespace ast {
         DOUBLE,
         CHAR,
         BOOLEAN,
-        NULLPTR
+        NULLPTR,
+        HEX_NUMBER,
+        OCT_NUMBER,
+        BIN_NUMBER
     };
 
-    typedef std::variant<int64_t, double, float, bool> NumberValue;
+    typedef std::variant<int64_t, uint64_t, double, float, bool> NumberValue;
 
     NumberValue parseNumber(const std::string &lexical, NumberType type);
 

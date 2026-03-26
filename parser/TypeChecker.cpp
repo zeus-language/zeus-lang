@@ -168,6 +168,9 @@ namespace types {
         if (const auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
             switch (numberConst->numberType()) {
                 case ast::NumberType::INTEGER:
+                case ast::NumberType::HEX_NUMBER:
+                case ast::NumberType::BIN_NUMBER:
+                case ast::NumberType::OCT_NUMBER:
                 case ast::NumberType::FLOAT:
                 case ast::NumberType::CHAR:
                 case ast::NumberType::BOOLEAN:
@@ -327,6 +330,16 @@ namespace types {
                     node->setExpressionType(context.currentScope->getTypeByName("i32").value());
                 } else {
                     node->setExpressionType(context.currentScope->getTypeByName("i64").value());
+                }
+            }
+            break;
+            case ast::NumberType::HEX_NUMBER:
+            case ast::NumberType::OCT_NUMBER:
+            case ast::NumberType::BIN_NUMBER: {
+                if (node->numBits() == 32) {
+                    node->setExpressionType(context.currentScope->getTypeByName("u32").value());
+                } else {
+                    node->setExpressionType(context.currentScope->getTypeByName("u64").value());
                 }
             }
             break;
@@ -545,7 +558,8 @@ namespace types {
                         allParamsMatch = false;
                         break;
                     }
-                    if (node->args()[i - 1]->expressionType() == nullptr || !node->args()[i - 1]->expressionType() ||
+                    if (node->args()[i - 1]->expressionType() == nullptr || !node->args()[i - 1]->expressionType()
+                        ||
                         node->args()[i - 1]->expressionType().value()->name() !=
                         method->args()[i].type.value()->name()) {
                         allParamsMatch = false;
@@ -581,7 +595,8 @@ namespace types {
                     }
 
 
-                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction and
+                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction
+                        and
                         (!context.currentFunction->isMethod() or
                          context.currentFunction->parentStruct().value()->name() != structType->name())
                     ) {
@@ -646,7 +661,8 @@ namespace types {
                 type.value())) {
                 const auto variantIt = std::ranges::find_if(enumType->variants(),
                                                             [&](const types::EnumVariant &variant) {
-                                                                return variant.name == node->variantName().lexical();
+                                                                return variant.name == node->variantName().
+                                                                       lexical();
                                                             });
                 if (variantIt == enumType->variants().end()) {
                     context.messages.insert({
@@ -748,7 +764,8 @@ namespace types {
         type_check_base(node->expression(), context);
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType() && node->expression()->expressionType()) {
-            if (node->accessNode()->expressionType().value()->name() != node->expression()->expressionType().value()->
+            if (node->accessNode()->expressionType().value()->name() != node->expression()->expressionType().value()
+                ->
                 name()) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -756,7 +773,8 @@ namespace types {
                     "Type mismatch in field assignment: field '" + node->accessNode()->expressionToken().
                     lexical() +
                     "' is of type '" + node->accessNode()->expressionType().value()->name() +
-                    "', but assigned expression is of type '" + node->expression()->expressionType().value()->name() +
+                    "', but assigned expression is of type '" + node->expression()->expressionType().value()->name()
+                    +
                     "'."
                 });
                 return;
@@ -1021,7 +1039,8 @@ namespace types {
         std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
 
         if (node->lhs()->expressionType()) {
-            if (auto structType = std::dynamic_pointer_cast<types::StructType>(node->lhs()->expressionType().value())) {
+            if (auto structType = std::dynamic_pointer_cast<types::StructType>(
+                node->lhs()->expressionType().value())) {
                 lhsStructType = structType;
                 auto lhsToken = node->lhs()->expressionToken();
                 node->setLhs(std::make_unique<ast::ReferenceAccess>(
@@ -1183,7 +1202,8 @@ namespace types {
                         return;
                     }
                     node->setExpressionType(
-                        types::TypeRegistry::getArrayType(element->expressionType().value(), node->elements().size()).
+                        types::TypeRegistry::getArrayType(element->expressionType().value(),
+                                                          node->elements().size()).
                         value());
                 } else {
                     context.messages.insert({
@@ -1378,7 +1398,8 @@ namespace types {
                 return;
             }
             // 'sizeof' returns an integer type
-            if (const auto type = context.currentScope->getTypeByName(node->genericParam().value().lexical(), false))
+            if (const auto type = context.currentScope->
+                    getTypeByName(node->genericParam().value().lexical(), false))
                 node->setGenericType(type.value());
             node->setExpressionType(context.currentScope->getTypeByName("i64").value());
             return;
@@ -1596,7 +1617,8 @@ namespace types {
                         context.messages.insert({
                             parser::OutputType::ERROR,
                             node->returnValue().value()->expressionToken(),
-                            "Type mismatch in return statement of function '" + context.currentFunction->functionName()
+                            "Type mismatch in return statement of function '" + context.currentFunction->
+                            functionName()
                             +
                             "': expected '" +
                             returnType.value()->name() +
@@ -1834,7 +1856,8 @@ namespace types {
                                 context.messages.insert({
                                     parser::OutputType::ERROR,
                                     returnStatement->returnValue().value()->expressionToken(),
-                                    "Could not determine type of return value in function '" + node->functionName() +
+                                    "Could not determine type of return value in function '" + node->functionName()
+                                    +
                                     "'."
                                 });
                             } else if (node->expressionType() && *returnStatement->returnValue().value()->
@@ -1847,7 +1870,8 @@ namespace types {
                                     returnStatement->returnValue().value()->expressionToken(),
                                     "Type mismatch in return statement of function '" + node->functionName() +
                                     "': expected '" +
-                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->name()
+                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->
+                                    name()
                                     +
                                     "', but got '" +
                                     returnStatement->returnValue().value()->expressionType().value()->name() + "'."
@@ -1962,9 +1986,10 @@ namespace types {
             if (!enumType->variants().empty()) {
                 auto v = std::get<int64_t>(value);
                 // Initialize with the first variant of the enum
-                return std::make_unique<ast::EnumAccess>(Token(enumType->name(), Token::IDENTIFIER, SourceLocation{})
-                                                         , Token(enumType->variants()[v].name, Token::IDENTIFIER,
-                                                                 SourceLocation{}));
+                return std::make_unique<ast::EnumAccess>(
+                    Token(enumType->name(), Token::IDENTIFIER, SourceLocation{})
+                    , Token(enumType->variants()[v].name, Token::IDENTIFIER,
+                            SourceLocation{}));
             }
         }
         if (std::holds_alternative<int64_t>(value)) {

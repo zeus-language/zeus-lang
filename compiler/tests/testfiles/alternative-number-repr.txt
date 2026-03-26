@@ -1,0 +1,2 @@
+The result is: 30
+The long hexadecimal number is: 81985529216486895

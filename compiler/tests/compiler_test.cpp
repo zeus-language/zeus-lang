@@ -298,7 +298,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "strings","matchint","simpleenums","structmethod","arraylist","functionoverloading",
                              "functionpointer","externannotation","stringslice", "convert2string","convertfromstring",
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
-                             "global_var","new-string","var-type-infer"));
+                             "global_var","new-string","var-type-infer","alternative-number-repr"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

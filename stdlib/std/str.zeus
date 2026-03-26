@@ -88,6 +88,18 @@ struct string {
         num_str.destroy();
     }
 
+    pub fn append(self : mut &string, number : u32) : void {
+        let mut num_str : string = unsigned_to_str(number as u64);
+        self.append(&num_str);
+        num_str.destroy();
+    }
+
+    pub fn append(self : mut &string, number : u64) : void {
+        let mut num_str : string = unsigned_to_str(number);
+        self.append(&num_str);
+        num_str.destroy();
+    }
+
      pub fn append(self : mut &string, number : float) : void {
         let mut num_str1 : string = float_to_str(number);
         self.append(&num_str1);
@@ -299,6 +311,35 @@ pub fn double_to_str(value : double) : string {
 
 
     return resultx;
+}
+
+pub fn unsigned_to_str(value : u64) : string {
+    let mut digits : string = string::new(20); // Enough to hold -2,147,483,648 and null terminator
+
+    if value == 0 as u64 {
+        digits.append('0' as u8);
+        return digits;
+    }
+    let mut num : u64 = value;
+
+    while num > 0 as u64 {
+        let digit : i32 = (num % 10  as u64) as i32;
+        digits.append( char(digit) );
+
+        num = num / 10  as u64;
+    }
+
+    // Reverse the digits
+    let mut start = 0 ;
+    let mut end : i32 = digits.length - 1;
+    while start < end {
+        let temp : u8 = digits.get(start);
+        digits.set(start, digits.get(end));
+        digits.set(end,temp);
+        start = start + 1;
+        end = end - 1;
+    }
+    return digits;
 }
 
 pub fn int_to_str(value : i32) : string {

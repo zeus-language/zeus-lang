@@ -12,6 +12,12 @@ namespace ast {
         switch (type) {
             case NumberType::INTEGER:
                 return static_cast<int64_t>(std::stoull(lexical));
+            case NumberType::BIN_NUMBER:
+                return static_cast<uint64_t>(std::stoull(lexical.substr(2), nullptr, 2));
+            case NumberType::OCT_NUMBER:
+                return static_cast<uint64_t>(std::stoull(lexical.substr(2), nullptr, 8));
+            case NumberType::HEX_NUMBER:
+                return static_cast<uint64_t>(std::stoull(lexical.substr(2), nullptr, 16));
             case NumberType::FLOAT:
                 return std::stof(lexical);
             case NumberType::DOUBLE:
@@ -78,6 +84,23 @@ namespace ast {
     }
 
     size_t NumberConstant::numBits() const {
+        if (m_numberType == NumberType::FLOAT) {
+            return 32;
+        }
+        if (m_numberType == NumberType::DOUBLE) {
+            return 64;
+        }
+        if (m_numberType == NumberType::BOOLEAN) {
+            return 1;
+        }
+        if (m_numberType == NumberType::CHAR) {
+            return 8;
+        }
+        if (std::holds_alternative<uint64_t>(m_value)) {
+            auto base = 1 + static_cast<int>(std::log2(std::get<uint64_t>(m_value)));
+            base = (base > 32) ? 64 : 32;
+            return base;
+        }
         auto base = 1 + static_cast<int>(std::log2(std::get<int64_t>(m_value)));
         base = (base > 32) ? 64 : 32;
         return base;

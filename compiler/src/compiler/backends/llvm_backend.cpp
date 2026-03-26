@@ -1632,6 +1632,11 @@ namespace llvm_backend {
 
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(node->numBits(), std::get<int64_t>(node->value()), true));
+            case ast::NumberType::HEX_NUMBER:
+            case ast::NumberType::BIN_NUMBER:
+            case ast::NumberType::OCT_NUMBER:
+                return llvm::ConstantInt::get(*llvmState.TheContext,
+                                              llvm::APInt(node->numBits(), std::get<uint64_t>(node->value()), false));
             case ast::NumberType::FLOAT:
                 return llvm::ConstantFP::get(llvmState.Builder->getFloatTy(), std::get<float>(node->value()));
             case ast::NumberType::DOUBLE:

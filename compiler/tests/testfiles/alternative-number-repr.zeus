@@ -1,0 +1,13 @@
+
+fn main() : i32{
+    let a = 0b1010; // binary representation of 10
+    let b = 0o12;   // octal representation of 10
+    let c = 0xA;    // hexadecimal representation of 10
+
+    let result = a + b + c; // This should return 30
+    println("The result is: ${result}");
+    // long number should be supported as well
+    let long_hex = 0x123456789ABCDEF; // A long hexadecimal number
+    println("The long hexadecimal number is: ${long_hex}");
+    return 0;
+}
