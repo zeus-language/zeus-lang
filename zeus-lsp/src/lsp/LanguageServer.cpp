@@ -109,7 +109,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
     }
     includeDirs.push_back(parentDir);
 
-    modules::include_modules(includeDirs, moduleCache, result);
+    modules::include_modules(includeDirs, moduleCache, env, result);
 
     types::TypeCheckResult type_check_result;
     types::type_check(result.module, env, type_check_result);
@@ -810,7 +810,7 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
     }
     auto parseResult = parser::parse_tokens(tokens);
 
-    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, this->m_env, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
     for (auto &mod: parseResult.module->modules) {
@@ -898,7 +898,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         return result;
     }
     auto parseResult = parser::parse_tokens(tokens);
-    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, parseResult);
+    modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, this->m_env, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
     for (auto &mod: parseResult.module->modules) {
