@@ -24,6 +24,7 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
+#include "ast/IfMacro.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
@@ -162,7 +163,48 @@ namespace types {
         }
     }
 
-    typedef std::variant<ast::NumberValue, std::string> Constant;
+
+    bool to_bool(const Constant &constant) {
+        if (std::holds_alternative<ast::NumberValue>(constant)) {
+            auto value = std::get<ast::NumberValue>(constant);
+            if (std::holds_alternative<int64_t>(value)) {
+                return std::get<int64_t>(value) != 0;
+            } else if (std::holds_alternative<uint64_t>(value)) {
+                return std::get<uint64_t>(value) != 0;
+            } else if (std::holds_alternative<double>(value)) {
+                return std::get<double>(value) != 0.0;
+            } else if (std::holds_alternative<float>(value)) {
+                return std::get<float>(value) != 0.0f;
+            } else if (std::holds_alternative<bool>(value)) {
+                return std::get<bool>(value);
+            } else {
+                throw std::runtime_error("Invalid type for boolean conversion");
+            }
+        } else if (std::holds_alternative<std::string>(constant)) {
+            return !std::get<std::string>(constant).empty();
+        }
+        assert(false && "unknown alternative in constant");
+    }
+
+    ast::NumberValue boolValue(bool value) {
+        return ast::NumberValue(value);
+    }
+
+    ast::NumberValue operator+(const ast::NumberValue &lhs, const ast::NumberValue &rhs) {
+        if (std::holds_alternative<int64_t>(lhs) && std::holds_alternative<int64_t>(rhs)) {
+            return std::get<int64_t>(lhs) + std::get<int64_t>(rhs);
+        } else if (std::holds_alternative<uint64_t>(lhs) && std::holds_alternative<uint64_t>(rhs)) {
+            return std::get<uint64_t>(lhs) + std::get<uint64_t>(rhs);
+        } else if (std::holds_alternative<double>(lhs) && std::holds_alternative<double>(rhs)) {
+            return std::get<double>(lhs) + std::get<double>(rhs);
+        } else if (std::holds_alternative<float>(lhs) && std::holds_alternative<float>(rhs)) {
+            return std::get<float>(lhs) + std::get<float>(rhs);
+        } else if (std::holds_alternative<bool>(lhs) && std::holds_alternative<bool>(rhs)) {
+            return static_cast<bool>(std::get<bool>(lhs) + std::get<bool>(rhs));
+        } else {
+            throw std::runtime_error("Invalid types for addition");
+        }
+    }
 
     std::optional<Constant> evalConstantExpression(ast::ASTNode *node, Context &context) {
         if (const auto numberConst = dynamic_cast<ast::NumberConstant *>(node)) {
@@ -178,10 +220,82 @@ namespace types {
                 default:
                     return std::nullopt;
             }
+        } else if (auto enumConstant = dynamic_cast<ast::EnumAccess *>(node)) {
+            if (!enumConstant->expressionType())
+                return std::nullopt;
+            auto type = std::dynamic_pointer_cast<EnumType>(enumConstant->expressionType().value());
+            return type->getVariantByName(enumConstant->variantName().lexical()).value().value;
         } else if (auto stringConst = dynamic_cast<ast::StringConstant *>(node)) {
             return stringConst->value();
         } else if (auto rawStringConst = dynamic_cast<ast::RawStringConstant *>(node)) {
             return rawStringConst->value();
+        } else if (auto binExpr = dynamic_cast<ast::BinaryExpression *>(node)) {
+            auto lhs = evalConstantExpression(binExpr->lhs(), context);
+            auto rhs = evalConstantExpression(binExpr->rhs(), context);
+            if (!lhs or !rhs)
+                return std::nullopt;
+            switch (binExpr->binoperator()) {
+                case ast::BinaryOperator::ADD:
+                    return std::get<ast::NumberValue>(lhs.value()) + std::get<ast::NumberValue>(
+                               rhs.value());
+                case ast::BinaryOperator::SUB:
+                    break;
+                case ast::BinaryOperator::MUL:
+                    break;
+                case ast::BinaryOperator::DIV:
+                    break;
+                case ast::BinaryOperator::MOD:
+                    break;
+                case ast::BinaryOperator::POW:
+                    break;
+            }
+        } else if (auto expr = dynamic_cast<ast::LogicalExpression *>(node)) {
+            switch (expr->logical_operator()) {
+                case ast::LogicalOperator::AND: {
+                    auto lhs = evalConstantExpression(expr->lhs(), context);
+                    auto rhs = evalConstantExpression(expr->rhs(), context);
+                    if (lhs and rhs)
+                        return to_bool(lhs.value()) and to_bool(rhs.value());
+                }
+                case ast::LogicalOperator::OR: {
+                    auto lhs = evalConstantExpression(expr->lhs(), context);
+                    auto rhs = evalConstantExpression(expr->rhs(), context);
+                    if (lhs and rhs)
+                        return to_bool(lhs.value()) or to_bool(rhs.value());
+                }
+                case ast::LogicalOperator::NOT: {
+                    auto rhs = evalConstantExpression(expr->rhs(), context);
+                    if (rhs)
+                        return not to_bool(rhs.value());
+                }
+                case ast::LogicalOperator::XOR:
+                    break;
+            }
+        } else if (auto condition = dynamic_cast<ast::Comparisson *>(node)) {
+            switch (condition->cmpoperator()) {
+                case ast::CMPOperator::GREATER:
+                    break;
+                case ast::CMPOperator::LESS:
+                    break;
+                case ast::CMPOperator::GREATER_EQUAL:
+                    break;
+                case ast::CMPOperator::LESS_EQUAL:
+                    break;
+                case ast::CMPOperator::EQUALS: {
+                    auto lhs = evalConstantExpression(condition->lhs(), context);
+                    auto rhs = evalConstantExpression(condition->rhs(), context);
+                    if (lhs and rhs)
+                        return lhs.value() == rhs.value();
+                }
+                break;
+                case ast::CMPOperator::NOT_EQUALS:
+                    break;
+            }
+        } else if (auto varAccess = dynamic_cast<ast::VariableAccess *>(node)) {
+            auto var = context.currentScope->findVariable(varAccess->expressionToken().lexical());
+            if (var && var->value) {
+                return var->value;
+            }
         }
         return std::nullopt;
     }
@@ -1715,11 +1829,7 @@ namespace types {
             return;
         }
         const auto varType = node->expressionType();
-        context.currentScope->addVariable(varName,
-                                          Variable{
-                                              varName, varType.value_or(nullptr),
-                                              node->constant()
-                                          });
+
         if (node->initialValue()) {
             type_check_base(node->initialValue().value(), context);
             // check whenever the types match
@@ -1745,7 +1855,15 @@ namespace types {
                 });
             }
         }
-
+        auto constValue = (node->initialValue())
+                              ? evalConstantExpression(node->initialValue().value(), context)
+                              : std::nullopt;
+        context.currentScope->addVariable(varName,
+                                          Variable{
+                                              varName, varType.value_or(nullptr),
+                                              node->constant(),
+                                              constValue
+                                          });
         if (context.currentScope->isGlobalScope() && !node->constant() && varType) {
             if (const auto slice = dynamic_cast<types::StructType *>(varType.value().get())) {
                 if (slice->name() == "[u8]") {
@@ -2125,5 +2243,86 @@ namespace types {
         type_check_internal(module, environment, context);
         std::ranges::copy(context.messages, std::back_inserter(result.messages));
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
+    }
+
+    std::vector<std::unique_ptr<ast::ASTNode> > eval_if_macro(ast::IfMacro *node, Context &context) {
+        type_check_base(node->condition(), context);
+        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
+        if (node->condition()->expressionType()) {
+            if (node->condition()->expressionType().value()->name() != "bool") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->condition()->expressionToken(),
+                    "Condition in 'if' macro must be of type 'bool', but got '" +
+                    node->condition()->expressionType().value()->name() + "'."
+                });
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->condition()->expressionToken(),
+                "Could not determine type of condition in 'if' macro."
+            });
+            return {};
+        }
+        auto constant = evalConstantExpression(node->condition(), context);
+        if (constant.has_value()) {
+            if (std::holds_alternative<ast::NumberValue>(constant.value())) {
+                const auto conditionValue = std::get<ast::NumberValue>(constant.value());
+                if (std::get<bool>(conditionValue)) {
+                    for (auto &blockNode: node->ifBlock())
+                        resultNodes.push_back(std::move(blockNode));
+                } else {
+                    for (auto &blockNode: node->elseBlock())
+                        resultNodes.push_back(std::move(blockNode));
+                }
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->condition()->expressionToken(),
+                    "Condition in 'if' macro must be a boolean constant, but got a constant of type '" +
+                    node->condition()->expressionType().value()->name() + "'."
+                });
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->condition()->expressionToken(),
+                "Condition in 'if' macro must be a constant expression."
+            });
+        }
+        return resultNodes;
+    }
+
+    void evaluate_macros(std::shared_ptr<parser::Module> &module, const env::Environment &environment,
+                         TypeCheckResult &result) {
+        std::vector<std::unique_ptr<ast::ASTNode> > oldNodes;
+        Context context;
+        context.module = module;
+        registerEnvironmentVariables(environment, context);
+
+        for (auto &stmt: module->nodes) {
+            switch (stmt->nodeType()) {
+                case ast::NodeType::IF_MACRO: {
+                    auto nodes = eval_if_macro(dynamic_cast<ast::IfMacro *>(stmt.get()), context);
+                    for (auto &node: nodes) {
+                        //oldNodes.push_back(std::move(node));
+                        switch (node->nodeType()) {
+                            case ast::NodeType::USE_MODULE:
+                                auto useModule = dynamic_cast<ast::UseModule *>(node.get());
+                                module->useModuleNodes.push_back(std::unique_ptr<ast::UseModule>(useModule));
+                                break;
+                        }
+                    }
+                }
+                break;
+                default: {
+                    type_check_base(stmt.get(), context);
+                    oldNodes.push_back(std::move(stmt));
+                }
+            }
+        }
+        module->nodes = std::move(oldNodes);
+        std::ranges::copy(context.messages, std::back_inserter(result.messages));
     }
 }

@@ -63,23 +63,23 @@ namespace compiler {
     }
 
     void parse_and_compile(const compiler::CompilerOptions &options,
-                            const env::Environment &environment,
-                            modules::ModuleCache& moduleCache,
-                            const std::filesystem::path &inputPath,
-                            std::ostream &errorStream,
-                            std::ostream &outputStream) {
+                           const env::Environment &environment,
+                           modules::ModuleCache &moduleCache,
+                           const std::filesystem::path &inputPath,
+                           std::ostream &errorStream,
+                           std::ostream &outputStream) {
         const auto content = read_file(inputPath);
         const auto tokens = lexer::lex_file(inputPath.string(), content.value());
 
         auto result = parser::parse_tokens(tokens);
 
-        modules::include_modules(options.stdlibDirectories,moduleCache, result);
+        modules::include_modules(options.stdlibDirectories, moduleCache, environment, result);
         for (const auto &message: result.messages) {
             message.msg(errorStream, options.colorOutput);
         }
         types::TypeCheckResult typeCheckResult;
-        types::type_check(result.module,environment, typeCheckResult);
-        for (auto &mod : result.module->modules) {
+        types::type_check(result.module, environment, typeCheckResult);
+        for (auto &mod: result.module->modules) {
             moduleCache.addModule(mod->sourceFilePath.string(), mod);
         }
         for (const auto &message: typeCheckResult.messages) {

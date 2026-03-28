@@ -3,15 +3,21 @@
 #include <optional>
 #include <memory>
 #include <string>
+#include <variant>
 
 #include "TypeRegistry.h"
 #include "VariableType.h"
+#include "ast/NumberConstant.h"
 
 namespace types {
+    typedef std::variant<ast::NumberValue, std::string> Constant;
+
+
     struct Variable {
         std::string name;
         std::shared_ptr<VariableType> type;
         bool constant;
+        std::optional<Constant> value;
     };
 
     class Scope {

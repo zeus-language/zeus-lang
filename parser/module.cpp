@@ -8,6 +8,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/UseModule.h"
 #include "parser/Parser.h"
+#include "types/TypeChecker.h"
 
 namespace modules {
     std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
@@ -27,7 +28,7 @@ namespace modules {
     }
 
     void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
-                       parser::ParseResult &result,
+                       parser::ParseResult &result, const env::Environment &env,
                        ast::UseModule *useModule) {
         std::string modulePath;
         DBG_ASSERT(result.module, "Resulting module must not be null");
@@ -71,7 +72,11 @@ namespace modules {
                 for (const auto &message: moduleResult.messages) {
                     result.messages.push_back(message);
                 }
-
+                types::TypeCheckResult evalResult;
+                types::evaluate_macros(moduleResult.module, env, evalResult);
+                for (const auto &message: evalResult.messages) {
+                    result.messages.push_back(message);
+                }
 
                 result.module->modules.push_back(moduleResult.module);
 
@@ -79,7 +84,7 @@ namespace modules {
                 std::vector<ast::ASTNode *> nodesToDelete;
                 for (auto &node: moduleResult.module->useModuleNodes) {
                     if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
-                        useModuleFile(stdlibDirectories, moduleCache, moduleResult, subUseModule);
+                        useModuleFile(stdlibDirectories, moduleCache, moduleResult, env, subUseModule);
                     }
                 }
                 for (auto &function: moduleResult.module->functions) {
@@ -166,7 +171,13 @@ namespace modules {
 
     void include_modules(
         const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
+        const env::Environment &env,
         parser::ParseResult &result) {
+        types::TypeCheckResult evalResult;
+        types::evaluate_macros(result.module, env::Environment{}, evalResult);
+        for (const auto &message: evalResult.messages) {
+            result.messages.push_back(message);
+        }
         if (!result.module->modulePathName().starts_with("core") and !result.module->modulePathName().
             starts_with("std")) {
             if (!result.module->containsSubModuleUse("std::io")) {
@@ -195,7 +206,7 @@ namespace modules {
             if (const auto useModule = dynamic_cast<ast::UseModule *>(token.get())) {
                 parser::ParseResult moduleResult;
 
-                useModuleFile(stdlibDirectories, moduleCache, result, useModule);
+                useModuleFile(stdlibDirectories, moduleCache, result, env, useModule);
             }
         }
     }

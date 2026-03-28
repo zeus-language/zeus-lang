@@ -15,5 +15,9 @@ namespace types {
         }
     };
 
-    void type_check(const std::shared_ptr<parser::Module> &module,const env::Environment& environment, TypeCheckResult &result);
+    void type_check(const std::shared_ptr<parser::Module> &module, const env::Environment &environment,
+                    TypeCheckResult &result);
+
+    void evaluate_macros(std::shared_ptr<parser::Module> &module, const env::Environment &environment,
+                         TypeCheckResult &result);
 }

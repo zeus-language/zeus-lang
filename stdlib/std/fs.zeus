@@ -1,6 +1,10 @@
 use core::libc;
 use std::str;
-
+#if target_os == ostype::WINDOWS
+    use std::os::windows;
+#else
+    use std::os::unix;
+#endif
 pub fn path_separator() : [u8] {
     return match target_os {
         ostype::WINDOWS => "\\",
@@ -102,4 +106,10 @@ struct File {
         self.path.destroy();
     }
 
+}
+
+pub fn create_tmp_file() : Path {
+    let mut tmp_path = tmpnam(null as *u8);
+    let path  = string::from_c_str(tmp_path);
+    return Path::new(path);
 }

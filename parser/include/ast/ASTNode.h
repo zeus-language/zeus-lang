@@ -20,6 +20,7 @@ namespace ast {
         FUNCTION_CALL,
         METHOD_CALL,
         IF_STATEMENT,
+        IF_MACRO,
         WHILE_LOOP,
         FOR_LOOP,
         BLOCK,

@@ -1,0 +1,16 @@
+use std::fs;
+
+fn main() : i32 {
+    let mut tmp_file : Path = create_tmp_file();
+    defer tmp_file.destroy();
+
+    if(tmp_file.exists())
+    {
+        println("Temp file exists.");
+        let tmp_path = tmp_file.as_c_str();
+        println("Temp file created at: ${tmp_path}");
+    }
+    let tmp_path = tmp_file.as_c_str();
+    println("Temp file created at: ${tmp_path}");
+    return 0;
+}

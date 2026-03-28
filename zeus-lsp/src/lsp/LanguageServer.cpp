@@ -142,6 +142,8 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
  */
 std::optional<int> mapTokenType(const Token::Type type) {
     switch (type) {
+        case Token::Type::MACRO_KEYWORD:
+            return 12;
         case Token::Type::KEYWORD:
             return 13;
         case Token::Type::STRING:
