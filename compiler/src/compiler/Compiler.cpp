@@ -25,6 +25,11 @@ namespace compiler {
         std::ifstream file;
         std::istringstream is;
 
+        if (is_directory(inputPath)) {
+            std::cerr << "Error: " << inputPath.string() << " is a directory" << std::endl;
+            return std::nullopt;
+        }
+
         file.open(inputPath, std::ios::binary);
         if (!file.is_open()) {
             return std::nullopt;
@@ -69,6 +74,10 @@ namespace compiler {
                            std::ostream &errorStream,
                            std::ostream &outputStream) {
         const auto content = read_file(inputPath);
+        if (!content.has_value()) {
+            std::cerr << "Error: Could not read file " << inputPath.string() << std::endl;
+            return;
+        }
         const auto tokens = lexer::lex_file(inputPath.string(), content.value());
 
         auto result = parser::parse_tokens(tokens);

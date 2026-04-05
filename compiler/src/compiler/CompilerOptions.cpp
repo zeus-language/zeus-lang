@@ -35,7 +35,11 @@ namespace compiler {
                 options.lsp = true;
             } else if (arg == "--ggdb") {
                 options.ggdb = true;
-            }else {
+            } else if (arg.starts_with("-L")) {
+                options.libraryDirectories.emplace_back(arg.substr(2));
+            } else if (arg.starts_with("-I")) {
+                options.includeDirectories.emplace_back(arg.substr(2));
+            } else {
                 argList.push_back(arg);
                 break;
             }

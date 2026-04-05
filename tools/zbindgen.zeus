@@ -1,0 +1,44 @@
+use clang;
+fn visit_children(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CXChildVisitResult {
+    println("visit cursor");
+    printf(r"cursor.kind: %d\n", cursor.kind);
+    if(cursor.kind == CXCursorKind::CXCursor_TypedefDecl){
+        let display_name = clang_getCursorDisplayName(cursor);
+
+
+        let display_name_str = clang_getCString(display_name.data,display_name.private_flags);
+        printf(r"display_name: %s\n", display_name_str);
+        //println("display_name: ${display_name_str}");
+        clang_disposeString(display_name.data,display_name.private_flags);
+    }
+    return CXChildVisitResult::Recurse;
+}
+
+fn main(argc : i32, argv :** u8) : i32 {
+    let index : *void = clang::clang_createIndex(0, 0);
+    defer clang::clang_disposeIndex(index);
+
+    let filename = r"/usr/include/x86_64-linux-gnu/sys/stat.h";
+    //println("parse file: ${filename}")
+    let options : i32 = 0;
+    let mut unsaved_files : *CXUnsavedFile = null as *CXUnsavedFile;
+    let tu = clang_parseTranslationUnit(
+                index,
+                filename as *u8,
+                null as **u8 ,
+                0,
+                null as * CXUnsavedFile,
+                0,
+                options,
+            );
+    printf(r"tu: %p\n", tu);
+    let mut cursor : CXCursor = clang_getTranslationUnitCursor(tu);
+    printf(r"cursor: %p\n", cursor);
+    printf(r"cursor.kind: %d\n", cursor.kind);
+    //println("visit children:");
+    let result = clang_visitChildren(cursor,visit_children,null as *void);
+    println("visit children result: ${result}");
+
+
+    return 0;
+}

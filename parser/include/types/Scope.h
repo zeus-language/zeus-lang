@@ -41,6 +41,8 @@ namespace types {
 
         void registerType(const std::shared_ptr<VariableType> &type);
 
+        void registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type);
+
         void registerTypeInScope(const std::shared_ptr<VariableType> &type);
 
         void addVariable(const std::string &name, const Variable &var);

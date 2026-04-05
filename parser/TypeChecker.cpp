@@ -37,6 +37,7 @@
 #include "ast/StructDeclaration.h"
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
+#include "ast/TypeDefinition.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
@@ -422,6 +423,24 @@ namespace types {
     void type_check(ast::ContinueStatement *node, Context &context) {
     }
 
+    void type_check_typedef(ast::TypeDefinition *node, Context &context) {
+        auto type = resolveFromRawType(node->getType().get(), context.currentScope, true);
+        if (!type) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Failed to resolve type for type definition '" + node->getType()->fullTypeName() + "'!"
+            });
+            return;
+        }
+
+        if (node->expressionType()) {
+            node->setExpressionType(type.value());
+        }
+        context.currentScope->registerType(type.value());
+        context.currentScope->registerTypeAlias(node->expressionToken().lexical(), type.value());
+    }
+
     void type_check(ast::StringConstant *node, const Context &context) {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
@@ -588,6 +607,10 @@ namespace types {
         if (const auto deferStmt = dynamic_cast<ast::DeferStatement *>(node)) {
             return type_check(deferStmt, context);
         }
+        if (const auto typeDef = dynamic_cast<ast::TypeDefinition *>(node)) {
+            return type_check_typedef(typeDef, context);
+        }
+
         DBG_ASSERT(node != nullptr, "Node is null");
 
         context.messages.insert({
@@ -2317,7 +2340,6 @@ namespace types {
                 }
                 break;
                 default: {
-                    type_check_base(stmt.get(), context);
                     oldNodes.push_back(std::move(stmt));
                 }
             }

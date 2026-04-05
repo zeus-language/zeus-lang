@@ -27,6 +27,13 @@ void types::Scope::registerType(const std::shared_ptr<VariableType> &type) {
     }
 }
 
+void types::Scope::registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type) {
+    m_typeRegistry.registerTypeAlias(name, type);
+    if (m_parentScope != nullptr) {
+        m_parentScope->registerTypeAlias(name, type);
+    }
+}
+
 void types::Scope::registerTypeInScope(const std::shared_ptr<VariableType> &type) {
     m_typeRegistry.registerType(type);
 }

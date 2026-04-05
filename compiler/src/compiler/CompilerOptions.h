@@ -13,6 +13,9 @@ namespace compiler {
 
         std::filesystem::path outputDirectory;
         std::vector<std::filesystem::path> stdlibDirectories;
+        std::vector<std::filesystem::path> includeDirectories;
+        std::vector<std::filesystem::path> libraryDirectories;
+        std::vector<std::string> flags;
         std::string compilerPath;
         bool runProgram = false;
         bool printLLVMIR = false;

@@ -220,12 +220,13 @@ namespace llvm_backend {
     }
 
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
-                                bool functionTypeAsPointer = true);
+                                bool functionTypeAsPointer = true, bool unnamedType = false);
 
-    llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType, LLVMBackendState &context) {
+    llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType, LLVMBackendState &context,
+                                  bool unnamedType) {
         const auto typeName = structType->linkageName();
         const auto cached_type = llvm::StructType::getTypeByName(*context.TheContext, typeName);
-        if (cached_type == nullptr) {
+        if (cached_type == nullptr or unnamedType) {
             std::vector<llvm::Type *> types;
             for (const auto &[visibility,type, _]: structType->fields()) {
                 types.emplace_back(resolveLlvmType(type, context));
@@ -233,6 +234,8 @@ namespace llvm_backend {
 
             const llvm::ArrayRef<llvm::Type *> elements(types);
 
+            if (unnamedType)
+                return llvm::StructType::get(*context.TheContext, elements);
 
             return llvm::StructType::create(*context.TheContext, elements, typeName, false);
         }
@@ -240,14 +243,14 @@ namespace llvm_backend {
     }
 
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
-                                bool functionTypeAsPointer) {
+                                const bool functionTypeAsPointer, const bool unnamedType) {
         assert(value != nullptr && "Type is null");
         if (const auto &intType = std::dynamic_pointer_cast<types::IntegerType>(value)) {
             //return llvm::Type::getIntNTy(*context.TheContext, intType->size() * 8);
             return llvm::IntegerType::get(*context.TheContext, intType->size() * 8);
         }
         if (const auto &structType = std::dynamic_pointer_cast<types::StructType>(value)) {
-            return resolveStructType(structType, context);
+            return resolveStructType(structType, context, unnamedType);
         }
 
         switch (value->typeKind()) {
@@ -301,6 +304,14 @@ namespace llvm_backend {
         }
         assert(false && "Unknown type");
         return nullptr;
+    }
+
+    bool canStructBeAValue(const std::shared_ptr<types::VariableType> &structType, LLVMBackendState &context) {
+        const auto llvmStructType = resolveLlvmType(structType, context);
+        const auto dataLayout = llvm::DataLayout(context.TheModule.get());
+        auto _struct = llvm::cast<llvm::StructType>(llvmStructType);
+        const auto pointerSize = dataLayout.getPointerSize();
+        return _struct->getNumElements() <= 2;
     }
 
     llvm::GlobalVariable *getOrCreateGlobalString(const LLVMBackendState &llvmState, const std::string &value,
@@ -1477,8 +1488,9 @@ namespace llvm_backend {
     llvm::Value *codegen(const ast::VariableAccess *node, LLVMBackendState &llvmState) {
         if (const auto value = llvmState.findVariable(node->expressionToken().lexical(), false)) {
             if (const auto alloca = llvm::dyn_cast<llvm::AllocaInst>(value)) {
-                if (alloca->getAllocatedType()->isArrayTy() or alloca->getAllocatedType()->isStructTy())
+                if (alloca->getAllocatedType()->isArrayTy() or alloca->getAllocatedType()->isStructTy()) {
                     return alloca;
+                }
                 return llvmState.Builder->CreateLoad(alloca->getAllocatedType(), alloca,
                                                      node->expressionToken().lexical());
             }
@@ -1578,17 +1590,35 @@ namespace llvm_backend {
                 return alloca;
             } else if (varType->isStructTy()) {
                 const auto strValue = codegen_base(initialValue.value(), llvmState);
-                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
-                const size_t size = DL.getTypeAllocSize(varType);
-                const auto value = (strValue->getType()->isPointerTy())
-                                       ? strValue
-                                       : getLoadStorePointerOperand(strValue);
+                llvm::Value *value = nullptr;
+                if (strValue && strValue->getType()->isStructTy()) {
+                    //value = getLoadStorePointerOperand(strValue);
+                    // element weises kopieren
+                    llvm::StructType *structType = llvm::cast<llvm::StructType>(strValue->getType());
+                    for (size_t i = 0; i < structType->getNumElements(); i++) {
+                        auto offsetLhs = llvmState.Builder->CreateStructGEP(structType, alloca, i, "struct_gep_lhs");
+                        llvm::ArrayRef<unsigned> Idxs = {i};
+                        auto loadRhs = llvmState.Builder->CreateExtractValue(strValue, Idxs, "struct_gep_rhs");
 
-                llvmState.Builder->CreateMemCpy(alloca,
-                                                llvm::MaybeAlign(),
-                                                value,
-                                                llvm::MaybeAlign(),
-                                                size);
+                        llvmState.Builder->CreateStore(loadRhs, offsetLhs);
+                        //llvmState.Builder->CreateStore(llvm::cast<llvm::StructType>(strValue)->getStructElement(i), alloca);
+                    }
+                    return alloca;
+                }
+                if (strValue) {
+                    value = (strValue->getType()->isPointerTy())
+                                ? strValue
+                                : getLoadStorePointerOperand(strValue);
+                    const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                    const size_t size = DL.getTypeAllocSize(varType);
+
+                    llvmState.Builder->CreateMemCpy(alloca,
+                                                    llvm::MaybeAlign(),
+                                                    value,
+                                                    llvm::MaybeAlign(),
+                                                    size);
+                }
+
                 return alloca;
             }
             if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
@@ -1828,9 +1858,10 @@ namespace llvm_backend {
             return nullptr; // Error handling
         }
         std::vector<llvm::Value *> args;
+        
+        const auto isStructReturn = functionCall->getParamStructRetType(0) != nullptr;
 
-        const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+
         llvm::Value *returnValuePtr = nullptr;
         if (isStructReturn) {
             returnValuePtr = llvmState.Builder->CreateAlloca(
@@ -1866,6 +1897,7 @@ namespace llvm_backend {
             const size_t actualArgNum = argNum - argIndexOffset;
             const auto argType = node->args()[actualArgNum]->expressionType();
 
+            // struct arguments that cannot be passed as value need to be passed by pointer with the byval attribute
             if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
                 const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
 
@@ -1910,6 +1942,10 @@ namespace llvm_backend {
                 llvmState.Builder->CreateCall(memcpyCall, memcopyArgs);
                 return llvmState.Builder->CreateRetVoid();
             }
+            if (retValue->getType()->isPointerTy() && parentFunction->getReturnType()->isStructTy()) {
+                auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
+                return llvmState.Builder->CreateRet(loadedValue);
+            }
             return llvmState.Builder->CreateRet(retValue);
         } else {
             return llvmState.Builder->CreateRetVoid();
@@ -1918,12 +1954,23 @@ namespace llvm_backend {
 
     void codegen(ast::ExternFunctionDefinition *node, LLVMBackendState &llvmState) {
         const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const auto resultType = (returnTypeKind == types::TypeKind::STRUCT)
-                                    ? llvm::PointerType::getUnqual(*llvmState.TheContext)
-                                    : resolveLlvmType(node->expressionType().value(), llvmState);
+
+        const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState, false, true);
+
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT and not canStructBeAValue(
+                                         node->expressionType().value(), llvmState));
+
+
+        const auto resultType = isStructReturn
+                                    ? llvm::Type::getVoidTy(*llvmState.TheContext)
+                                    : llvmReturnType;
         std::vector<llvm::Type *> params;
+        if (isStructReturn) {
+            params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+        }
         for (const auto &param: node->args()) {
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT and !canStructBeAValue(
+                    param.type.value(), llvmState)) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
@@ -1945,10 +1992,16 @@ namespace llvm_backend {
         const auto functionDefinition = llvm::Function::Create(FT, linkage, functionName,
                                                                llvmState.TheModule.get());
 
-
+        functionDefinition->setCallingConv(llvm::CallingConv::C);
         std::vector<std::string> argNames;
+        const size_t offset = (isStructReturn) ? 1 : 0;
+
         for (auto &arg: functionDefinition->args()) {
-            auto &param = node->args()[arg.getArgNo()];
+            if (isStructReturn && arg.getArgNo() == 0) {
+                arg.setName("ret");
+                continue;
+            }
+            auto &param = node->args()[arg.getArgNo() - offset];
             arg.setName(param.name.lexical());
         }
         //attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
@@ -1963,7 +2016,14 @@ namespace llvm_backend {
             functionDefinition->addFnAttr(llvm::Attribute::NoSync);
             functionDefinition->addFnAttr(llvm::Attribute::NoCallback);
         }
-
+        if (isStructReturn) {
+            functionDefinition->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                 resolveLlvmType(node->expressionType().value(),
+                                                                 llvmState)));
+            functionDefinition->addParamAttr(0, llvm::Attribute::Writable);
+            functionDefinition->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            functionDefinition->addParamAttr(0, llvm::Attribute::NoAlias);
+        }
 
         if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {
             llvmState.TheFPM->run(*functionDefinition, *llvmState.TheFAM);
@@ -2004,7 +2064,7 @@ namespace llvm_backend {
                                                                llvmState.TheModule.get());
         functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
         functionDefinition->addFnAttr(llvm::Attribute::NoFree);
-
+        functionDefinition->setDSOLocal(true);
 
         llvm::AttrBuilder b(*llvmState.TheContext);
         b.addAttribute("frame-pointer", "all");
@@ -2426,6 +2486,9 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     if (context.target.getOS() == llvm::Triple::Win32) {
         executableName += ".exe";
         //flags.erase(std::ranges::find(flags, "-lc"));
+    }
+    for (const auto &libDir: options.libraryDirectories) {
+        flags.push_back("-L" + libDir.string());
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {

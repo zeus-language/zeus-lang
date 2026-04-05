@@ -170,6 +170,8 @@ namespace ast {
 
         std::unique_ptr<ASTNode> clone() override;
 
+        VariableDeclaration copy() const;
+
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
             ASTNode::makeNonGeneric(genericParam);
             if (m_initialValue.has_value()) {

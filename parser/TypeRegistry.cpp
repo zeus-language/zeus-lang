@@ -80,6 +80,9 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArr
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(
     const std::string &name, bool rawGenericName) const {
+    if (const auto foundType = m_typeAliases.find(name); foundType != m_typeAliases.end()) {
+        return foundType->second;
+    }
     for (const auto &type: m_types) {
         if (rawGenericName && type->rawTypeName() == name) {
             return type;
@@ -95,4 +98,8 @@ void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type
     if (std::ranges::none_of(m_types, [&type](const auto &t) { return t->name() == type->name(); })) {
         m_types.push_back(type);
     }
+}
+
+void types::TypeRegistry::registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type) {
+    m_typeAliases[name] = type;
 }
