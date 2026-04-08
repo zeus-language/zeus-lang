@@ -1165,7 +1165,8 @@ namespace parser {
                 constant = false;
             }
             Token &nameToken = current();
-            consume(Token::Type::IDENTIFIER);
+            if ( !consume(Token::Type::IDENTIFIER))
+                next(); // we go further even with an error
             std::optional<std::unique_ptr<ast::RawType> > type = std::nullopt;
             if (tryConsume(Token::Type::COLON)) {
                 type = parseRawType();
@@ -1375,6 +1376,9 @@ namespace parser {
             consume(Token::GREATER);
             auto expression = parseExpression(false);
             if (!expression) {
+                expression = parseBlock();
+            }
+            if (!expression) {
                 m_messages.push_back(ParserMessasge{
                     .token = current(),
                     .message = "Missing expression after '=>' in a match expression!"
@@ -1406,7 +1410,6 @@ namespace parser {
                 matchCases.emplace_back(std::move(parsedMatch.value()));
             }
             consume(Token::Type::CLOSE_BRACE);
-            consume(Token::SEMICOLON);
             return std::make_unique<ast::MatchExpression>(name, std::move(identifier.value()), std::move(matchCases));
         }
 

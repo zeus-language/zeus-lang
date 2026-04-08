@@ -1615,8 +1615,16 @@ namespace types {
 
                 node->setExpressionType(nonGenericType.value());
             } else if (funcDef->returnType()) {
-                node->setExpressionType(
-                    resolveFromRawType(funcDef->returnType().value(), context.currentScope).value());
+                const auto type = resolveFromRawType(funcDef->returnType().value(), context.currentScope);
+                if (!type) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not resolve return type of function '" + node->functionName() + "'."
+                    });
+                    return;
+                }
+                node->setExpressionType(type.value());
             } else {
                 node->setExpressionType(context.currentScope->getTypeByName("void").value());
             }

@@ -309,7 +309,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "private_fields","private_function",
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
-                             "try-infer-void-return"
+                             "try-infer-void-return","keyword-as-identifier"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,

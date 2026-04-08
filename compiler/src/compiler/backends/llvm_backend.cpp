@@ -267,7 +267,7 @@ namespace llvm_backend {
             case types::TypeKind::VOID:
                 return llvm::Type::getVoidTy(*context.TheContext);
             case types::TypeKind::ENUM:
-                return context.Builder->getInt64Ty();
+                return context.Builder->getInt32Ty();
             case types::TypeKind::STRUCT:
                 break;
             case types::TypeKind::GENERIC:
@@ -526,7 +526,7 @@ namespace llvm_backend {
             throw std::runtime_error("Enum value not found: " + node->variantName().lexical());
         }
         const auto enumValue = enumVariant.value().value;
-        return llvm::ConstantInt::get(llvmState.Builder->getInt64Ty(), enumValue);
+        return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
     }
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState) {
@@ -1076,12 +1076,16 @@ namespace llvm_backend {
     llvm::Value *codegen_range_for(const ast::ForLoop *node, LLVMBackendState &llvmState) {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
-        llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
-        llvm::BasicBlock *LoopBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.body", TheFunction);
-        llvm::BasicBlock *LoopEndBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.end", TheFunction);
-        llvm::BasicBlock *AfterBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.cleanup", TheFunction);
+        auto *PreheaderBB = llvmState.Builder->GetInsertBlock();
+        auto *LoopCondBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.cond", TheFunction);
+        auto *LoopBodyBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.body", TheFunction);
+        auto *LoopIncBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.inc", TheFunction);
+        auto *AfterBB =
+                llvm::BasicBlock::Create(*llvmState.TheContext, "afterloop", TheFunction);
+
+
         // Create the PHI node to hold the loop variable.
-        const auto varType = node->expressionType();
+        const auto &varType = node->expressionType();
         if (!varType) {
             assert(false && "Could not determine type of iterator variable in for loop");
             return nullptr;
@@ -1091,7 +1095,7 @@ namespace llvm_backend {
             assert(false && "Could not resolve LLVM type of iterator variable in for loop");
             return nullptr;
         }
-        auto range = dynamic_cast<ast::RangeExpression *>(node->range());
+        const auto range = dynamic_cast<ast::RangeExpression *>(node->range());
 
         auto startValue = codegen_base(range->start(), llvmState);
 
@@ -1101,43 +1105,22 @@ namespace llvm_backend {
             return nullptr;
         }
 
+
         if (startValue->getType() != llvmVarType) {
             startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
         }
+        const auto iterator = node->iteratorToken().lexical();
+        const auto iteratorVar = llvmState.Builder->CreateAlloca(llvmVarType, nullptr, iterator);
+        llvmState.addNamedValue(iterator, iteratorVar);
+        llvmState.Builder->CreateStore(startValue, iteratorVar);
 
-        // Insert an explicit fall through from the current block to the LoopBB.
-        llvmState.Builder->CreateBr(LoopBB);
+
+        llvmState.Builder->CreateBr(LoopCondBB);
 
         // Start insertion in LoopBB.
-        llvmState.Builder->SetInsertPoint(LoopBB);
+        llvmState.Builder->SetInsertPoint(LoopCondBB);
 
 
-        const auto iterator = node->iteratorToken().lexical();
-
-        // Initialize the PHI node with the start value.
-        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2, iterator);
-
-        llvmState.addNamedValue(iterator, Variable);
-
-        Variable->addIncoming(startValue, PreheaderBB);
-        const auto oldCurrentLoop = llvmState.currentBreakBlock.currentLoop;
-        const auto oldAfterLoop = llvmState.currentBreakBlock.afterLoop;
-        llvmState.currentBreakBlock.currentLoop = LoopEndBB;
-        llvmState.currentBreakBlock.afterLoop = AfterBB;
-        llvmState.currentBreakBlock.BlockUsed = false;
-        // Generate the loop body.
-        llvmState.Builder->SetInsertPoint(LoopBB);
-
-        codegen_base(node->block(), llvmState);
-        llvmState.currentBreakBlock.currentLoop = oldCurrentLoop;
-        llvmState.currentBreakBlock.afterLoop = oldAfterLoop;
-
-        // Step: increment the loop variable.
-        llvmState.Builder->CreateBr(LoopEndBB);
-        llvmState.Builder->SetInsertPoint(LoopEndBB);
-
-        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
-        const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
         // Compute the end condition.
         auto endValue = codegen_base(range->end(), llvmState);
         if (!endValue) {
@@ -1147,23 +1130,50 @@ namespace llvm_backend {
         if (endValue->getType() != llvmVarType) {
             endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
         }
+        const auto loadedItertaor = llvmState.Builder->CreateLoad(llvmVarType, iteratorVar, "iterator_load");
+
         llvm::Value *endCond = nullptr;
         if (range->isInclusive()) {
-            endCond = llvmState.Builder->CreateICmpSLE(nextVar, endValue, "loopcond");
+            endCond = llvmState.Builder->CreateICmpSLE(loadedItertaor, endValue, "loopcond");
         } else {
-            endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
+            endCond = llvmState.Builder->CreateICmpSLT(loadedItertaor, endValue, "loopcond");
         }
+
 
         // Create the "after loop" block and insert it.
-        llvmState.Builder->CreateCondBr(endCond, LoopBB, AfterBB);
-        llvmState.Builder->SetInsertPoint(AfterBB);
-        // Add the incoming value for the PHI node from the backedge.
-        Variable->addIncoming(nextVar, LoopEndBB);
+        llvmState.Builder->CreateCondBr(endCond, LoopBodyBB, AfterBB);
 
-        if (llvmState.hasNamedAllocation(iterator)) {
-            llvmState.Builder->CreateStore(llvmState.findNamedValue(iterator), llvmState.findNamedAllocation(iterator));
-        }
-        llvmState.removeNamedValue(iterator);
+        // Start insertion in LoopBB.
+
+
+        llvmState.Builder->SetInsertPoint(LoopBodyBB);
+
+        const auto oldCurrentLoop = llvmState.currentBreakBlock.currentLoop;
+        const auto oldAfterLoop = llvmState.currentBreakBlock.afterLoop;
+        llvmState.currentBreakBlock.currentLoop = LoopIncBB;
+        llvmState.currentBreakBlock.afterLoop = AfterBB;
+        llvmState.currentBreakBlock.BlockUsed = false;
+        // Generate the loop body.
+        //llvmState.Builder->SetInsertPoint(LoopBB);
+
+        codegen_base(node->block(), llvmState);
+        llvmState.currentBreakBlock.currentLoop = oldCurrentLoop;
+        llvmState.currentBreakBlock.afterLoop = oldAfterLoop;
+
+        llvmState.Builder->CreateBr(LoopIncBB);
+
+        llvmState.Builder->SetInsertPoint(LoopIncBB);
+
+        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
+        const auto loadForInc = llvmState.Builder->CreateLoad(llvmVarType, iteratorVar, "iterator_load");
+        // Add the incoming value for the PHI node from the backedge.
+        const auto nextVar = llvmState.Builder->CreateAdd(loadForInc, stepValue, "nextvar");
+        llvmState.Builder->CreateStore(nextVar, iteratorVar);
+
+        llvmState.Builder->CreateBr(LoopCondBB);
+
+        llvmState.Builder->SetInsertPoint(AfterBB);
+
 
         return llvm::Constant::getNullValue(llvm::Type::getInt32Ty(*llvmState.TheContext));
     }
@@ -1175,7 +1185,7 @@ namespace llvm_backend {
     }
 
     void setCallArgInfo(ast::ASTNode *node, llvm::CallInst *call, size_t argNum, LLVMBackendState &llvmState) {
-        const auto argType = node->expressionType();
+        const auto &argType = node->expressionType();
 
         if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
             const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
@@ -1858,7 +1868,7 @@ namespace llvm_backend {
             return nullptr; // Error handling
         }
         std::vector<llvm::Value *> args;
-        
+
         const auto isStructReturn = functionCall->getParamStructRetType(0) != nullptr;
 
 
@@ -1890,7 +1900,7 @@ namespace llvm_backend {
             call->addParamAttr(0, llvm::Attribute::NoAlias);
             argIndexOffset = 1;
         }
-        for (size_t argNum = 0; argNum < node->args().size(); ++argNum) {
+        for (size_t argNum = 0; argNum < args.size(); ++argNum) {
             if (isStructReturn && argNum == 0) {
                 continue; // Skip the hidden struct return pointer argument
             }
