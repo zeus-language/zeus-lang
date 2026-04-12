@@ -27,7 +27,7 @@ types::StructType::StructType(std::string name, const std::vector<StructField> &
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
 }
 
-const ast::FunctionDefinition * types::StructType::getMethodByName(const std::string &methodName) const {
+const ast::FunctionDefinition *types::StructType::getMethodByName(const std::string &methodName) const {
     for (const auto &method: m_methods) {
         if (method->functionName() == methodName) {
             return method.get();
@@ -47,56 +47,58 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
     std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
 
     for (const auto &method: this->m_methods) {
-            auto returnType = std::make_optional(method->returnType().value()->clone());
-            Token token = method->expressionToken();
-            std::vector<ast::FunctionArgument> args;
-            for (auto &argOld: method->args()) {
-                auto arg = ast::FunctionArgument(argOld.name, argOld.rawType->clone(), argOld.isConstant);
-                if (argOld.type && argOld.type.value()->typeKind() == TypeKind::GENERIC) {
-                    arg.type = genericParam;
-                } else {
-                    arg.type = argOld.type;
-                }
-
-
-                args.push_back(std::move(arg));
-            }
-            auto  statements = method->block()->cloneBlock();
-
-            auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
-            for (auto &annotationOld: method->rawAnnotations()) {
-                annotations.push_back(std::move(annotationOld->cloneAnnotation()));
-            }
-
-            auto functionClone = std::make_unique<ast::FunctionDefinition>(
-                std::move(token),
-                std::move(args),
-                std::move(returnType),
-                std::move(statements),
-                method->getGenericParam(),
-                std::move(annotations),
-                method->visibilityModifier()
-            );
-            functionClone->setParentStruct(this);
-
-            if (method->returnType()) {
-                if (method->returnType().value()->genericParam) {
-                    auto expr = method->expressionType().value();
-                    functionClone->setExpressionType(expr);
-                } else if (method->expressionType() && method->expressionType().value()->typeKind() ==
-                           TypeKind::GENERIC) {
-                    functionClone->setExpressionType(genericParam);
-                } else {
-                    functionClone->setExpressionType(method->expressionType().value());
-                }
+        auto returnType = std::make_optional(method->returnType().value()->clone());
+        Token token = method->expressionToken();
+        std::vector<ast::FunctionArgument> args;
+        for (auto &argOld: method->args()) {
+            auto arg = ast::FunctionArgument(argOld.name,
+                                             (argOld.rawType)
+                                                 ? std::make_optional(argOld.rawType.value()->clone())
+                                                 : std::nullopt, argOld.isConstant);
+            if (argOld.type && argOld.type.value()->typeKind() == TypeKind::GENERIC) {
+                arg.type = genericParam;
+            } else {
+                arg.type = argOld.type;
             }
 
 
-            for (auto &stmt: functionClone->block()->statements()) {
-                stmt->makeNonGeneric(genericParam);
-            }
-            methods.push_back(std::move(functionClone));
+            args.push_back(std::move(arg));
+        }
+        auto statements = method->block()->cloneBlock();
 
+        auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
+        for (auto &annotationOld: method->rawAnnotations()) {
+            annotations.push_back(std::move(annotationOld->cloneAnnotation()));
+        }
+
+        auto functionClone = std::make_unique<ast::FunctionDefinition>(
+            std::move(token),
+            std::move(args),
+            std::move(returnType),
+            std::move(statements),
+            method->getGenericParam(),
+            std::move(annotations),
+            method->visibilityModifier()
+        );
+        functionClone->setParentStruct(this);
+
+        if (method->returnType()) {
+            if (method->returnType().value()->genericParam) {
+                auto expr = method->expressionType().value();
+                functionClone->setExpressionType(expr);
+            } else if (method->expressionType() && method->expressionType().value()->typeKind() ==
+                       TypeKind::GENERIC) {
+                functionClone->setExpressionType(genericParam);
+            } else {
+                functionClone->setExpressionType(method->expressionType().value());
+            }
+        }
+
+
+        for (auto &stmt: functionClone->block()->statements()) {
+            stmt->makeNonGeneric(genericParam);
+        }
+        methods.push_back(std::move(functionClone));
     }
 
     auto structType = std::make_shared<StructType>(VariableType::rawTypeName(), fields, std::move(methods),

@@ -41,7 +41,8 @@ namespace ast {
         ANNOTATION,
         GENERIC_PARAM,
         OTHER,
-        DEREFERENCE
+        DEREFERENCE,
+        BINARY_EXPRESSION
     };
 
     class ASTNode {

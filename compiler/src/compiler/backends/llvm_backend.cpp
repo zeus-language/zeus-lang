@@ -49,6 +49,7 @@
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/IfCondition.h"
+#include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
@@ -81,35 +82,14 @@ namespace llvm_backend {
     };
 
 
-    struct LLVMBackendState {
-    private:
-        std::vector<ast::FunctionDefinitionBase *> function_definition;
+    struct Scope {
         std::unordered_map<std::string, Allocation> NamedAllocations;
         std::unordered_map<std::string, llvm::Value *> NamedValues;
+        std::optional<std::shared_ptr<Scope> > parent = std::nullopt;
 
-    public:
-        std::unique_ptr<llvm::DIBuilder> DBuilder;
-        std::unique_ptr<llvm::LLVMContext> TheContext;
-        std::unique_ptr<llvm::Module> TheModule;
-        std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > Builder;
-
-        llvm::Function *TopLevelFunction{};
-        std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
-
-        std::unique_ptr<llvm::FunctionPassManager> TheFPM;
-        std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
-        std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
-        std::unique_ptr<llvm::ModulePassManager> TheMPM;
-        std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
-        std::unique_ptr<llvm::StandardInstrumentations> TheSI;
-        BreakBlock currentBreakBlock;
-        llvm::Triple target;
-        std::vector<ast::ASTNode *> deferedStatements;
-
-        std::vector<std::string> linkerFlags;
-
-
-        llvm::Value *findVariable(const std::string &name, const bool loadValue = true) {
+        llvm::Value *findVariable(
+            const std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > &Builder,
+            const std::string &name, const bool loadValue = true) {
             if (NamedValues.contains(name)) {
                 return NamedValues[name];
             }
@@ -119,12 +99,18 @@ namespace llvm_backend {
                 return Builder->CreateLoad(NamedAllocations[name].allocaInst->getAllocatedType(),
                                            NamedAllocations[name].allocaInst, name);
             }
+            if (parent) {
+                return parent.value()->findVariable(Builder, name, loadValue);
+            }
             return nullptr;
         }
 
         llvm::Value *findNamedAllocation(const std::string &name) {
             if (NamedAllocations.contains(name)) {
                 return NamedAllocations[name].allocaInst;
+            }
+            if (parent) {
+                return parent.value()->findNamedAllocation(name);
             }
             return nullptr;
         }
@@ -133,27 +119,38 @@ namespace llvm_backend {
             if (NamedValues.contains(name)) {
                 return NamedValues[name];
             }
+            if (parent) {
+                return parent.value()->findNamedValue(name);
+            }
             return nullptr;
         }
 
         bool hasNamedAllocation(const std::string &name) const {
-            return NamedAllocations.contains(name);
+            bool hasAlloc = NamedAllocations.contains(name);
+            if (parent && !hasAlloc) {
+                hasAlloc = parent.value()->hasNamedAllocation(name);
+            }
+            return hasAlloc;
         }
 
         bool hasNamedValue(const std::string &name) const {
-            return NamedValues.contains(name);
+            bool hasAlloc = NamedValues.contains(name);
+            if (parent && !hasAlloc) {
+                hasAlloc = parent.value()->hasNamedValue(name);
+            }
+            return hasAlloc;
         }
 
         std::shared_ptr<types::VariableType> findVariableType(const std::string &name) {
             if (NamedAllocations.contains(name)) {
                 return NamedAllocations[name].type;
             }
+            if (parent) {
+                return parent.value()->findVariableType(name);
+            }
             return nullptr;
         }
 
-        void registerFunction(ast::FunctionDefinitionBase *function) {
-            function_definition.emplace_back(function);
-        }
 
         void addNamedValue(const std::string &name, llvm::Value *value) {
             NamedValues[name] = value;
@@ -180,6 +177,100 @@ namespace llvm_backend {
                                              const std::shared_ptr<types::VariableType> &type) {
             NamedAllocations[name] = Allocation{allocaInst, type};
             return allocaInst;
+        }
+    };
+
+    struct LLVMBackendState {
+    private:
+        std::vector<ast::FunctionDefinitionBase *> function_definition;
+        std::shared_ptr<Scope> scope = std::make_shared<Scope>();
+
+    public:
+        std::unique_ptr<llvm::DIBuilder> DBuilder;
+        std::unique_ptr<llvm::LLVMContext> TheContext;
+        std::unique_ptr<llvm::Module> TheModule;
+        std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > Builder;
+
+        llvm::Function *TopLevelFunction{};
+        std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
+
+        std::unique_ptr<llvm::FunctionPassManager> TheFPM;
+        std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
+        std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
+        std::unique_ptr<llvm::ModulePassManager> TheMPM;
+        std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
+        std::unique_ptr<llvm::StandardInstrumentations> TheSI;
+        BreakBlock currentBreakBlock;
+        llvm::Triple target;
+        std::vector<ast::ASTNode *> deferedStatements;
+
+        std::vector<std::string> linkerFlags;
+
+
+        llvm::Value *findVariable(const std::string &name, const bool loadValue = true) {
+            return scope->findVariable(Builder, name, loadValue);
+        }
+
+        llvm::Value *findNamedAllocation(const std::string &name) {
+            return scope->findNamedAllocation(name);
+        }
+
+        llvm::Value *findNamedValue(const std::string &name) {
+            return scope->findNamedValue(name);
+        }
+
+        bool hasNamedAllocation(const std::string &name) const {
+            return scope->hasNamedAllocation(name);
+        }
+
+        bool hasNamedValue(const std::string &name) const {
+            return scope->hasNamedValue(name);
+        }
+
+        std::shared_ptr<types::VariableType> findVariableType(const std::string &name) {
+            return scope->findVariableType(name);
+        }
+
+        void registerFunction(ast::FunctionDefinitionBase *function) {
+            function_definition.emplace_back(function);
+        }
+
+        void addNamedValue(const std::string &name, llvm::Value *value) {
+            scope->addNamedValue(name, value);
+        }
+
+
+        void removeNamedValue(const std::string &name) {
+            scope->removeNamedValue(name);
+        }
+
+        void removeNamedAllocation(const std::string &name) {
+            scope->removeNamedAllocation(name);
+        }
+
+        void clearNamedValues() {
+            scope->clearNamedValues();
+        }
+
+        void clearNamedAllocations() {
+            scope->clearNamedAllocations();
+        }
+
+        void newScope() {
+            scope->parent = std::make_shared<Scope>(*scope);
+        }
+
+        void swapScope() {
+            if (scope->parent.has_value()) {
+                scope = scope->parent.value();
+            } else {
+                scope = std::make_shared<Scope>();
+            }
+        }
+
+        llvm::AllocaInst *addNamedAllocation(const std::string &name, llvm::AllocaInst *allocaInst,
+                                             const std::shared_ptr<types::VariableType> &type) {
+            return scope->addNamedAllocation(name, allocaInst, type);
         }
 
         std::optional<ast::FunctionDefinitionBase *> findFunction(const std::string &name) {
@@ -391,6 +482,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::LambdaExpression *node, LLVMBackendState &llvmState);
+
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
             return;
@@ -504,6 +597,9 @@ namespace llvm_backend {
         }
         if (const auto derefNode = dynamic_cast<ast::DerefNode *>(node)) {
             return llvm_backend::codegen(derefNode, llvmState);
+        }
+        if (const auto lambdaExpr = dynamic_cast<ast::LambdaExpression *>(node)) {
+            return llvm_backend::codegen(lambdaExpr, llvmState);
         }
 
         // Handle other node types or throw an error
@@ -1531,6 +1627,7 @@ namespace llvm_backend {
             return llvmState.Builder->CreateLoad(globalVar->getValueType(), globalVar,
                                                  node->expressionToken().lexical());
         }
+        std::cerr << "Variable not found: " << node->expressionToken().lexical() << std::endl;
         assert(false && "Variable not found");
         return nullptr;
     }
@@ -1972,6 +2069,147 @@ namespace llvm_backend {
         }
     }
 
+    static llvm::DISubroutineType *CreateFunctionType(LLVMBackendState &llvmState, unsigned NumArgs) {
+        llvm::SmallVector<llvm::Metadata *, 8> EltTys;
+        // TODO
+
+        return llvmState.DBuilder->createSubroutineType(llvmState.DBuilder->getOrCreateTypeArray(EltTys));
+    }
+
+    llvm::Value *codegen(ast::LambdaExpression *node, LLVMBackendState &llvmState) {
+        llvmState.newScope();
+        const auto returnTypeKind = node->resolvedReturnType().value()->typeKind();
+        const auto llvmReturnType = resolveLlvmType(node->resolvedReturnType().value(), llvmState, false, true);
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT and not canStructBeAValue(
+                                         node->expressionType().value(), llvmState));
+        const auto resultType = isStructReturn
+                                    ? llvm::Type::getVoidTy(*llvmState.TheContext)
+                                    : llvmReturnType;
+        std::vector<llvm::Type *> params;
+        if (isStructReturn) {
+            params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+        }
+        for (const auto &param: node->args()) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT and !canStructBeAValue(
+                    param.type.value(), llvmState)) {
+                params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
+            } else {
+                params.push_back(resolveLlvmType(param.type.value(), llvmState));
+            }
+        }
+        llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
+        auto linkage = llvm::Function::PrivateLinkage;
+
+        const auto functionDefinition = llvm::Function::Create(FT, linkage, "",
+                                                               llvmState.TheModule.get());
+
+        auto oldBasicBlock = llvmState.Builder->GetInsertBlock();
+        llvm::BasicBlock *functionBaseBlock = llvm::BasicBlock::Create(*llvmState.TheContext,
+                                                                       functionDefinition->getName(),
+                                                                       functionDefinition);
+
+        llvmState.Builder->SetInsertPoint(functionBaseBlock);
+        std::vector<std::string> argNames;
+
+
+        if (isStructReturn) {
+            functionDefinition->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                 resolveLlvmType(node->expressionType().value(),
+                                                                 llvmState)));
+            functionDefinition->addParamAttr(0, llvm::Attribute::Writable);
+            functionDefinition->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
+            functionDefinition->addParamAttr(0, llvm::Attribute::NoAlias);
+        }
+        const size_t offset = (isStructReturn) ? 1 : 0;
+        for (auto &arg: functionDefinition->args()) {
+            if (isStructReturn && arg.getArgNo() == 0) {
+                arg.setName("ret");
+                continue;
+            }
+            auto &param = node->args()[arg.getArgNo() - offset];
+            arg.setName(param.name.lexical());
+            // Create an alloca for this variable.
+            const auto varType = resolveLlvmType(param.type.value(), llvmState);
+            llvm::AllocaInst *alloca;
+            if (varType->isFunctionTy()) {
+                alloca = llvmState.Builder->CreateAlloca(llvm::PointerType::getUnqual(*llvmState.TheContext), nullptr,
+                                                         arg.getName() + ".addr");
+            } else {
+                alloca = llvmState.Builder->CreateAlloca(varType, nullptr, arg.getName() + ".addr");
+            }
+            // Store the initial value into the alloca.
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                const size_t size = DL.getTypeAllocSize(varType);
+                llvmState.Builder->CreateMemCpy(alloca,
+                                                llvm::MaybeAlign(),
+                                                &arg,
+                                                llvm::MaybeAlign(),
+                                                size);
+            } else if (varType->isFunctionTy()) {
+                llvmState.Builder->CreateStore(
+                    llvmState.Builder->CreatePointerCast(&arg, llvm::PointerType::getUnqual(*llvmState.TheContext)),
+                    alloca);
+            } else {
+                llvmState.Builder->CreateStore(&arg, alloca);
+            }
+            // Add arguments to variable symbol table.
+            llvmState.addNamedAllocation(std::string(arg.getName()), alloca, param.type.value());
+            argNames.push_back(arg.getName().str());
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+                arg.addAttr(llvm::Attribute::getWithByValType(*llvmState.TheContext,
+                                                              resolveLlvmType(param.type.value(), llvmState)));
+                arg.addAttr(llvm::Attribute::NoUndef);
+            }
+        }
+        if (llvmState.DBuilder) {
+            llvm::DIFile *Unit = llvmState.DBuilder->createFile(llvmState.KSDbgInfo.TheCU->getFilename(),
+                                                                llvmState.KSDbgInfo.TheCU->getDirectory());
+            llvm::DIScope *FContext = Unit;
+            unsigned LineNo = 0;
+            unsigned ScopeLine = 0;
+            llvm::DISubprogram *SP = llvmState.DBuilder->createFunction(
+                FContext, "", llvm::StringRef(), Unit, LineNo,
+                CreateFunctionType(llvmState, functionDefinition->arg_size()),
+                ScopeLine,
+                llvm::DINode::FlagPrototyped,
+                llvm::DISubprogram::SPFlagDefinition);
+            functionDefinition->setSubprogram(SP);
+            llvmState.KSDbgInfo.LexicalBlocks.push_back(SP);
+        }
+
+        codegen_base(node->block(), llvmState);
+        functionDefinition->addFnAttr(llvm::Attribute::MustProgress);
+        functionDefinition->addFnAttr(llvm::Attribute::NoFree);
+
+        for (auto &argName: argNames) {
+            llvmState.removeNamedAllocation(argName);
+        }
+
+
+        llvm::AttrBuilder b(*llvmState.TheContext);
+        b.addAttribute("frame-pointer", "all");
+        functionDefinition->addFnAttrs(b);
+        if (!node->expressionType() || node->expressionType().value()->typeKind() == types::TypeKind::VOID) {
+            for (auto deferedExpression: llvmState.deferedStatements) {
+                codegen_base(deferedExpression, llvmState);
+            }
+            llvmState.Builder->CreateRetVoid();
+        }
+
+        if (llvm::verifyFunction(*functionDefinition, &llvm::errs())) {
+            llvmState.TheFPM->run(*functionDefinition, *llvmState.TheFAM);
+        }
+        llvmState.clearNamedAllocations();
+        llvmState.clearNamedValues();
+        llvmState.swapScope();
+        if (llvmState.DBuilder)
+            llvmState.KSDbgInfo.LexicalBlocks.pop_back();
+
+        llvmState.Builder->SetInsertPoint(oldBasicBlock);
+        return functionDefinition;
+    }
+
     void codegen(ast::ExternFunctionDefinition *node, LLVMBackendState &llvmState) {
         const auto returnTypeKind = node->expressionType().value()->typeKind();
 
@@ -2099,14 +2337,9 @@ namespace llvm_backend {
         }
     }
 
-    static llvm::DISubroutineType *CreateFunctionType(LLVMBackendState &llvmState, unsigned NumArgs) {
-        llvm::SmallVector<llvm::Metadata *, 8> EltTys;
-        // TODO
-
-        return llvmState.DBuilder->createSubroutineType(llvmState.DBuilder->getOrCreateTypeArray(EltTys));
-    }
 
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
+        llvmState.newScope();
         llvmState.deferedStatements.clear();
         std::vector<llvm::Type *> params;
         if (llvmState.DBuilder) {
@@ -2242,6 +2475,7 @@ namespace llvm_backend {
         }
         llvmState.clearNamedAllocations();
         llvmState.clearNamedValues();
+        llvmState.swapScope();
         if (llvmState.DBuilder)
             llvmState.KSDbgInfo.LexicalBlocks.pop_back();
     }

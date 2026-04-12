@@ -26,6 +26,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
@@ -44,13 +45,14 @@
 #include "ast/VariableDeclaration.h"
 #include "ast/WhileLoop.h"
 #include "types/Scope.h"
+#include "types/TypeResolver.h"
 
 namespace types {
     struct Context {
         std::set<parser::ParserMessasge> messages;
         std::shared_ptr<parser::Module> module;
         std::shared_ptr<Scope> currentScope = std::make_shared<Scope>();
-        ast::FunctionDefinition *currentFunction = nullptr;
+        ast::FunctionDefinitionBase *currentFunction = nullptr;
         types::TypeRegistry typeRegistry;
 
         [[nodiscard]] std::vector<ast::FunctionDefinitionBase *> findFunctionsByName(const std::string &path,
@@ -89,82 +91,6 @@ namespace types {
             return result;
         }
     };
-
-
-    std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
-                                                                     std::shared_ptr<Scope> &currentScope,
-                                                                     bool resolveGeneric = false) {
-        const bool useRawGenericName = rawType->genericParam.has_value() && resolveGeneric;
-        if (const auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
-            const auto baseType = resolveFromRawType(arrayType->baseType.get(), currentScope);
-            if (!baseType) return std::nullopt;
-            auto type = types::TypeRegistry::getArrayType(baseType.value(), arrayType->size);
-            if (rawType->typeModifier == ast::TypeModifier::POINTER) {
-                if (!type) return std::nullopt;
-                return types::TypeRegistry::getPointerType(type.value());
-            } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
-                if (!type) return std::nullopt;
-                return types::TypeRegistry::getReferenceType(type.value());
-            }
-            return type;
-        } else if (auto sliceType = dynamic_cast<ast::SliceRawType *>(rawType)) {
-            const auto baseType = resolveFromRawType(sliceType->baseType.get(), currentScope);
-            if (!baseType) return std::nullopt;
-            auto type = currentScope->getSliceType(baseType.value());
-            if (rawType->typeModifier == ast::TypeModifier::POINTER) {
-                if (!type) return std::nullopt;
-                return types::TypeRegistry::getPointerType(type.value());
-            } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
-                if (!type) return std::nullopt;
-                return types::TypeRegistry::getReferenceType(type.value());
-            }
-            return type;
-        } else if (auto pointerType = dynamic_cast<ast::PointerRawType *>(rawType)) {
-            const auto baseType = resolveFromRawType(pointerType->baseType.get(), currentScope);
-            if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getPointerType(baseType.value());
-        } else if (auto functionType = dynamic_cast<ast::FunctionRawType *>(rawType)) {
-            // Function types are not supported as variable types
-            std::vector<std::shared_ptr<VariableType> > argTypes;
-            for (const auto &argRawType: functionType->argumentTypes) {
-                const auto argType = resolveFromRawType(argRawType.get(), currentScope);
-                if (!argType) return std::nullopt;
-                argTypes.push_back(argType.value());
-            }
-            const auto returnType = resolveFromRawType(functionType->returnType.get(), currentScope);
-            if (!returnType) return std::nullopt;
-            std::string name = "fn(";
-            for (size_t i = 0; i < argTypes.size(); ++i) {
-                name += argTypes[i]->name();
-                if (i < argTypes.size() - 1) {
-                    name += ",";
-                }
-            }
-            name += "):" + returnType.value()->name();
-            return std::make_shared<FunctionType>(name, argTypes, returnType.value());
-        } else if (rawType->typeModifier == ast::TypeModifier::POINTER) {
-            const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
-            if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getPointerType(baseType.value());
-        } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
-            const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
-            if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getReferenceType(baseType.value());
-        } else {
-            if (useRawGenericName) {
-                auto nonGenericType = currentScope->getTypeByName(rawType->fullTypeName(), false);
-                if (nonGenericType)
-                    return nonGenericType;
-                auto param = currentScope->getTypeByName(rawType->genericParam.value().lexical(), false);
-                auto type = currentScope->getTypeByName(rawType->typeToken.lexical(), useRawGenericName);
-                nonGenericType = type.value()->makeNonGenericType(param.value());
-                currentScope->registerType(nonGenericType.value());
-                return nonGenericType;
-            } else
-                return currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
-        }
-    }
-
 
     bool to_bool(const Constant &constant) {
         if (std::holds_alternative<ast::NumberValue>(constant)) {
@@ -418,6 +344,8 @@ namespace types {
 
     void type_check(ast::DeferStatement *node, Context &context);
 
+    void type_check_lambda(ast::LambdaExpression *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -616,6 +544,10 @@ namespace types {
 
         if (const auto derefNode = dynamic_cast<ast::DerefNode *>(node)) {
             return type_check_deref(derefNode, context);
+        }
+
+        if (const auto lambdaExpr = dynamic_cast<ast::LambdaExpression *>(node)) {
+            return type_check_lambda(lambdaExpr, context);
         }
 
         DBG_ASSERT(node != nullptr, "Node is null");
@@ -1770,7 +1702,7 @@ namespace types {
             node->setExpressionType(context.currentScope->getTypeByName("void").value());
         }
         if (context.currentFunction) {
-            if (const auto returnType = context.currentFunction->expressionType()) {
+            if (const auto returnType = context.currentFunction->resolvedReturnType()) {
                 if (node->returnValue()) {
                     if (!node->returnValue().value()->expressionType()) {
                         context.messages.insert({
@@ -1976,6 +1908,139 @@ namespace types {
 
     void eval_function(ast::FunctionDefinition *node, Context &context);
 
+    void type_check_lambda(ast::LambdaExpression *node, Context &context) {
+        for (auto &raw: node->rawAnnotations()) {
+            if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
+                node->addAnnotation(annotationType);
+            }
+        }
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+
+        if (node->returnType()) {
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
+                node->setResolvedReturnType(returnType.value());
+            else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function retu."
+                });
+            }
+        } else {
+            if (const auto resolvedType = resolveRawReturnTypeFromUsage(node->block())) {
+                node->setResolvedReturnType(
+                    resolveFromRawType(resolvedType.value().get(), context.currentScope).value());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Could not resolve return type for lambda expression."
+                });
+                return;
+            }
+        }
+
+        for (auto &arg: node->args()) {
+            if (!arg.rawType) {
+                auto resolvedType = resolveRawTypeFromUsage(node->block(), arg.name.lexical());
+                if (!resolvedType) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Could not resolve type for argument '" + arg.name.lexical() + "' in lambda expression."
+                    });
+                    return;
+                }
+                arg.type = resolveFromRawType(resolvedType.value().get(), context.currentScope);
+            } else {
+                arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
+            }
+            if (!arg.type) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "'."
+                });
+            }
+            context.currentScope->addVariable(arg.name.lexical(), Variable{
+                                                  arg.name.lexical(), arg.type.value_or(nullptr), arg.isConstant
+                                              });
+        }
+        bool hasReturnStatement = false;
+        const auto oldFunction = context.currentFunction;
+        context.currentFunction = node;
+        for (auto &stmt: node->block()->statements()) {
+            type_check_base(stmt.get(), context);
+            if (stmt->nodeType() == ast::NodeType::RETURN) {
+                if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(stmt.get())) {
+                    hasReturnStatement = true;
+                    if (node->resolvedReturnType()) {
+                        if (returnStatement->returnValue()) {
+                            if (!returnStatement->returnValue().value()->expressionType()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Could not determine type of return value in function '" + node->functionName()
+                                    +
+                                    "'."
+                                });
+                            } else if (node->expressionType() && *returnStatement->returnValue().value()->
+                                       expressionType().
+                                       value()
+                                       != *node->
+                                       expressionType().value()) {
+                                context.messages.insert({
+                                    parser::OutputType::ERROR,
+                                    returnStatement->returnValue().value()->expressionToken(),
+                                    "Type mismatch in return statement of function '" + node->functionName() +
+                                    "': expected '" +
+                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->
+                                    name()
+                                    +
+                                    "', but got '" +
+                                    returnStatement->returnValue().value()->expressionType().value()->name() + "'."
+                                });
+                            }
+                        } else {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                returnStatement->expressionToken(),
+                                "Return statement in lambda expression '" + node->functionSignature() +
+                                "' must return a value of type '" +
+                                node->returnType().value()->fullTypeName() + "'."
+                            });
+                        }
+                    } else {
+                        if (returnStatement->returnValue()) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                returnStatement->returnValue().value()->expressionToken(),
+                                "Return statement in void function '" + node->functionName() +
+                                "' must not return a value."
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+
+        if (node->returnType() and node->returnType().value()->fullTypeName() != "void" and !hasReturnStatement) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Lambda Expression '" + node->functionSignature() + "' must have a return statement."
+            });
+        }
+
+        node->setExpressionType(node->asFunctionType());
+
+        context.currentFunction = oldFunction;
+        context.currentScope = context.currentScope->parentScope();
+    }
+
+
     void type_check_funcdef(ast::FunctionDefinition *node, Context &context) {
         if (node->expressionType().has_value())
             return;
@@ -1990,9 +2055,10 @@ namespace types {
             }
         }
         if (node->returnType()) {
-            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope))
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope)) {
                 node->setExpressionType(returnType.value());
-            else {
+                node->setResolvedReturnType(returnType.value());
+            } else {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
@@ -2001,15 +2067,17 @@ namespace types {
             }
         } else {
             node->setExpressionType(context.currentScope->getTypeByName("void").value());
+            node->setResolvedReturnType(context.currentScope->getTypeByName("void").value());
         }
 
         for (auto &arg: node->args()) {
-            arg.type = resolveFromRawType(arg.rawType.get(), context.currentScope);
+            arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
             if (!arg.type) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType->fullTypeName() + "' for argument '" + arg.name.lexical() + "'."
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "'."
                 });
             }
             context.currentScope->addVariable(arg.name.lexical(), Variable{
@@ -2108,12 +2176,13 @@ namespace types {
         }
 
         for (auto &arg: node->args()) {
-            arg.type = resolveFromRawType(arg.rawType.get(), context.currentScope);
+            arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
             if (!arg.type) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType->fullTypeName() + "' for argument '" + arg.name.lexical() + "'."
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "'."
                 });
             }
         }

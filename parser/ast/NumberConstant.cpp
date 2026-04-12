@@ -79,7 +79,8 @@ namespace ast {
     }
 
     NumberConstant::NumberConstant(Token constant, const NumberType numberType)
-        : ASTNode(std::move(constant)), m_value(parseNumber(expressionToken().lexical(), numberType)),
+        : ASTNode(std::move(constant), NodeType::NUMBER_CONSTANT),
+          m_value(parseNumber(expressionToken().lexical(), numberType)),
           m_numberType(numberType) {
     }
 

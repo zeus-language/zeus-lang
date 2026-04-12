@@ -18,10 +18,12 @@ namespace ast {
     private:
         BinaryOperator m_operator;
 
-
     public:
         explicit BinaryExpression(Token name, BinaryOperator op, std::unique_ptr<ASTNode> lhs,
-                                  std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),std::move(lhs),std::move(rhs) ), m_operator(op){
+                                  std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),
+                                                                               NodeType::BINARY_EXPRESSION,
+                                                                               std::move(lhs), std::move(rhs)),
+                                                                  m_operator(op) {
         }
 
         ~BinaryExpression() override = default;
@@ -29,7 +31,7 @@ namespace ast {
         [[nodiscard]] BinaryOperator binoperator() const { return m_operator; }
 
 
-        [[nodiscard]]  std::string operatorFunctionName() const override {
+        [[nodiscard]] std::string operatorFunctionName() const override {
             switch (m_operator) {
                 case BinaryOperator::ADD:
                     return "__add__";
