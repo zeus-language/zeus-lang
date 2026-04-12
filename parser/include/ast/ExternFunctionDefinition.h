@@ -5,12 +5,12 @@
 namespace ast {
     class ExternFunctionDefinition final : public FunctionDefinitionBase {
     public:
-        explicit ExternFunctionDefinition(const Token& functionName, std::vector<FunctionArgument> args,
+        explicit ExternFunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
                                           std::optional<std::unique_ptr<RawType> > returnType,
                                           std::vector<std::unique_ptr<RawAnnotation> >
                                           annotations,
-                                        const VisibilityModifier visibilityModifier) : FunctionDefinitionBase(
-            functionName, std::move(args), std::move(returnType), std::move(annotations),visibilityModifier) {
+                                          const VisibilityModifier visibilityModifier) : FunctionDefinitionBase(
+            functionName, std::move(args), std::move(returnType), std::move(annotations), visibilityModifier) {
         }
 
         ~ExternFunctionDefinition() override = default;
@@ -26,5 +26,6 @@ namespace ast {
 
         std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
 
+        [[nodiscard]] bool isMethod() const override;
     };
 }

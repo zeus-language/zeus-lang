@@ -44,6 +44,7 @@ add_library(${PROJECT_NAME} STATIC
         ast/AnnotatedNode.cpp
         include/ast/AnnotatedNode.h
         ast/DerefNode.cpp
+        ast/FunctionDefinitionBase.cpp
 )
 target_sources(${PROJECT_NAME} PRIVATE
 )

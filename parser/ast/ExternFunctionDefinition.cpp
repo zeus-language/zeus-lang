@@ -22,4 +22,8 @@ namespace ast {
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);
     }
+
+    bool ExternFunctionDefinition::isMethod() const {
+        return false;
+    }
 }

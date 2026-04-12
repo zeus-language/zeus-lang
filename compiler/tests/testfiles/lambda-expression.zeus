@@ -1,0 +1,18 @@
+type MapFunc = fn(i32) : i32;
+
+fn do_function(f: MapFunc, value: i32) : i32 {
+    return f(value);
+}
+
+fn main() : i32 {
+    // short form
+    let func : MapFunc= |x :i32| : i32 return x*2;
+    // long form
+    let func2 : MapFunc= |x : i32| : i32 {
+        return x*2;
+    };
+
+   println(do_function(func,2));
+   println(do_function(func2,4));
+   return 0;
+}

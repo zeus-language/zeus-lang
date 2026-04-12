@@ -24,6 +24,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
@@ -589,6 +590,8 @@ namespace parser {
                 result = std::move(arrayInit.value());
             } else if (auto matchExpression = parseMatchExpression()) {
                 return std::move(matchExpression.value());
+            } else if (auto lambdaExpression = parseLambdaExpression()) {
+                result = std::move(lambdaExpression.value());
             }
 
             if (result) {
@@ -1482,7 +1485,8 @@ namespace parser {
             }
         }
 
-        std::optional<std::unique_ptr<ast::ASTNode> > parseStatement(bool allowTopLevel = false) {
+        std::optional<std::unique_ptr<ast::ASTNode> > parseStatement(bool allowTopLevel = false,
+                                                                     bool consumeSemicolon = true) {
             std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
             if (auto functionCall = parseFunctionCall()) {
                 result = std::move(functionCall.value());
@@ -1539,7 +1543,7 @@ namespace parser {
                 }
             }
 
-            if (result) {
+            if (result && consumeSemicolon) {
                 tryConsume(Token::SEMICOLON);
             }
             return result;
@@ -1763,6 +1767,64 @@ namespace parser {
                                                                        std::move(annotations), visibility);
             }
             return std::nullopt;
+        }
+
+        std::optional<std::unique_ptr<ast::FunctionDefinitionBase> > parseLambdaExpression() {
+            if (!canConsume(Token::PIPE)) {
+                return std::nullopt;
+            }
+            Token lambdaToken = current();
+            consume(Token::PIPE);
+            std::vector<ast::FunctionArgument> functionArgs;
+            while (!canConsume(Token::PIPE) && hasNext()) {
+                if (auto arg = tryParseFunctionArgument()) {
+                    functionArgs.push_back(std::move(arg.value()));
+                    tryConsume(Token::COMMA);
+                } else {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected a lambda argument but found '" + current().lexical() + "'"
+                    });
+                    break;
+                }
+            }
+            consume(Token::PIPE);
+            std::optional<std::unique_ptr<ast::RawType> > returnType = std::nullopt;
+            if (tryConsume(Token::COLON)) {
+                returnType = parseRawType();
+                if (!returnType) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected return type after ':' in lambda expression!"
+                    });
+                    return std::nullopt;
+                }
+            }
+
+            auto block = tryParseBlock();
+
+            if (!block) {
+                auto blockStmt = parseStatement(true, false);
+                auto token = blockStmt.value()->expressionToken();
+                auto stmts = std::vector<std::unique_ptr<ast::ASTNode> >{
+
+                };
+                stmts.push_back(std::move(blockStmt.value()));
+
+                block = std::make_unique<ast::BlockNode>(token,
+                                                         std::move(stmts));
+            }
+
+            auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >{};
+            // Collect annotations
+            for (auto &m_pendingAnnotation: m_pendingAnnotations) {
+                annotations.push_back(std::move(m_pendingAnnotation));
+            }
+            m_pendingAnnotations.clear();
+
+
+            return std::make_unique<ast::LambdaExpression>(lambdaToken, std::move(functionArgs), std::move(returnType),
+                                                           std::move(block.value()), std::move(annotations));
         }
 
         std::optional<std::unique_ptr<ast::FunctionDefinition> > parseFunctionDefinition(bool isMethod = false) {
