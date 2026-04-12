@@ -11,17 +11,19 @@
 namespace ast {
     struct FunctionArgument {
         Token name;
-        std::unique_ptr<RawType> rawType;
+        std::optional<std::unique_ptr<RawType> > rawType;
         bool isConstant;
 
         std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
 
-        FunctionArgument(Token name, std::unique_ptr<RawType> type, const bool isConstant)
+        FunctionArgument(Token name, std::optional<std::unique_ptr<RawType> > type, const bool isConstant)
             : name(std::move(name)), rawType(std::move(type)), isConstant(isConstant) {
         }
 
         FunctionArgument(const FunctionArgument &other)
-            : name(other.name), rawType(other.rawType->clone()), isConstant(other.isConstant), type(other.type) {
+            : name(other.name),
+              rawType((other.rawType) ? std::make_optional(other.rawType.value()->clone()) : std::nullopt),
+              isConstant(other.isConstant), type(other.type) {
         }
     };
 
@@ -50,6 +52,10 @@ namespace ast {
             return m_returnType.has_value() ? std::make_optional<RawType *>(m_returnType->get()) : std::nullopt;
         }
 
+
+        void setReturnType(std::unique_ptr<ast::RawType> type) {
+            m_returnType = std::move(type);
+        }
 
         void setModulePath(const std::vector<Token> &module_path);
 

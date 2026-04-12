@@ -14,11 +14,12 @@ namespace ast {
     class Comparisson final : public OperatorNode {
     private:
         CMPOperator m_operator;
+
     public:
         explicit Comparisson(Token name, CMPOperator op, std::unique_ptr<ASTNode> lhs,
-                             std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),std::move(lhs),std::move(rhs)
-                                 ), m_operator(op)
-                                                              {
+                             std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name), ast::NodeType::OTHER,
+                                                                          std::move(lhs), std::move(rhs)
+                                                             ), m_operator(op) {
         }
 
         ~Comparisson() override = default;
@@ -26,7 +27,7 @@ namespace ast {
         [[nodiscard]] CMPOperator cmpoperator() const { return m_operator; }
 
 
-        [[nodiscard]]  std::string operatorFunctionName() const override {
+        [[nodiscard]] std::string operatorFunctionName() const override {
             switch (m_operator) {
                 case CMPOperator::GREATER:
                     return "__gt__";

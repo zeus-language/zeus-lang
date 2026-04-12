@@ -53,6 +53,8 @@ namespace ast {
                                                               visibilityModifier());
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
+        if (resolvedReturnType())
+            cloneNode->setResolvedReturnType(resolvedReturnType().value());
         cloneNode->setModulePath(modulePath());
         return std::move(cloneNode);
     }

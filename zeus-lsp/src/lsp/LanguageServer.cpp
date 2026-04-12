@@ -17,6 +17,7 @@
 #include "ast/FieldAccess.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/LambdaExpression.h"
 #include "ast/MethodCallNode.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/StructDeclaration.h"
@@ -484,11 +485,16 @@ lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semantic
 
 void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::vector<lsp::InlayHint> &hints);
 
+void resolveInlayHintsForLambda(const ast::LambdaExpression *funcDef, std::vector<lsp::InlayHint> &hints);
+
 void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHint> &hints) {
     switch (node->nodeType()) {
         case ast::NodeType::FUNCTION_DEFINITION: {
-            const auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(node);
-            resolveInlayHintsForFunction(funcDef, hints);
+            if (const auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(node))
+                resolveInlayHintsForFunction(funcDef, hints);
+            else if (const auto lambda = dynamic_cast<const ast::LambdaExpression *>(node)) {
+                resolveInlayHintsForLambda(lambda, hints);
+            }
             break;
         }
         case ast::NodeType::VARIABLE_DECLARATION: {
@@ -508,10 +514,50 @@ void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHin
                 hint.kind = lsp::InlayHintKind::Type;
                 hints.push_back(std::move(hint));
             }
+            if (varDecl->initialValue().has_value()) {
+                resolveInlayHintForNode(varDecl->initialValue().value(), hints);
+            }
             break;
         }
         default:
             break;
+    }
+}
+
+void resolveInlayHintsForLambda(const ast::LambdaExpression *funcDef, std::vector<lsp::InlayHint> &hints) {
+    for (const auto &node: funcDef->block()->statements()) {
+        resolveInlayHintForNode(node.get(), hints);
+    }
+    SourceLocation last_location = funcDef->expressionToken().source_location;
+    for (auto &arg: funcDef->args()) {
+        if (!arg.rawType) {
+            lsp::InlayHint hint;
+            hint.position.line = static_cast<uint32_t>(arg.name.source_location.row - 1);
+            hint.position.character = static_cast<uint32_t>(arg.name.source_location.col
+                                                            + arg.name.source_location.num_bytes - 1);
+            if (arg.type) {
+                hint.label = ":" + arg.type.value()->name();
+            } else {
+                hint.label = ":unknown";
+            }
+            hint.kind = lsp::InlayHintKind::Type;
+            hints.push_back(std::move(hint));
+        }
+        last_location = arg.name.source_location;
+    }
+    if (!funcDef->returnType()) {
+        lsp::InlayHint hint;
+        hint.position.line = static_cast<uint32_t>(last_location.row - 1);
+        hint.position.character = static_cast<uint32_t>(last_location.col
+                                                        + last_location.num_bytes);
+        if (funcDef->resolvedReturnType()) {
+            hint.label = ":" + funcDef->resolvedReturnType().value()->name();
+        } else {
+            hint.label = ":unknown";
+            std::cerr << "Lambda expression has no return type\n";
+        }
+        hint.kind = lsp::InlayHintKind::Type;
+        hints.push_back(std::move(hint));
     }
 }
 

@@ -6,9 +6,9 @@ fn do_function(f: MapFunc, value: i32) : i32 {
 
 fn main() : i32 {
     // short form
-    let func : MapFunc= |x :i32| : i32 return x*2;
+    let func : MapFunc= |x|  return x*2;
     // long form
-    let func2 = |x : i32| : i32 {
+    let func2 = |x| {
         return x*2;
     };
 

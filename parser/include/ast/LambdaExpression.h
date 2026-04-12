@@ -13,7 +13,7 @@ namespace ast {
                          std::vector<std::unique_ptr<RawAnnotation> > annotations)
             : FunctionDefinitionBase(functionName, args, std::move(returnType), std::move(annotations),
                                      VisibilityModifier::PRIVATE), m_blockNode(std::move(blockNode)) {
-            setFunctionName(functionSignature(false));
+            setFunctionName("fn");
         }
 
 
@@ -33,6 +33,8 @@ namespace ast {
                                                                 std::move(annotationsClones));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
+            if (resolvedReturnType())
+                cloneNode->setResolvedReturnType(resolvedReturnType().value());
             cloneNode->setModulePath(modulePath());
             return std::move(cloneNode);
         }
