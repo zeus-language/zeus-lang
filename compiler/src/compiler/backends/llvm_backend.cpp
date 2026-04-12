@@ -1611,22 +1611,21 @@ namespace llvm_backend {
                 return alloca;
             } else if (varType->isStructTy()) {
                 const auto strValue = codegen_base(initialValue.value(), llvmState);
-                llvm::Value *value = nullptr;
                 if (strValue && strValue->getType()->isStructTy()) {
-                    //value = getLoadStorePointerOperand(strValue);
                     // element weises kopieren
-                    llvm::StructType *structType = llvm::cast<llvm::StructType>(strValue->getType());
+                    const auto structType = llvm::cast<llvm::StructType>(strValue->getType());
                     for (size_t i = 0; i < structType->getNumElements(); i++) {
-                        auto offsetLhs = llvmState.Builder->CreateStructGEP(structType, alloca, i, "struct_gep_lhs");
-                        llvm::ArrayRef<unsigned> Idxs = {i};
-                        auto loadRhs = llvmState.Builder->CreateExtractValue(strValue, Idxs, "struct_gep_rhs");
+                        const auto offsetLhs = llvmState.Builder->CreateStructGEP(
+                            structType, alloca, i, "struct_gep_lhs");
+                        llvm::ArrayRef<unsigned> idxs = {static_cast<unsigned>(i)};
+                        const auto loadRhs = llvmState.Builder->CreateExtractValue(strValue, idxs, "struct_gep_rhs");
 
                         llvmState.Builder->CreateStore(loadRhs, offsetLhs);
-                        //llvmState.Builder->CreateStore(llvm::cast<llvm::StructType>(strValue)->getStructElement(i), alloca);
                     }
                     return alloca;
                 }
                 if (strValue) {
+                    llvm::Value *value = nullptr;
                     value = (strValue->getType()->isPointerTy())
                                 ? strValue
                                 : getLoadStorePointerOperand(strValue);

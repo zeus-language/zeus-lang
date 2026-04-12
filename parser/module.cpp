@@ -85,16 +85,8 @@ namespace modules {
                 for (auto &node: moduleResult.module->useModuleNodes) {
                     useModuleFile(stdlibDirectories, moduleCache, moduleResult, env, node.get());
                 }
-                for (auto &function: moduleResult.module->functions) {
+                for (const auto &function: moduleResult.module->functions) {
                     function->setModulePath(useModule->modulePath());
-                    // if (funcDef->isPrivate()) {
-                    //     result.messages.push_back(parser::ParserMessasge{
-                    //         .outputType = parser::OutputType::ERROR,
-                    //         .token = funcDef->expressionToken(),
-                    //         .message = "Cannot use private function '" + funcDef->functionName() +
-                    //                    "' from module '" + fullPath.string() + "'!"
-                    //     });
-                    // }
                 }
                 if (!moduleResult.hasError()) {
                     moduleResult.module->sourceFilePath = fullPath;
@@ -172,7 +164,7 @@ namespace modules {
         const env::Environment &env,
         parser::ParseResult &result) {
         types::TypeCheckResult evalResult;
-        types::evaluate_macros(result.module, env::Environment{}, evalResult);
+        types::evaluate_macros(result.module, env, evalResult);
         for (const auto &message: evalResult.messages) {
             result.messages.push_back(message);
         }
