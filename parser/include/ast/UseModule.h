@@ -10,7 +10,8 @@ namespace ast {
         std::optional<Token> m_alias;
 
     public:
-        explicit UseModule(std::vector<Token> modulePath, std::optional<Token> aliasName) : ASTNode(modulePath.front()),
+        explicit UseModule(std::vector<Token> modulePath, std::optional<Token> aliasName) : ASTNode(modulePath.front(),
+                NodeType::USE_MODULE),
             m_modulePath(std::move(modulePath)), m_alias(std::move(aliasName)) {
         }
 
@@ -25,6 +26,7 @@ namespace ast {
         UseModule &operator=(const UseModule &) = delete;
 
         [[nodiscard]] const std::vector<Token> &modulePath() const { return m_modulePath; }
+
         [[nodiscard]] std::string modulePathName() const {
             std::string pathName;
             for (const auto &token: m_modulePath) {
@@ -36,17 +38,20 @@ namespace ast {
             }
             return pathName;
         }
-        [[nodiscard]] const std::optional<Token>& alias() const { return m_alias; }
+
+        [[nodiscard]] const std::optional<Token> &alias() const { return m_alias; }
 
         [[nodiscard]] std::optional<std::string> aliasName() const {
             return (m_alias.has_value()) ? std::make_optional(m_alias.value().lexical()) : std::nullopt;
         }
+
         std::unique_ptr<UseModule> cloneModule() {
             auto cloneNode = std::make_unique<UseModule>(m_modulePath, m_alias);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);
         }
+
         std::unique_ptr<ASTNode> clone() override {
             return cloneModule();
         }

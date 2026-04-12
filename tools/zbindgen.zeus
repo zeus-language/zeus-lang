@@ -1,0 +1,180 @@
+use clang;
+use core::libc;
+fn type_as_slice(type_ : CXType) : string {
+    let type_spelling = clang_getTypeSpelling(type_);
+    let type_str = clang_getCString(type_spelling.data,type_spelling.private_flags);
+    let mut result : string = string::new();
+    result.append(type_str);
+    clang_disposeString(type_spelling.data,type_spelling.private_flags);
+    return result;
+}
+
+fn pointer_to_zeus_type(pointee_type : CXType) : string {
+    let mut pointee_type_str = argtype_to_zeus_type(pointee_type);
+    let mut result = string::from_slice("* ");
+    result.append(pointee_type_str);
+    pointee_type_str.destroy();
+    return result;
+}
+
+fn default_case(arg_type : CXType) : string {
+    let mut result = type_as_slice(arg_type);
+    return result;
+}
+
+fn argtype_to_zeus_type(arg_type : CXType ) : string {
+    // if(clang_isConstQualifiedType(arg_type) != 0 as u32) {
+    //     println("argtype_to_zeus_type: const");
+    //     return argtype_to_zeus_type(clang_Type_getNamedType(arg_type));
+    // }
+
+    if(arg_type.kind == CXTypeKind::Pointer) {
+        return pointer_to_zeus_type(clang_getPointeeType(arg_type));
+    }
+
+    let value =  match arg_type.kind {
+        CXTypeKind::Invalid => string::from_slice("invalid"),
+        CXTypeKind::Void => string::from_slice("void"),
+        CXTypeKind::Bool =>  string::from_slice("bool"),
+        CXTypeKind::UChar =>  string::from_slice("u8"),
+        CXTypeKind::UShort =>  string::from_slice("u16"),
+        CXTypeKind::UInt =>   string::from_slice("u32"),
+        CXTypeKind::ULong =>   string::from_slice("u64"),
+        CXTypeKind::Char_S =>  string::from_slice("u8"),
+        CXTypeKind::SChar =>  string::from_slice("i8"),
+        CXTypeKind::Short =>  string::from_slice("i16"),
+        CXTypeKind::Int =>      string::from_slice("i32"),
+        CXTypeKind::Long =>  string::from_slice("i64"),
+        CXTypeKind::Float =>   string::from_slice("float"),
+        CXTypeKind::Double =>  string::from_slice("double"),
+        CXTypeKind::Pointer => pointer_to_zeus_type(clang_getPointeeType(arg_type)),
+        CXTypeKind::Typedef => argtype_to_zeus_type(clang_Type_getNamedType(arg_type)),
+        CXTypeKind::Elaborated =>  type_as_slice(arg_type), // argtype_to_zeus_type(clang_Type_getNamedType(arg_type)),
+        _ => default_case(arg_type),
+    };
+    return value;
+}
+
+fn handle_function_decl(cursor : CXCursor) : void {
+    let spelling = clang_getCursorSpelling(cursor);
+    let spelling_cstr = clang_getCString(spelling.data,spelling.private_flags);
+    printf(r"extern pub fn %s(", spelling_cstr);
+    clang_disposeString(spelling.data,spelling.private_flags);
+
+    let num_args = clang_Cursor_getNumArguments(cursor);
+    for i in 0 .. num_args {
+        let arg :CXCursor = clang_Cursor_getArgument(cursor,i as u32);
+        let arg_spelling = clang_getCursorSpelling(arg);
+
+        let arg_type = clang_getCursorType(arg);
+
+        printf(r"%s : ", clang_getCString(arg_spelling.data,arg_spelling.private_flags));
+        let mut zeus_arg_type = argtype_to_zeus_type(arg_type);
+        print(zeus_arg_type);
+        zeus_arg_type.destroy();
+        clang_disposeString(arg_spelling.data,arg_spelling.private_flags);
+
+        if i != num_args - 1 {
+            printf(r",");
+        }
+    }
+    print(") : ");
+    let return_type = clang_getCursorResultType(cursor);
+    let mut zeus_return_type = argtype_to_zeus_type(return_type);
+    print(zeus_return_type);
+    zeus_return_type.destroy();
+    println(";");
+}
+fn handle_typedef_decl(cursor : CXCursor) : void {
+    let spelling = clang_getCursorSpelling(cursor);
+    let spelling_cstr = clang_getCString(spelling.data,spelling.private_flags);
+    let base_type = clang_getTypedefDeclUnderlyingType(cursor);
+    let mut _type = argtype_to_zeus_type(base_type);
+
+    printf(r"type %s = ", spelling_cstr);
+    print(_type);
+    println(";");
+    _type.destroy();
+
+    clang_disposeString(spelling.data,spelling.private_flags);
+}
+fn visit_fields(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CXChildVisitResult {
+    let display_name = clang_getCursorDisplayName(cursor);
+    let display_name_str = clang_getCString(display_name.data,display_name.private_flags);
+    let field_type = clang_getCursorType(cursor);
+    let mut _type = argtype_to_zeus_type(field_type);
+    defer _type.destroy();
+
+    printf(r"\t%s : %s,\n", display_name_str,_type.as_c_str());
+    //println("display_name: ${display_name_str}");
+    clang_disposeString(display_name.data,display_name.private_flags);
+    return CXChildVisitResult::Continue;
+}
+
+fn handle_struct_decl(cursor : CXCursor) : void {
+    let spelling = clang_getCursorSpelling(cursor);
+    let spelling_cstr = clang_getCString(spelling.data,spelling.private_flags);
+    printf(r"struct %s {\n", spelling_cstr);
+    clang_disposeString(spelling.data,spelling.private_flags);
+
+    clang_visitChildren(cursor,visit_fields,null as *void);
+    println("}");
+}
+
+fn visit_children(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CXChildVisitResult {
+
+    match cursor.kind {
+        CXCursorKind::FunctionDecl => handle_function_decl(cursor),
+        CXCursorKind::StructDecl => handle_struct_decl(cursor),
+//        CXCursorKind::FieldDecl => {
+//            println("FieldDecl");
+//        },
+        CXCursorKind::TypedefDecl => handle_typedef_decl(cursor),
+//        CXCursorKind::ParmDecl => {
+//            println("ParmDecl");
+//        },
+//        CXCursorKind::TypeRef => {
+//            println("TypeRef");
+//        },
+//        CXCursorKind::UnexposedAttr => {
+//            println("UnexposedAttr");
+//        },
+//        CXCursorKind::IntegerLiteral => {
+//              println("IntegerLiteral");
+//          },
+        //_ => printf(r"cursor.kind: %d\n", cursor.kind),
+    };
+
+
+//    let display_name = clang_getCursorDisplayName(cursor);
+//    let display_name_str = clang_getCString(display_name.data,display_name.private_flags);
+//    printf(r"display_name: %s\n", display_name_str);
+//    //println("display_name: ${display_name_str}");
+//    clang_disposeString(display_name.data,display_name.private_flags);
+    return CXChildVisitResult::Continue;
+}
+
+fn main(argc : i32, argv :** u8) : i32 {
+    let index : *void = clang::clang_createIndex(0, 0);
+    defer clang::clang_disposeIndex(index);
+
+    let filename = r"/usr/include/x86_64-linux-gnu/sys/stat.h";
+    //let filename = r"/usr/include/SDL2/SDL.h";
+    //println("parse file: ${filename}")
+    let options : i32 = 0;
+    let mut unsaved_files : *CXUnsavedFile = null as *CXUnsavedFile;
+    let tu = clang_parseTranslationUnit(
+                index,
+                filename as *u8,
+                null as **u8 ,
+                0,
+                null as * CXUnsavedFile,
+                0,
+                options,
+            );
+    let mut cursor : CXCursor = clang_getTranslationUnitCursor(tu);
+    clang_visitChildren(cursor,visit_children,null as *void);
+
+
+    return 0;
+}

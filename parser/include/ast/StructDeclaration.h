@@ -20,7 +20,8 @@ namespace ast {
     public:
         StructDeclaration(Token name, std::vector<StructField> fields,
                           std::vector<std::unique_ptr<ast::FunctionDefinition> >
-                          methods, std::optional<Token> genericParam) : ASTNode(std::move(name)),
+                          methods, std::optional<Token> genericParam) : ASTNode(std::move(name),
+                                                                            NodeType::STRUCT_DECLARATION),
                                                                         m_fields(std::move(fields)),
                                                                         m_methods(std::move(methods)),
                                                                         m_genericParam(std::move(genericParam)) {

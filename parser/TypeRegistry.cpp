@@ -22,6 +22,8 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("u8", 1, false));
     registerType(std::make_shared<types::IntegerType>("u16", 2, false));
     registerType(std::make_shared<types::IntegerType>("u32", 4, false));
+    registerType(std::make_shared<types::IntegerType>("i8", 1, true));
+    registerType(std::make_shared<types::IntegerType>("i16", 2, true));
     registerType(std::make_shared<types::IntegerType>("i64", 8, true));
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
@@ -80,6 +82,9 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArr
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(
     const std::string &name, bool rawGenericName) const {
+    if (const auto foundType = m_typeAliases.find(name); foundType != m_typeAliases.end()) {
+        return foundType->second;
+    }
     for (const auto &type: m_types) {
         if (rawGenericName && type->rawTypeName() == name) {
             return type;
@@ -95,4 +100,8 @@ void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type
     if (std::ranges::none_of(m_types, [&type](const auto &t) { return t->name() == type->name(); })) {
         m_types.push_back(type);
     }
+}
+
+void types::TypeRegistry::registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type) {
+    m_typeAliases[name] = type;
 }

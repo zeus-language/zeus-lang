@@ -1,6 +1,10 @@
 use core::libc;
 use std::str;
-
+#if target_os == ostype::WINDOWS
+    use std::os::windows;
+#else
+    use std::os::unix;
+#endif
 pub fn path_separator() : [u8] {
     return match target_os {
         ostype::WINDOWS => "\\",
@@ -45,14 +49,14 @@ struct Path {
     }
 
     pub fn exists(self: &Path) : bool{
-        let fp : *FILE = fopen(self.as_c_str(), r"r" as *u8);
-        let mut is_exist : bool = false;
-        if (fp != null as *FILE)
-        {
-            is_exist = true;
-            fclose(fp); // close the file
-        }
-        return is_exist;
+#if target_os == ostype::WINDOWS
+        return PathFileExistsA(self.as_c_str());
+#else
+        let mut sb : stat = stat{};
+        stat(self.as_c_str(),*sb);
+        return sb.st_mode != 0 as __mode_t;
+#endif
+
     }
 
     pub fn destroy(self: mut &Path) : void {
@@ -102,4 +106,10 @@ struct File {
         self.path.destroy();
     }
 
+}
+
+pub fn create_tmp_file() : Path {
+    let mut tmp_path = tmpnam(null as *u8);
+    let path  = string::from_c_str(tmp_path);
+    return Path::new(path);
 }

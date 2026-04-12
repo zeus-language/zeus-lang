@@ -1,0 +1,14 @@
+
+type DWORD = u32;
+type LPCSTR = *u8;
+type LPCTSTR = *u8;
+type UINT = u32;
+type BOOL = bool;
+
+@extern(libname = "Shlwapi")
+extern pub fn PathFileExistsA(pszPath :LPCSTR) : BOOL;
+
+extern fn  GetFileAttributesA(
+            lpFileName : LPCSTR
+          ) : DWORD;
+

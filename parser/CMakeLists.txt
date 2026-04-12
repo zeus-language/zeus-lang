@@ -43,6 +43,7 @@ add_library(${PROJECT_NAME} STATIC
         include/types/Annotation.h
         ast/AnnotatedNode.cpp
         include/ast/AnnotatedNode.h
+        ast/DerefNode.cpp
 )
 target_sources(${PROJECT_NAME} PRIVATE
 )

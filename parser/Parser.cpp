@@ -13,6 +13,7 @@
 #include "ast/Comparisson.h"
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
+#include "ast/DerefNode.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -22,6 +23,7 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
+#include "ast/IfMacro.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
@@ -34,6 +36,7 @@
 #include "ast/StructDeclaration.h"
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
+#include "ast/TypeDefinition.h"
 #include "ast/UseModule.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
@@ -126,7 +129,8 @@ namespace parser {
 
             return std::nullopt;
         }
- std::optional<std::unique_ptr<ast::ASTNode> > parseOctNumber() {
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseOctNumber() {
             if (!canConsume(Token::OCT_NUMBER)) {
                 return std::nullopt;
             }
@@ -872,6 +876,16 @@ namespace parser {
                                            std::move(rhs.value())));
             }
 
+            if (canConsume(Token::MUL) && !lhs) {
+                auto operatorToken = current();
+                consume(Token::MUL);
+                auto rhs = parseExpression(false);
+                return parseExpression(false,
+                                       std::make_unique<ast::DerefNode>(
+                                           operatorToken,
+                                           std::move(rhs.value())));
+            }
+
             if (!lhs)
                 return std::nullopt;
 
@@ -894,6 +908,7 @@ namespace parser {
                                                                    std::move(lhs.value()),
                                                                    std::move(rhs.value())));
             }
+
             return lhs;
         }
 
@@ -1028,7 +1043,39 @@ namespace parser {
                                                           std::move(value.value()));
         }
 
-        std::optional<std::unique_ptr<ast::RawType> > parseRawType() {
+        std::optional<std::unique_ptr<ast::RawType> > parseRawType(std::optional<Token> expectedName = std::nullopt) {
+            const Token nameToken = expectedName.value_or(current());
+
+            if (tryConsumeKeyWord("fn")) {
+                consume(Token::Type::LEFT_CURLY);
+                std::vector<std::unique_ptr<ast::RawType> > functionArgs;
+                while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                    if (auto arg = parseRawType()) {
+                        functionArgs.push_back(std::move(arg.value()));
+                        tryConsume(Token::COMMA);
+                    } else {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "a function argument but found '" + current().lexical() + "'"
+                        });
+                        break;
+                    }
+                }
+                consume(Token::Type::RIGHT_CURLY);
+                consume(Token::COLON);
+                auto returnType = parseRawType();
+                if (!returnType) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected return type after ':' in function argument!"
+                    });
+                    return std::nullopt;
+                }
+                return std::make_unique<ast::FunctionRawType>(
+                    nameToken, std::move(functionArgs), std::move(returnType.value()));
+            }
+
+
             auto typeModifier = ast::TypeModifier::NONE;
             if (tryConsume(Token::MUL)) {
                 typeModifier = ast::TypeModifier::POINTER;
@@ -1077,14 +1124,13 @@ namespace parser {
 
             if (tryConsume(Token::LEFT_SQUAR)) {
                 typeToken = current();
-                if (!canConsume(Token::IDENTIFIER)) {
+                auto rawType = parseRawType();
+                if (!rawType) {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
-                        .message = "expected type identifier after '[' in array type declaration!"
+                        .message = "expected type after '[' in array type declaration!"
                     });
-                    return std::nullopt;
                 }
-                consume(Token::IDENTIFIER);
                 if (tryConsume(Token::SEMICOLON)) {
                     if (!canConsume(Token::NUMBER)) {
                         m_messages.push_back(ParserMessasge{
@@ -1108,10 +1154,7 @@ namespace parser {
                     }
 
                     return std::make_unique<ast::ArrayRawType>(typeToken, namespaceElements, typeModifier,
-                                                               std::make_unique<ast::RawType>(
-                                                                   typeToken, namespaceElements,
-                                                                   ast::TypeModifier::NONE,
-                                                                   std::nullopt),
+                                                               std::move(rawType.value()),
                                                                size);
                 }
                 consume(Token::RIGHT_SQUAR);
@@ -1134,7 +1177,8 @@ namespace parser {
                 constant = false;
             }
             Token &nameToken = current();
-            consume(Token::Type::IDENTIFIER);
+            if (!consume(Token::Type::IDENTIFIER))
+                next(); // we go further even with an error
             std::optional<std::unique_ptr<ast::RawType> > type = std::nullopt;
             if (tryConsume(Token::Type::COLON)) {
                 type = parseRawType();
@@ -1159,6 +1203,57 @@ namespace parser {
             return std::make_unique<ast::VariableDeclaration>(std::move(nameToken), std::move(type),
                                                               constant,
                                                               std::move(value));
+        }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseIfMacro(bool topLevel = false) {
+            if (!canConsumeMacro("#if")) {
+                return std::nullopt;
+            }
+            auto token = current();
+            consumeMacro("#if");
+            auto condition = parseExpression(false);
+            if (!condition) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected condition expression after '#if'!"
+                });
+                return std::nullopt;
+            }
+            auto ifStatements = std::vector<std::unique_ptr<ast::ASTNode> >{};
+            auto elseStatements = std::vector<std::unique_ptr<ast::ASTNode> >{};
+            while (!canConsumeMacro("#endif") && !canConsumeMacro("#else") && !canConsumeMacro("#elif") && !canConsume(
+                       Token::END_OF_FILE)) {
+                // skip tokens until #endif
+                auto stmt = parseStatement(topLevel);
+                if (!stmt) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected statement after 'if'!"
+                    });
+                    return std::nullopt;
+                } else {
+                    ifStatements.push_back(std::move(stmt.value()));
+                }
+            }
+            if (tryConsumeMacro("#else")) {
+                while (!canConsumeMacro("#endif") && !canConsumeMacro("#else") && !canConsumeMacro("#elif") && !
+                       canConsume(Token::END_OF_FILE)) {
+                    // skip tokens until #endif
+                    auto stmt = parseStatement(topLevel);
+                    if (!stmt) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected statement after 'if'!"
+                        });
+                        return std::nullopt;
+                    } else {
+                        elseStatements.push_back(std::move(stmt.value()));
+                    }
+                }
+            }
+            consumeMacro("#endif");
+            return std::make_unique<ast::IfMacro>(token, std::move(condition.value()), std::move(ifStatements),
+                                                  std::move(elseStatements));
         }
 
 
@@ -1293,6 +1388,9 @@ namespace parser {
             consume(Token::GREATER);
             auto expression = parseExpression(false);
             if (!expression) {
+                expression = parseBlock();
+            }
+            if (!expression) {
                 m_messages.push_back(ParserMessasge{
                     .token = current(),
                     .message = "Missing expression after '=>' in a match expression!"
@@ -1324,7 +1422,6 @@ namespace parser {
                 matchCases.emplace_back(std::move(parsedMatch.value()));
             }
             consume(Token::Type::CLOSE_BRACE);
-            consume(Token::SEMICOLON);
             return std::make_unique<ast::MatchExpression>(name, std::move(identifier.value()), std::move(matchCases));
         }
 
@@ -1385,6 +1482,69 @@ namespace parser {
             }
         }
 
+        std::optional<std::unique_ptr<ast::ASTNode> > parseStatement(bool allowTopLevel = false) {
+            std::optional<std::unique_ptr<ast::ASTNode> > result = std::nullopt;
+            if (auto functionCall = parseFunctionCall()) {
+                result = std::move(functionCall.value());
+            } else if (auto deferStatement = parseDefer()) {
+                result = std::move(deferStatement.value());
+            } else if (auto returnStatement = parseReturnStatement()) {
+                result = std::move(returnStatement.value());
+            } else if (auto varDecl = parseVariableDeclaration()) {
+                result = std::move(varDecl.value());
+            } else if (auto methodCall = parseMethodCall()) {
+                result = std::move(methodCall.value());
+            } else if (auto varAssign = parseVariableAssignment()) {
+                result = std::move(varAssign.value());
+            } else if (auto fieldAssign = parseFieldAssignment()) {
+                result = std::move(fieldAssign.value());
+            } else if (auto ifCondition = parseIfCondition()) {
+                result = std::move(ifCondition.value());
+            } else if (auto whileLoop = parseWhileLoop()) {
+                result = std::move(whileLoop.value());
+            } else if (auto forLoop = parseForLoop()) {
+                result = std::move(forLoop.value());
+            } else if (auto breakStmt = parseBreak()) {
+                result = std::move(breakStmt.value());
+            } else if (auto continueStmt = parseContinue()) {
+                result = std::move(continueStmt.value());
+            } else if (auto matchStatement = parseMatchExpression()) {
+                result = std::move(matchStatement.value());
+            }
+            if (!result && allowTopLevel) {
+                if (auto useModule = parseUseModule()) {
+                    result = std::move(useModule.value());
+                } else if (auto structDef = parseStructDeclaration()) {
+                    result = std::move(structDef.value());
+                } else if (auto enumDef = parseEnumDeclaration()) {
+                    result = std::move(enumDef.value());
+                } else if (auto functionDef = parseFunctionDefinition()) {
+                    result = std::move(functionDef.value());
+                } else if (auto externFunctionDef = parseExternFunctionDefinition()) {
+                    result = std::move(externFunctionDef.value());
+                } else if (auto annotation = parseAnnotation()) {
+                    result = std::move(annotation.value());
+                } else if (auto typeDefinition = parseTypeDefinition()) {
+                    result = std::move(typeDefinition.value());
+                } else {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "unexpected token found " +
+                                   std::string(magic_enum::enum_name(current().type)) + "!"
+                    });
+                    next();
+                    if (current().type == Token::Type::END_OF_FILE) {
+                        return std::nullopt;
+                    }
+                }
+            }
+
+            if (result) {
+                tryConsume(Token::SEMICOLON);
+            }
+            return result;
+        }
+
         std::unique_ptr<ast::BlockNode> parseBlock() {
             Token &token = current();
             consume(Token::Type::OPEN_BRACE);
@@ -1392,33 +1552,10 @@ namespace parser {
             std::vector<std::unique_ptr<ast::ASTNode> > oldBLockNodes = std::move(m_blockNodes);
 
             while (!canConsume(Token::CLOSE_BRACE)) {
-                if (tryConsume(Token::SEMICOLON)) {
-                } else if (auto functionCall = parseFunctionCall()) {
-                    m_blockNodes.push_back(std::move(functionCall.value()));
-                } else if (auto deferStatement = parseDefer()) {
-                    m_blockNodes.push_back(std::move(deferStatement.value()));
-                } else if (auto returnStatement = parseReturnStatement()) {
-                    m_blockNodes.push_back(std::move(returnStatement.value()));
-                } else if (auto varDecl = parseVariableDeclaration()) {
-                    m_blockNodes.push_back(std::move(varDecl.value()));
-                } else if (auto methodCall = parseMethodCall()) {
-                    m_blockNodes.push_back(std::move(methodCall.value()));
-                } else if (auto varAssign = parseVariableAssignment()) {
-                    m_blockNodes.push_back(std::move(varAssign.value()));
-                } else if (auto fieldAssign = parseFieldAssignment()) {
-                    m_blockNodes.push_back(std::move(fieldAssign.value()));
-                } else if (auto ifCondition = parseIfCondition()) {
-                    m_blockNodes.push_back(std::move(ifCondition.value()));
-                } else if (auto whileLoop = parseWhileLoop()) {
-                    m_blockNodes.push_back(std::move(whileLoop.value()));
-                } else if (auto forLoop = parseForLoop()) {
-                    m_blockNodes.push_back(std::move(forLoop.value()));
-                } else if (auto breakStmt = parseBreak()) {
-                    m_blockNodes.push_back(std::move(breakStmt.value()));
-                } else if (auto continueStmt = parseContinue()) {
-                    m_blockNodes.push_back(std::move(continueStmt.value()));
-                } else if (auto matchStatement = parseMatchExpression()) {
-                    m_blockNodes.push_back(std::move(matchStatement.value()));
+                if (auto stmt = parseStatement()) {
+                    m_blockNodes.push_back(std::move(stmt.value()));
+                } else if (auto ifMacro = parseIfMacro()) {
+                    m_blockNodes.push_back(std::move(ifMacro.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -1503,6 +1640,35 @@ namespace parser {
             }
             return std::nullopt;
         }
+
+        std::optional<std::unique_ptr<ast::ASTNode> > parseTypeDefinition() {
+            if (!canConsumeKeyWord("type")) {
+                return std::nullopt;
+            }
+            Token nameToken = current();
+            consumeKeyWord("type");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected type name after 'type' keyword!"
+                });
+                return std::nullopt;
+            }
+            Token name = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::EQUAL);
+            auto type = parseRawType(name);
+            if (!type) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected type after 'type' keyword!"
+                });
+                return std::nullopt;
+            }
+            consume(Token::SEMICOLON);
+            return std::make_unique<ast::TypeDefinition>(name, std::move(type.value()));
+        }
+
 
         std::optional<std::unique_ptr<ast::RawAnnotation> > parseAnnotation() {
             if (!canConsume(Token::ANNOTATION)) {
@@ -1932,7 +2098,7 @@ namespace parser {
                     // Currently we do not use the value, but we can extend this later
                     value = parseNumber();
                 }
-                variants.push_back(ast::EnumVariant{.name = variantName, .value = std::move(value)});
+                variants.push_back(ast::EnumVariant(variantName, std::move(value)));
                 if (!tryConsume(Token::COMMA)) {
                     break;
                 }
@@ -1953,8 +2119,12 @@ namespace parser {
                     module->nodes.push_back(std::move(varDecl.value()));
                 } else if (auto externType = parseExternType()) {
                     module->externTypes.push_back(std::move(externType.value()));
+                } else if (auto typeDefinition = parseTypeDefinition()) {
+                    module->nodes.push_back(std::move(typeDefinition.value()));
                 } else if (auto externFnDefintion = parseExternFunctionDefinition()) {
                     module->functions.push_back(std::move(externFnDefintion.value()));
+                } else if (auto ifMacro = parseIfMacro(true)) {
+                    module->nodes.push_back(std::move(ifMacro.value()));
                 } else if (auto useModule = parseUseModule()) {
                     module->useModuleNodes.push_back(std::move(useModule.value()));
                 } else if (auto structDecl = parseStructDeclaration()) {
@@ -2036,6 +2206,18 @@ namespace parser {
             return false;
         }
 
+        bool consumeMacro(const std::string &keyword) {
+            if (tryConsumeMacro(keyword)) {
+                return true;
+            }
+            m_messages.push_back(ParserMessasge{
+                .token = m_tokens[m_current],
+                .message = "expected macro '" + keyword + "' but found " +
+                           std::string(m_tokens[m_current].lexical()) + "!"
+            });
+            return false;
+        }
+
         bool tryConsumeKeyWord(const std::string &keyword) {
             if (canConsumeKeyWord(keyword)) {
                 next();
@@ -2044,8 +2226,20 @@ namespace parser {
             return false;
         }
 
+        bool tryConsumeMacro(const std::string &keyword) {
+            if (canConsumeMacro(keyword)) {
+                next();
+                return true;
+            }
+            return false;
+        }
+
         [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword, const size_t next) const {
             return canConsume(Token::Type::KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
+        }
+
+        [[nodiscard]] bool canConsumeMacro(const std::string &keyword, const size_t next = 0) const {
+            return canConsume(Token::Type::MACRO_KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
         }
 
         [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword) const {

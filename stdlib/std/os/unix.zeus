@@ -1,0 +1,111 @@
+type __u_char = u8;
+type __u_short = u16;
+type __u_int = u32;
+type __u_long = u64;
+type __int8_t = i8;
+type __uint8_t = u8;
+type __int16_t = i16;
+type __uint16_t = u16;
+type __int32_t = i32;
+type __uint32_t = u32;
+type __int64_t = i64;
+type __uint64_t = u64;
+type __int_least8_t = __int8_t;
+type __uint_least8_t = __uint8_t;
+type __int_least16_t = __int16_t;
+type __uint_least16_t = __uint16_t;
+type __int_least32_t = __int32_t;
+type __uint_least32_t = __uint32_t;
+type __int_least64_t = __int64_t;
+type __uint_least64_t = __uint64_t;
+type __quad_t = i64;
+type __u_quad_t = u64;
+type __intmax_t = i64;
+type __uintmax_t = u64;
+type __dev_t = u64;
+type __uid_t = u32;
+type __gid_t = u32;
+type __ino_t = u64;
+type __ino64_t = u64;
+type __mode_t = u32;
+type __nlink_t = u64;
+type __off_t = i64;
+type __off64_t = i64;
+type __pid_t = i32;
+struct __fsid_t {
+	__val : [i32;2],
+}
+type __clock_t = i64;
+type __rlim_t = u64;
+type __rlim64_t = u64;
+type __id_t = u32;
+type __time_t = i64;
+type __useconds_t = u32;
+type __suseconds_t = i64;
+type __suseconds64_t = i64;
+type __daddr_t = i32;
+type __key_t = i32;
+type __clockid_t = i32;
+type __timer_t = * void;
+type __blksize_t = i64;
+type __blkcnt_t = i64;
+type __blkcnt64_t = i64;
+type __fsblkcnt_t = u64;
+type __fsblkcnt64_t = u64;
+type __fsfilcnt_t = u64;
+type __fsfilcnt64_t = u64;
+type __fsword_t = i64;
+type __ssize_t = i64;
+type __syscall_slong_t = i64;
+type __syscall_ulong_t = u64;
+type __loff_t = __off64_t;
+type __caddr_t = * u8;
+type __intptr_t = i64;
+type __socklen_t = u32;
+type __sig_atomic_t = i32;
+type time_t = __time_t;
+struct timespec {
+	tv_sec : __time_t,
+	tv_nsec : __syscall_slong_t,
+}
+type dev_t = __dev_t;
+type gid_t = __gid_t;
+type ino_t = __ino_t;
+type mode_t = __mode_t;
+type nlink_t = __nlink_t;
+type off_t = __off_t;
+type uid_t = __uid_t;
+struct stat {
+	pub st_dev : __dev_t,
+	pub st_ino : __ino_t,
+	pub st_nlink : __nlink_t,
+	pub st_mode : __mode_t,
+	pub st_uid : __uid_t,
+	pub st_gid : __gid_t,
+	__pad0 : i32,
+	pub st_rdev : __dev_t,
+	pub st_size : __off_t,
+	pub st_blksize : __blksize_t,
+	pub st_blocks : __blkcnt_t,
+	pub st_atim : timespec,
+	pub st_mtim : timespec,
+	pub st_ctim : timespec,
+	__glibc_reserved : [__syscall_slong_t;3],
+}
+extern pub fn stat(__file : * u8,__buf : * stat) : i32;
+extern pub fn fstat(__fd : i32,__buf : * stat) : i32;
+extern pub fn fstatat(__fd : i32,__file : * u8,__buf : * stat,__flag : i32) : i32;
+extern pub fn lstat(__file : * u8,__buf : * stat) : i32;
+extern pub fn chmod(__file : * u8,__mode : __mode_t) : i32;
+extern pub fn lchmod(__file : * u8,__mode : __mode_t) : i32;
+extern pub fn fchmod(__fd : i32,__mode : __mode_t) : i32;
+extern pub fn fchmodat(__fd : i32,__file : * u8,__mode : __mode_t,__flag : i32) : i32;
+extern pub fn umask(__mask : __mode_t) : __mode_t;
+extern pub fn mkdir(__path : * u8,__mode : __mode_t) : i32;
+extern pub fn mkdirat(__fd : i32,__path : * u8,__mode : __mode_t) : i32;
+extern pub fn mknod(__path : * u8,__mode : __mode_t,__dev : __dev_t) : i32;
+extern pub fn mknodat(__fd : i32,__path : * u8,__mode : __mode_t,__dev : __dev_t) : i32;
+extern pub fn mkfifo(__path : * u8,__mode : __mode_t) : i32;
+extern pub fn mkfifoat(__fd : i32,__path : * u8,__mode : __mode_t) : i32;
+extern pub fn utimensat(__fd : i32,__path : * u8,__times : [timespec;2],__flags : i32) : i32;
+extern pub fn futimens(__fd : i32,__times : [timespec;2]) : i32;

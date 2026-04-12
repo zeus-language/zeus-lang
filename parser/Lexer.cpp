@@ -11,6 +11,8 @@ namespace lexer {
         "use", "or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not", "pub", "defer"
     };
 
+    static const std::vector<std::string> macro_tokens = {"#if", "#else", "#endif", "#elif"};
+
 
     constexpr bool validStartNameChar(const char value) {
         return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || value == '_';
@@ -18,6 +20,22 @@ namespace lexer {
 
     constexpr bool validNameChar(const char value) {
         return validStartNameChar(value) || (value >= '0' && value <= '9');
+    }
+
+    constexpr bool find_macro_token(const std::string &content, const size_t start, size_t *endPosition) {
+        char current = content[start];
+        *endPosition = start + 1;
+        if (current != '#')
+            return false;
+        current = content[*endPosition];
+
+        while (validNameChar(current) && *endPosition < content.size()) {
+            *endPosition += 1;
+            current = content[*endPosition];
+        }
+
+        const auto tmp = std::string_view(content.data() + start, *endPosition - start);
+        return std::ranges::any_of(macro_tokens, [tmp](const std::string &token) { return tmp == token; });
     }
 
     constexpr bool find_fixed_token(const std::string &content, const size_t start, size_t *endPosition) {
@@ -179,6 +197,10 @@ namespace lexer {
 
                 while (!(current == '*' && next == '/') && current != 0) {
                     *endPosition += 1;
+
+                    if (*endPosition >= content.size()) {
+                        return true;
+                    }
                     current = content[*endPosition];
                     next = content[*endPosition + 1];
                 }
@@ -191,6 +213,9 @@ namespace lexer {
 
                 while (current != '\n' && current != 0) {
                     *endPosition += 1;
+                    if (*endPosition >= content.size()) {
+                        break;
+                    }
                     current = content[*endPosition];
                 }
                 *endPosition -= 1;
@@ -358,6 +383,20 @@ namespace lexer {
                     col += offset;
                     continue;
                 }
+
+                found = find_macro_token(source_code, start, &endPosition);
+                if (found) {
+                    const size_t offset = endPosition - start;
+                    SourceLocation source_location = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                        .row = row,
+                        .col = col
+                    };
+                    tokens.emplace_back(Token::MACRO_KEYWORD, std::move(source_location));
+                    start = endPosition;
+                    col += offset;
+                }
+
                 found = find_fixed_token(source_code, start, &endPosition);
                 if (found) {
                     const size_t offset = endPosition - start;

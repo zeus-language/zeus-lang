@@ -34,4 +34,20 @@ namespace ast {
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);
     }
+
+    VariableDeclaration VariableDeclaration::copy() const {
+        auto type = m_type.has_value()
+                        ? std::make_optional<std::unique_ptr<RawType> >(m_type.value()->clone())
+                        : std::nullopt;
+        auto cloneNode = VariableDeclaration(expressionToken(),
+                                             std::move(type),
+                                             m_constant,
+                                             m_initialValue.has_value()
+                                                 ? std::make_optional<std::unique_ptr<ASTNode> >(
+                                                     m_initialValue.value()->clone())
+                                                 : std::nullopt);
+        if (expressionType())
+            cloneNode.setExpressionType(expressionType().value());
+        return cloneNode;
+    }
 } // ast

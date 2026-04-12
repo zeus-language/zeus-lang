@@ -56,6 +56,7 @@ public:
         RAW_STRING,
         UNCLOSED_RAW_STRING,
         KEYWORD,
+        MACRO_KEYWORD,
         END_OF_FILE,
         CHAR,
         PLUS,

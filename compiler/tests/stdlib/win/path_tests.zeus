@@ -9,6 +9,8 @@ fn main() : i32 {
     defer path2.destroy();
     path2.append("file.txt");
 
+    let mut c_drive : Path = Path::new("C:\\");
+
     if(path.exists() == false)
     {
         println("File does not exist, creating file...");
@@ -19,6 +21,12 @@ fn main() : i32 {
         println("File does not exist, creating file...");
         println(path2.path());
     }
+
+    if(c_drive.exists())
+    {
+        println("C drive exists");
+    }
+
 
     return 0;
 }

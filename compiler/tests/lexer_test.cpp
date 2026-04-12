@@ -507,6 +507,30 @@ let y = 10; // fourth comment
     EXPECT_EQ(tokens[10].type, Token::Type::CLOSE_BRACE);
 }
 
+TEST(LexerLexCommentTest, TestLineCommentAtFileEnd) {
+    std::string source = R"(let bla;
+// asdasd asd)";
+    auto tokens = lexer::lex_file("test.zeus", source, false);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[3].type, Token::Type::LINE_COMMENT);
+    VerifyTokenPosition(tokens[3], source, 9, 13, "// asdasd asd");
+    EXPECT_EQ(tokens[4].type, Token::Type::END_OF_FILE);
+}
+
+TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsAtEnd) {
+    std::string source = R"(let bla;
+    // asdasd asd
+// asdasd asd)";
+    auto tokens = lexer::lex_file("test.zeus", source, false);
+    EXPECT_EQ(tokens.size(), 6);
+    EXPECT_EQ(tokens[3].type, Token::Type::LINE_COMMENT);
+    VerifyTokenPosition(tokens[3], source, 13, 13, "// asdasd asd");
+    EXPECT_EQ(tokens[4].type, Token::Type::LINE_COMMENT);
+    VerifyTokenPosition(tokens[4], source, 27, 13, "// asdasd asd");
+    EXPECT_EQ(tokens[5].type, Token::Type::END_OF_FILE);
+}
+
 TEST(LexerLexNumbersTest, LexHexNumbers) {
     std::string source = "let hex1 = 0x1A3F;";
     auto tokens = lexer::lex_file("test.zeus", source);

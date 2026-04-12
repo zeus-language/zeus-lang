@@ -16,6 +16,14 @@ fn main() : i32 {
     for let i in 1 .. 10 {
         println(i);
     }
+    // no loop
+    let start = 1;
+    let end = 1;
+
+    for let i in start .. end {
+        println(i);
+    }
+
 
     return 0;
 }

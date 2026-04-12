@@ -111,10 +111,10 @@ namespace ast {
                 argTypes.push_back(nullptr);
             }
             name += argTypes.back() ? argTypes.back()->name() : "unknown";
-            name += ", ";
+            name += ",";
         }
         if (!m_args.empty()) {
-            name = name.substr(0, name.size() - 2); // Remove last ", "
+            name = name.substr(0, name.size() - 1); // Remove last ","
         }
         name += ")";
 

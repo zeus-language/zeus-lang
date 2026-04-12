@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 #include "VariableType.h"
@@ -19,6 +20,7 @@ namespace types {
     class TypeRegistry final {
     private:
         std::vector<std::shared_ptr<VariableType> > m_types;
+        std::unordered_map<std::string, std::shared_ptr<VariableType> > m_typeAliases;
 
     public:
         TypeRegistry();
@@ -54,5 +56,7 @@ namespace types {
             const std::string &name, bool rawGenericName) const;
 
         void registerType(const std::shared_ptr<VariableType> &type);
+
+        void registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type);
     };
 }

@@ -14,8 +14,12 @@ namespace ast {
         : ASTNode(token), m_statements(std::move(statements)) {
     }
 
-    const std::vector<std::unique_ptr<ASTNode> > &BlockNode::statements() {
+    std::vector<std::unique_ptr<ASTNode> > &BlockNode::statements() {
         return m_statements;
+    }
+
+    void BlockNode::setStatements(std::vector<std::unique_ptr<ASTNode> > statements) {
+        m_statements = std::move(statements);
     }
 
     std::unique_ptr<BlockNode> BlockNode::cloneBlock() const {

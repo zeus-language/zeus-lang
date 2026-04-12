@@ -3,15 +3,21 @@
 #include <optional>
 #include <memory>
 #include <string>
+#include <variant>
 
 #include "TypeRegistry.h"
 #include "VariableType.h"
+#include "ast/NumberConstant.h"
 
 namespace types {
+    typedef std::variant<ast::NumberValue, std::string> Constant;
+
+
     struct Variable {
         std::string name;
         std::shared_ptr<VariableType> type;
         bool constant;
+        std::optional<Constant> value;
     };
 
     class Scope {
@@ -34,6 +40,8 @@ namespace types {
             const std::string &name, const bool rawGenericName = false) const;
 
         void registerType(const std::shared_ptr<VariableType> &type);
+
+        void registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type);
 
         void registerTypeInScope(const std::shared_ptr<VariableType> &type);
 

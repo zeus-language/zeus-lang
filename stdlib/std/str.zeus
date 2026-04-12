@@ -83,7 +83,11 @@ struct string {
         self.data[self.length] = 0 as u8; // Null-terminate
     }
     pub fn append(self : mut &string, number : i32) : void {
-        let mut num_str : string = int_to_str(number);
+        self.append(number as i64);
+    }
+
+    pub fn append(self : mut &string, number : i64) : void {
+        let mut num_str : string = i64_to_str(number);
         self.append(&num_str);
         num_str.destroy();
     }
@@ -343,24 +347,28 @@ pub fn unsigned_to_str(value : u64) : string {
 }
 
 pub fn int_to_str(value : i32) : string {
-    let mut digits : string = string::new(12); // Enough to hold -2,147,483,648 and null terminator
+    return i64_to_str(value as i64);
+}
 
-    if value == 0 {
+pub fn i64_to_str(value : i64) : string {
+    let mut digits : string = string::new(22); // Enough to hold -2,147,483,648 and null terminator
+
+    if value == 0 as i64{
         digits.append('0' as u8);
         return digits;
     }
     let mut is_negative : bool = false;
-    let mut num : i32 = value;
-    if num < 0 {
+    let mut num : i64 = value;
+    if num < 0 as i64{
         is_negative = true;
         //num = -num;
-        num = 0 - num;
+        num = 0 as i64 - num;
     }
-    while num > 0 {
-        let digit : i32 = num % 10;
+    while num > 0 as i64 {
+        let digit : i32 = (num % 10 as i64) as i32;
         digits.append( char(digit) );
 
-        num = num / 10;
+        num = num / 10 as i64;
     }
     if is_negative {
         digits.append( '-' as u8 );
