@@ -50,7 +50,7 @@ struct Path {
 
     pub fn exists(self: &Path) : bool{
 #if target_os == ostype::WINDOWS
-        return PathFileExistsA(self.as_c_str()) != 0 as i32;
+        return PathFileExistsA(self.as_c_str());
 #else
         let mut sb : stat = stat{};
         stat(self.as_c_str(),*sb);
