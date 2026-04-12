@@ -41,6 +41,7 @@
 #include "ast/Comparisson.h"
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
+#include "ast/DerefNode.h"
 #include "ast/EnumAccess.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
@@ -388,6 +389,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState);
+
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
             return;
@@ -499,10 +502,18 @@ namespace llvm_backend {
         if (const auto deferNode = dynamic_cast<ast::DeferStatement *>(node)) {
             return llvm_backend::codegen(deferNode, llvmState);
         }
+        if (const auto derefNode = dynamic_cast<ast::DerefNode *>(node)) {
+            return llvm_backend::codegen(derefNode, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState) {
+        const auto value = codegen_base(node->accessNode(), llvmState);
+        return (!value->getType()->isPointerTy()) ? getLoadStorePointerOperand(value) : value;
     }
 
     llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState) {

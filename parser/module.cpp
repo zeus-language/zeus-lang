@@ -83,9 +83,7 @@ namespace modules {
 
                 std::vector<ast::ASTNode *> nodesToDelete;
                 for (auto &node: moduleResult.module->useModuleNodes) {
-                    if (const auto subUseModule = dynamic_cast<ast::UseModule *>(node.get())) {
-                        useModuleFile(stdlibDirectories, moduleCache, moduleResult, env, subUseModule);
-                    }
+                    useModuleFile(stdlibDirectories, moduleCache, moduleResult, env, node.get());
                 }
                 for (auto &function: moduleResult.module->functions) {
                     function->setModulePath(useModule->modulePath());

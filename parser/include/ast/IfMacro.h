@@ -30,5 +30,23 @@ namespace ast {
         [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &ifBlock() { return m_ifBlock; }
 
         [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &elseBlock() { return m_elseBlock; }
+
+        std::unique_ptr<ASTNode> clone() override {
+            std::vector<std::unique_ptr<ASTNode> > ifBlockClone;
+            ifBlockClone.reserve(m_ifBlock.size());
+            for (const auto &statement: m_ifBlock) {
+                ifBlockClone.push_back(statement->clone());
+            }
+            std::vector<std::unique_ptr<ASTNode> > elseBlockClone;
+            elseBlockClone.reserve(m_elseBlock.size());
+            for (const auto &statement: m_elseBlock) {
+                elseBlockClone.push_back(statement->clone());
+            }
+            auto cloneNode = std::make_unique<IfMacro>(expressionToken(), m_condition->clone(), std::move(ifBlockClone),
+                                                       std::move(elseBlockClone));
+            if (expressionType())
+                cloneNode->setExpressionType(expressionType().value());
+            return std::move(cloneNode);
+        }
     };
 }

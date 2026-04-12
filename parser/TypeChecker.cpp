@@ -15,6 +15,7 @@
 #include "ast/Comparisson.h"
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
+#include "ast/DerefNode.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -497,9 +498,11 @@ namespace types {
         }
     }
 
+    void type_check_deref(ast::DerefNode *node, Context &context);
+
 
     void type_check_base(ast::ASTNode *node, Context &context) {
-        if (node->expressionType().has_value())
+        if (node && node->expressionType().has_value())
             return;
         if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node)) {
             return type_check_funcdef(funcDef, context);
@@ -611,6 +614,10 @@ namespace types {
             return type_check_typedef(typeDef, context);
         }
 
+        if (const auto derefNode = dynamic_cast<ast::DerefNode *>(node)) {
+            return type_check_deref(derefNode, context);
+        }
+
         DBG_ASSERT(node != nullptr, "Node is null");
 
         context.messages.insert({
@@ -618,6 +625,20 @@ namespace types {
             node->expressionToken(),
             "Unknown AST node that can not be type checked yet."
         });
+    }
+
+    void type_check_deref(ast::DerefNode *node, Context &context) {
+        type_check_base(node->accessNode(), context);
+        if (node->accessNode()->expressionType()) {
+            auto accessType = node->accessNode()->expressionType().value();
+            node->setExpressionType(TypeRegistry::getPointerType(accessType).value());
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of dereference operand."
+            });
+        }
     }
 
     void type_check(ast::DeferStatement *node, Context &context) {
@@ -1953,9 +1974,13 @@ namespace types {
         }
     }
 
+    void eval_function(ast::FunctionDefinition *node, Context &context);
+
     void type_check_funcdef(ast::FunctionDefinition *node, Context &context) {
         if (node->expressionType().has_value())
             return;
+
+        eval_function(node, context);
 
         context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
 
@@ -2175,6 +2200,83 @@ namespace types {
         }
     }
 
+
+    std::vector<std::unique_ptr<ast::ASTNode> > eval_if_macro(ast::IfMacro *node, Context &context) {
+        type_check_base(node->condition(), context);
+        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
+        if (node->condition()->expressionType()) {
+            if (node->condition()->expressionType().value()->name() != "bool") {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->condition()->expressionToken(),
+                    "Condition in 'if' macro must be of type 'bool', but got '" +
+                    node->condition()->expressionType().value()->name() + "'."
+                });
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->condition()->expressionToken(),
+                "Could not determine type of condition in 'if' macro."
+            });
+            return {};
+        }
+        auto constant = evalConstantExpression(node->condition(), context);
+        if (constant.has_value()) {
+            if (std::holds_alternative<ast::NumberValue>(constant.value())) {
+                const auto conditionValue = std::get<ast::NumberValue>(constant.value());
+                if (std::get<bool>(conditionValue)) {
+                    for (auto &blockNode: node->ifBlock())
+                        resultNodes.push_back(std::move(blockNode));
+                } else {
+                    for (auto &blockNode: node->elseBlock())
+                        resultNodes.push_back(std::move(blockNode));
+                }
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->condition()->expressionToken(),
+                    "Condition in 'if' macro must be a boolean constant, but got a constant of type '" +
+                    node->condition()->expressionType().value()->name() + "'."
+                });
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->condition()->expressionToken(),
+                "Condition in 'if' macro must be a constant expression."
+            });
+        }
+        return resultNodes;
+    }
+
+
+    void eval_block(ast::BlockNode *block, Context &context) {
+        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
+        for (auto &old: block->statements()) {
+            switch (old->nodeType()) {
+                case ast::NodeType::IF_MACRO: {
+                    auto nodes = eval_if_macro(dynamic_cast<ast::IfMacro *>(old.get()), context);
+                    for (auto &node: nodes) {
+                        resultNodes.push_back(std::move(node));
+                    }
+                }
+                break;
+                default: {
+                    resultNodes.push_back(std::move(old));
+                }
+            }
+        }
+        block->setStatements(std::move(resultNodes));
+    }
+
+    void eval_function(ast::FunctionDefinition *node, Context &context) {
+        for (auto &annotation: node->rawAnnotations()) {
+            resolveAnnotation(annotation.get(), context);
+        }
+        eval_block(node->block(), context);
+    }
+
     void type_check_internal(const std::shared_ptr<parser::Module> &module, const env::Environment &environment,
                              Context &context) {
         // if (module->isTypeChecked) {
@@ -2196,7 +2298,9 @@ namespace types {
 
         // resolve global type declarations first
         for (auto &node: module->nodes) {
-            if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
+            if (const auto typeDef = dynamic_cast<ast::TypeDefinition *>(node.get())) {
+                type_check_base(typeDef, context);
+            } else if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 std::vector<types::StructField> structFields;
                 context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
                 std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
@@ -2276,54 +2380,6 @@ namespace types {
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
     }
 
-    std::vector<std::unique_ptr<ast::ASTNode> > eval_if_macro(ast::IfMacro *node, Context &context) {
-        type_check_base(node->condition(), context);
-        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
-        if (node->condition()->expressionType()) {
-            if (node->condition()->expressionType().value()->name() != "bool") {
-                context.messages.insert({
-                    parser::OutputType::ERROR,
-                    node->condition()->expressionToken(),
-                    "Condition in 'if' macro must be of type 'bool', but got '" +
-                    node->condition()->expressionType().value()->name() + "'."
-                });
-            }
-        } else {
-            context.messages.insert({
-                parser::OutputType::ERROR,
-                node->condition()->expressionToken(),
-                "Could not determine type of condition in 'if' macro."
-            });
-            return {};
-        }
-        auto constant = evalConstantExpression(node->condition(), context);
-        if (constant.has_value()) {
-            if (std::holds_alternative<ast::NumberValue>(constant.value())) {
-                const auto conditionValue = std::get<ast::NumberValue>(constant.value());
-                if (std::get<bool>(conditionValue)) {
-                    for (auto &blockNode: node->ifBlock())
-                        resultNodes.push_back(std::move(blockNode));
-                } else {
-                    for (auto &blockNode: node->elseBlock())
-                        resultNodes.push_back(std::move(blockNode));
-                }
-            } else {
-                context.messages.insert({
-                    parser::OutputType::ERROR,
-                    node->condition()->expressionToken(),
-                    "Condition in 'if' macro must be a boolean constant, but got a constant of type '" +
-                    node->condition()->expressionType().value()->name() + "'."
-                });
-            }
-        } else {
-            context.messages.insert({
-                parser::OutputType::ERROR,
-                node->condition()->expressionToken(),
-                "Condition in 'if' macro must be a constant expression."
-            });
-        }
-        return resultNodes;
-    }
 
     void evaluate_macros(std::shared_ptr<parser::Module> &module, const env::Environment &environment,
                          TypeCheckResult &result) {
@@ -2341,12 +2397,14 @@ namespace types {
                         switch (node->nodeType()) {
                             case ast::NodeType::USE_MODULE:
                                 auto useModule = dynamic_cast<ast::UseModule *>(node.get());
-                                module->useModuleNodes.push_back(std::unique_ptr<ast::UseModule>(useModule));
+                                module->useModuleNodes.push_back(useModule->cloneModule());
                                 break;
                         }
                     }
                 }
                 break;
+
+
                 default: {
                     oldNodes.push_back(std::move(stmt));
                 }

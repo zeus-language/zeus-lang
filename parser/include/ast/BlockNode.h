@@ -9,7 +9,9 @@ namespace ast {
     public:
         BlockNode(const Token &token, std::vector<std::unique_ptr<ASTNode> > statements);
 
-        [[nodiscard]] const std::vector<std::unique_ptr<ASTNode> > &statements();
+        [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &statements();
+
+        void setStatements(std::vector<std::unique_ptr<ASTNode> > statements);
 
         [[nodiscard]] std::unique_ptr<BlockNode> cloneBlock() const;
 

@@ -22,6 +22,8 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::IntegerType>("u8", 1, false));
     registerType(std::make_shared<types::IntegerType>("u16", 2, false));
     registerType(std::make_shared<types::IntegerType>("u32", 4, false));
+    registerType(std::make_shared<types::IntegerType>("i8", 1, true));
+    registerType(std::make_shared<types::IntegerType>("i16", 2, true));
     registerType(std::make_shared<types::IntegerType>("i64", 8, true));
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));

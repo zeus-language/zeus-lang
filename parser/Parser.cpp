@@ -13,6 +13,7 @@
 #include "ast/Comparisson.h"
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
+#include "ast/DerefNode.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -875,6 +876,16 @@ namespace parser {
                                            std::move(rhs.value())));
             }
 
+            if (canConsume(Token::MUL) && !lhs) {
+                auto operatorToken = current();
+                consume(Token::MUL);
+                auto rhs = parseExpression(false);
+                return parseExpression(false,
+                                       std::make_unique<ast::DerefNode>(
+                                           operatorToken,
+                                           std::move(rhs.value())));
+            }
+
             if (!lhs)
                 return std::nullopt;
 
@@ -897,6 +908,7 @@ namespace parser {
                                                                    std::move(lhs.value()),
                                                                    std::move(rhs.value())));
             }
+
             return lhs;
         }
 
@@ -1165,7 +1177,7 @@ namespace parser {
                 constant = false;
             }
             Token &nameToken = current();
-            if ( !consume(Token::Type::IDENTIFIER))
+            if (!consume(Token::Type::IDENTIFIER))
                 next(); // we go further even with an error
             std::optional<std::unique_ptr<ast::RawType> > type = std::nullopt;
             if (tryConsume(Token::Type::COLON)) {

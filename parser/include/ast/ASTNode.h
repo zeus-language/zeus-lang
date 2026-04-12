@@ -40,7 +40,8 @@ namespace ast {
         MODULE,
         ANNOTATION,
         GENERIC_PARAM,
-        OTHER
+        OTHER,
+        DEREFERENCE
     };
 
     class ASTNode {
