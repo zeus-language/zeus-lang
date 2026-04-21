@@ -1328,16 +1328,45 @@ namespace types {
             });
             return;
         }
+        if (node->accessNode()->constant()) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Cannot assign to an element of an immutable array."
+            });
+            return;
+        }
+
         node->setArrayType(varType.value());
         if (const auto arrayType = dynamic_cast<ArrayType *>(varType.value().get())) {
             node->setExpressionType(arrayType->baseType());
         } else if (const auto pointerType = dynamic_cast<PointerType *>(varType.value().get())) {
             node->setExpressionType(pointerType->baseType());
+        } else if (const auto sliceType = dynamic_cast<types::SliceType *>(varType.value().get())) {
+            const auto dataField = sliceType->field("data");
+            if (!dataField) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Internal error: slice type does not have a 'data' field."
+                });
+                return;
+            }
+            if (const auto dataPtr = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                node->setExpressionType(dataPtr->baseType());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Internal error: 'data' field of slice type is not a pointer type."
+                });
+                return;
+            }
         } else {
             context.messages.insert({
                 parser::OutputType::ERROR,
                 node->expressionToken(),
-                "Type '" + varType.value()->name() + "' is not an array or pointer type."
+                "Type '" + varType.value()->name() + "' is not an array, slice or pointer type."
             });
             return;
         }
@@ -1379,13 +1408,26 @@ namespace types {
             node->setExpressionType(arrayType->baseType());
         } else if (const auto pointerType = dynamic_cast<PointerType *>(varType.value().get())) {
             node->setExpressionType(pointerType->baseType());
-        } else {
-            context.messages.insert({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "Type '" + varType.value()->name() + "' is not an array or pointer type."
-            });
-            return;
+        } else if (const auto sliceType = dynamic_cast<types::SliceType *>(varType.value().get())) {
+            auto dataField = sliceType->field("data");
+            if (!dataField) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Internal error: slice type does not have a 'data' field."
+                });
+                return;
+            }
+            if (const auto dataPtr = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                node->setExpressionType(dataPtr->baseType());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Internal error: 'data' field of slice type is not a pointer type."
+                });
+                return;
+            }
         }
     }
 
@@ -1959,7 +2001,8 @@ namespace types {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical()
+                    +
                     "'."
                 });
             }
@@ -2076,7 +2119,8 @@ namespace types {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical()
+                    +
                     "'."
                 });
             }
@@ -2181,7 +2225,8 @@ namespace types {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical() +
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical()
+                    +
                     "'."
                 });
             }
@@ -2465,7 +2510,7 @@ namespace types {
                         //oldNodes.push_back(std::move(node));
                         switch (node->nodeType()) {
                             case ast::NodeType::USE_MODULE:
-                                auto useModule = dynamic_cast<ast::UseModule *>(node.get());
+                                const auto useModule = dynamic_cast<ast::UseModule *>(node.get());
                                 module->useModuleNodes.push_back(useModule->cloneModule());
                                 break;
                         }

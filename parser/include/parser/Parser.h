@@ -57,7 +57,7 @@ namespace parser {
         Token token;
         std::string message;
 
-        void msg(std::ostream &ostream, bool printColor) const;
+        void msg(std::ostream &ostream, bool printColor, bool withDetails = true) const;
 
         int operator<(const ParserMessasge &other) const {
             if (message != other.message) {

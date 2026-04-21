@@ -1,0 +1,9 @@
+
+fn main() : i32{
+    let mut hello:[i32;5]  = [ 1,2,3,4,5 ];
+    hello[10] = 1;
+
+
+
+    return 0;
+}

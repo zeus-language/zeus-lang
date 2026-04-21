@@ -22,6 +22,7 @@ namespace types {
         BOOL,
         VOID,
         STRUCT,
+        SLICE,
         POINTER,
         ARRAY,
         ENUM,
@@ -33,6 +34,9 @@ namespace types {
     private:
         std::string m_typename;
         TypeKind m_typeKind;
+
+    protected:
+        void setTypeKind(const TypeKind typeKind) { m_typeKind = typeKind; }
 
     public:
         explicit VariableType(std::string name, const TypeKind typeKind) : m_typename(std::move(name)),
@@ -88,7 +92,7 @@ namespace types {
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
 
         std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
     };
@@ -103,7 +107,7 @@ namespace types {
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
     };
 
 
@@ -120,7 +124,7 @@ namespace types {
 
         [[nodiscard]] size_t size() const { return m_size; }
 
-        [[nodiscard]] const std::shared_ptr<VariableType>& baseType() const { return m_baseType; }
+        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
     };
 
     struct StructField {
@@ -129,7 +133,7 @@ namespace types {
         std::string name;
     };
 
-    class StructType final : public VariableType {
+    class StructType : public VariableType {
     private:
         std::vector<StructField> m_fields;
         std::vector<std::unique_ptr<ast::FunctionDefinition> > m_methods;
@@ -148,7 +152,7 @@ namespace types {
             return m_methods;
         }
 
-        [[nodiscard]] const ast::FunctionDefinition* getMethodByName(const std::string &methodName) const;
+        [[nodiscard]] const ast::FunctionDefinition *getMethodByName(const std::string &methodName) const;
 
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {
@@ -168,7 +172,7 @@ namespace types {
             return 0;
         }
 
-        [[nodiscard]] const std::optional<std::shared_ptr<VariableType>>& genericParam() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<VariableType> > &genericParam() const {
             return m_genericParam;
         }
 
@@ -180,6 +184,11 @@ namespace types {
 
         std::shared_ptr<VariableType> makeNonGenericType(
             const std::shared_ptr<VariableType> &genericParam) override;
+    };
+
+    class SliceType final : public StructType {
+    public:
+        explicit SliceType(std::string name, std::shared_ptr<VariableType> baseType);
     };
 
 
@@ -239,7 +248,7 @@ namespace types {
             return m_argumentTypes;
         }
 
-        [[nodiscard]] const std::shared_ptr<VariableType>& returnType() const {
+        [[nodiscard]] const std::shared_ptr<VariableType> &returnType() const {
             return m_returnType;
         }
     };

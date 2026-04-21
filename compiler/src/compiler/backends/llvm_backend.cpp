@@ -28,6 +28,8 @@
 #include <llvm/Transforms/Scalar/MemCpyOptimizer.h>
 #include <llvm/Transforms/Scalar/Reassociate.h>
 #include <llvm/Transforms/Scalar/SCCP.h>
+#include <llvm/Transforms/Scalar/Sink.h>
+#include <llvm/Transforms/Scalar/LoopUnrollPass.h>
 #include <llvm/Transforms/Utils/LoopSimplify.h>
 #include "os/command.h"
 #include "linker/linker.h"
@@ -67,6 +69,7 @@
 #include "ast/VariableDeclaration.h"
 #include "ast/WhileLoop.h"
 #include "llvm/IR/DIBuilder.h"
+#include "parser/Parser.h"
 
 
 namespace llvm_backend {
@@ -77,8 +80,8 @@ namespace llvm_backend {
     };
 
     struct Allocation {
-        llvm::AllocaInst *allocaInst;
-        std::shared_ptr<types::VariableType> type;
+        llvm::AllocaInst *allocaInst = nullptr;
+        std::shared_ptr<types::VariableType> type = nullptr;
     };
 
 
@@ -190,10 +193,6 @@ namespace llvm_backend {
         std::unique_ptr<llvm::LLVMContext> TheContext;
         std::unique_ptr<llvm::Module> TheModule;
         std::unique_ptr<llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter> > Builder;
-
-        llvm::Function *TopLevelFunction{};
-        std::unordered_map<std::string, llvm::Function *> FunctionDefinitions;
-
         std::unique_ptr<llvm::FunctionPassManager> TheFPM;
         std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
         std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
@@ -207,15 +206,15 @@ namespace llvm_backend {
         std::vector<std::string> linkerFlags;
 
 
-        llvm::Value *findVariable(const std::string &name, const bool loadValue = true) {
+        llvm::Value *findVariable(const std::string &name, const bool loadValue = true) const {
             return scope->findVariable(Builder, name, loadValue);
         }
 
-        llvm::Value *findNamedAllocation(const std::string &name) {
+        llvm::Value *findNamedAllocation(const std::string &name) const {
             return scope->findNamedAllocation(name);
         }
 
-        llvm::Value *findNamedValue(const std::string &name) {
+        llvm::Value *findNamedValue(const std::string &name) const {
             return scope->findNamedValue(name);
         }
 
@@ -227,7 +226,7 @@ namespace llvm_backend {
             return scope->hasNamedValue(name);
         }
 
-        std::shared_ptr<types::VariableType> findVariableType(const std::string &name) {
+        std::shared_ptr<types::VariableType> findVariableType(const std::string &name) const {
             return scope->findVariableType(name);
         }
 
@@ -235,28 +234,28 @@ namespace llvm_backend {
             function_definition.emplace_back(function);
         }
 
-        void addNamedValue(const std::string &name, llvm::Value *value) {
+        void addNamedValue(const std::string &name, llvm::Value *value) const {
             scope->addNamedValue(name, value);
         }
 
 
-        void removeNamedValue(const std::string &name) {
+        void removeNamedValue(const std::string &name) const {
             scope->removeNamedValue(name);
         }
 
-        void removeNamedAllocation(const std::string &name) {
+        void removeNamedAllocation(const std::string &name) const {
             scope->removeNamedAllocation(name);
         }
 
-        void clearNamedValues() {
+        void clearNamedValues() const {
             scope->clearNamedValues();
         }
 
-        void clearNamedAllocations() {
+        void clearNamedAllocations() const {
             scope->clearNamedAllocations();
         }
 
-        void newScope() {
+        void newScope() const {
             scope->parent = std::make_shared<Scope>(*scope);
         }
 
@@ -269,7 +268,7 @@ namespace llvm_backend {
         }
 
         llvm::AllocaInst *addNamedAllocation(const std::string &name, llvm::AllocaInst *allocaInst,
-                                             const std::shared_ptr<types::VariableType> &type) {
+                                             const std::shared_ptr<types::VariableType> &type) const {
             return scope->addNamedAllocation(name, allocaInst, type);
         }
 
@@ -401,9 +400,9 @@ namespace llvm_backend {
     bool canStructBeAValue(const std::shared_ptr<types::VariableType> &structType, LLVMBackendState &context) {
         const auto llvmStructType = resolveLlvmType(structType, context);
         const auto dataLayout = llvm::DataLayout(context.TheModule.get());
-        auto _struct = llvm::cast<llvm::StructType>(llvmStructType);
+        const auto _struct = llvm::cast<llvm::StructType>(llvmStructType);
         const auto pointerSize = dataLayout.getPointerSize();
-        return _struct->getNumElements() <= 2;
+        return _struct->getNumElements() <= 2 || _struct->getScalarSizeInBits() <= pointerSize * 8;
     }
 
     llvm::GlobalVariable *getOrCreateGlobalString(const LLVMBackendState &llvmState, const std::string &value,
@@ -752,7 +751,8 @@ namespace llvm_backend {
         const auto elementPointer = getLoadStorePointerOperand(element);
 
 
-        if (node->accessNode()->expressionType().value()->typeKind() == types::TypeKind::STRUCT) {
+        if (node->accessNode()->expressionType().value()->typeKind() == types::TypeKind::STRUCT
+            or node->accessNode()->expressionType().value()->typeKind() == types::TypeKind::SLICE) {
             const auto fieldtype = resolveLlvmType(node->accessNode()->expressionType().value(), llvmState);
             const size_t size = DL.getTypeAllocSize(fieldtype);
             llvmState.Builder->CreateMemCpy(elementPointer,
@@ -832,7 +832,7 @@ namespace llvm_backend {
                     llvmState.Builder->CreateStructGEP(structType, val, i, fieldName);
             const auto llvmFieldType = resolveLlvmType(fieldType, llvmState);
             const auto alignment = DL.getPrefTypeAlign(llvmFieldType);
-            if (fieldType->typeKind() == types::TypeKind::STRUCT) {
+            if (fieldType->typeKind() == types::TypeKind::STRUCT or fieldType->typeKind() == types::TypeKind::SLICE) {
                 const auto value = (values[i]->getType()->isPointerTy())
                                        ? values[i]
                                        : getLoadStorePointerOperand(values[i]);
@@ -897,12 +897,55 @@ namespace llvm_backend {
         return nullptr;
     }
 
+
+    void generateRangeCheck(const Token &location, llvm::Value *indexValue, llvm::Value *arrayLength,
+                            LLVMBackendState &llvmState) {
+        const auto indexType = indexValue->getType();
+        const auto lengthType = arrayLength->getType();
+        const auto targetType = llvm::Type::getInt64Ty(*llvmState.TheContext);
+        if (indexType != targetType) {
+            indexValue = llvmState.Builder->CreateIntCast(indexValue, targetType, false, "index_cast");
+        }
+        if (lengthType != targetType) {
+            arrayLength = llvmState.Builder->CreateIntCast(arrayLength, targetType, false, "length_cast");
+        }
+        const auto errorFunction = llvmState.TheModule->getFunction("core::utils::panic(*u8)");
+        if (!errorFunction) {
+            for (auto &func: llvmState.TheModule->functions()) {
+                std::cerr << "Available function: " << func.getName().str() << "\n";
+            }
+            std::cerr << "Bounds check function not found" << std::endl;
+            return;
+        }
+        const auto msg = parser::ParserMessasge{
+            .outputType = parser::OutputType::ERROR,
+            .token = location,
+            .message = "Index out of bounds"
+        };
+        std::stringstream sstream;
+        msg.msg(sstream, false, false);
+        const auto msgValue = getOrCreateGlobalString(llvmState, sstream.str(), "");
+        const auto inBoundsBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "inBounds",
+                                                            llvmState.Builder->GetInsertBlock()->getParent());
+        const auto outBoundsBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "outBounds",
+                                                             llvmState.Builder->GetInsertBlock()->getParent());
+        llvmState.Builder->CreateCondBr(
+            llvmState.Builder->CreateICmpUGE(indexValue, arrayLength),
+            outBoundsBlock, inBoundsBlock
+
+        );
+        llvmState.Builder->SetInsertPoint(outBoundsBlock);
+        llvmState.Builder->CreateCall(errorFunction, {msgValue});
+        llvmState.Builder->CreateUnreachable();
+        llvmState.Builder->SetInsertPoint(inBoundsBlock);
+    }
+
     llvm::Value *codegen(const ast::ArrayAssignment *node, LLVMBackendState &llvmState) {
         const auto baseType = node->arrayType();
         assert(baseType && "Array type is null in array assignment");
-        const auto arrayPtr = codegen_base(node->accessNode(), llvmState);
+        auto arrayPtr = codegen_base(node->accessNode(), llvmState);
 
-        const auto arrayType = resolveLlvmType(baseType, llvmState);
+        auto arrayType = resolveLlvmType(baseType, llvmState);
         auto indexValue = codegen_base(node->index(), llvmState);
         if (!indexValue) {
             assert(false && "Failed to generate index value for array access");
@@ -928,7 +971,29 @@ namespace llvm_backend {
             return nullptr;
         }
         llvm::Value *elementPtr = nullptr;
+        llvm::Value *arrayLength = nullptr;
+
         if (baseType->typeKind() == types::TypeKind::ARRAY) {
+            elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
+            arrayLength = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext),
+                                                 std::dynamic_pointer_cast<types::ArrayType>(baseType)->size());
+        } else if (auto sliceType = std::dynamic_pointer_cast<types::SliceType>(baseType)) {
+            const auto dataField = sliceType->field("data");
+            if (const auto arrayDataPtrType = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                arrayType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
+            }
+            size_t index = sliceType->getFieldIndexByName("data");
+            auto originalPtr = arrayPtr;
+
+            arrayPtr = llvmState.Builder->CreateStructGEP(resolveLlvmType(sliceType, llvmState), arrayPtr, index,
+                                                          "slice_data_ptr");
+            arrayPtr = llvmState.Builder->CreateLoad(resolveLlvmType(dataField->type, llvmState), arrayPtr, "data");
+
+            index = sliceType->getFieldIndexByName("length");
+            arrayLength = llvmState.Builder->CreateStructGEP(resolveLlvmType(sliceType, llvmState), originalPtr, index,
+                                                             "slice_length");
+            arrayLength = llvmState.Builder->CreateLoad(resolveLlvmType(sliceType->field("length")->type, llvmState),
+                                                        arrayLength, "length");
             elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayPtr, indices, "elem_ptr");
         } else {
             const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(baseType);
@@ -937,6 +1002,9 @@ namespace llvm_backend {
             }
             const auto type = resolveLlvmType(ptrType->baseType(), llvmState);
             elementPtr = llvmState.Builder->CreateGEP(type, arrayPtr, indices, "elem_ptr");
+        }
+        if (arrayLength) {
+            generateRangeCheck(node->expressionToken(), indexValue, arrayLength, llvmState);
         }
         llvmState.Builder->CreateStore(valueToStore, elementPtr);
         return valueToStore;
@@ -1024,6 +1092,7 @@ namespace llvm_backend {
         }
     }
 
+
     llvm::Value *codegen(const ast::ArrayAccess *node, LLVMBackendState &llvmState) {
         const auto baseType = node->arrayType().value();
         auto arrayType = resolveLlvmType(baseType, llvmState);
@@ -1037,14 +1106,36 @@ namespace llvm_backend {
             assert(false && "Array index is not an integer");
             return nullptr;
         }
-        const auto arrayPtr = codegen_base(node->accessExpression(), llvmState);
+        auto arrayPtr = codegen_base(node->accessExpression(), llvmState);
         std::vector<llvm::Value *> indices;
+        llvm::Value *arrayLength = nullptr;
         if (baseType->typeKind() == types::TypeKind::ARRAY) {
             indices.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0));
+            arrayLength = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext),
+                                                 std::dynamic_pointer_cast<types::ArrayType>(baseType)->size());
         } else if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(baseType)) {
             arrayType = resolveLlvmType(ptrType->baseType(), llvmState);
-        }
+        } else if (auto sliceType = std::dynamic_pointer_cast<types::SliceType>(baseType)) {
+            const auto dataField = sliceType->field("data");
+            if (const auto arrayDataPtrType = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                arrayType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
+            }
+            size_t index = sliceType->getFieldIndexByName("data");
+            auto originalPtr = arrayPtr;
 
+            arrayPtr = llvmState.Builder->CreateStructGEP(resolveLlvmType(sliceType, llvmState), arrayPtr, index,
+                                                          "slice_data_ptr");
+            arrayPtr = llvmState.Builder->CreateLoad(resolveLlvmType(dataField->type, llvmState), arrayPtr, "data");
+
+            index = sliceType->getFieldIndexByName("length");
+            arrayLength = llvmState.Builder->CreateStructGEP(resolveLlvmType(sliceType, llvmState), originalPtr, index,
+                                                             "slice_length");
+            arrayLength = llvmState.Builder->CreateLoad(resolveLlvmType(sliceType->field("length")->type, llvmState),
+                                                        arrayLength, "length");
+        }
+        if (arrayLength) {
+            generateRangeCheck(node->expressionToken(), indexValue, arrayLength, llvmState);
+        }
         if (indexValue->getType() != llvm::Type::getInt32Ty(*llvmState.TheContext)) {
             indexValue = llvmState.Builder->CreateIntCast(indexValue, llvm::Type::getInt32Ty(*llvmState.TheContext),
                                                           true, "array_index_cast");
@@ -1087,7 +1178,7 @@ namespace llvm_backend {
         llvmState.Builder->SetInsertPoint(LoopBB);
 
         // Create the PHI node to hold the loop variable.
-        const auto varType = node->expressionType();
+        const auto &varType = node->expressionType();
         if (!varType) {
             assert(false && "Could not determine type of iterator variable in for loop");
             return nullptr;
@@ -1183,10 +1274,9 @@ namespace llvm_backend {
     llvm::Value *codegen_range_for(const ast::ForLoop *node, LLVMBackendState &llvmState) {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
-        auto *PreheaderBB = llvmState.Builder->GetInsertBlock();
-        auto *LoopCondBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.cond", TheFunction);
-        auto *LoopBodyBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.body", TheFunction);
-        auto *LoopIncBB = llvm::BasicBlock::Create(*llvmState.TheContext, "loop.inc", TheFunction);
+        auto *LoopCondBB = llvm::BasicBlock::Create(*llvmState.TheContext, "for.header", TheFunction);
+        auto *LoopBodyBB = llvm::BasicBlock::Create(*llvmState.TheContext, "body", TheFunction);
+        auto *LoopIncBB = llvm::BasicBlock::Create(*llvmState.TheContext, "latch", TheFunction);
         auto *AfterBB =
                 llvm::BasicBlock::Create(*llvmState.TheContext, "afterloop", TheFunction);
 
@@ -1294,7 +1384,8 @@ namespace llvm_backend {
     void setCallArgInfo(ast::ASTNode *node, llvm::CallInst *call, size_t argNum, LLVMBackendState &llvmState) {
         const auto &argType = node->expressionType();
 
-        if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
+        if (argType.has_value() && (argType.value()->typeKind() == types::TypeKind::STRUCT or argType.value()->
+                                    typeKind() == types::TypeKind::SLICE)) {
             const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
 
             call->addParamAttr(static_cast<unsigned>(argNum), llvm::Attribute::NoUndef);
@@ -1309,7 +1400,8 @@ namespace llvm_backend {
         const auto returnTypeKind = node->expressionType().has_value()
                                         ? node->expressionType().value()->typeKind()
                                         : types::TypeKind::VOID;
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                     types::TypeKind::SLICE);
 
         const auto opFunction = node->operatorFunction();
         assert(opFunction && "Struct binary expression operator function not found");
@@ -1737,6 +1829,27 @@ namespace llvm_backend {
                 }
 
                 return alloca;
+            } else if (varType->isArrayTy()) {
+                const auto arrayValue = codegen_base(initialValue.value(), llvmState);
+                if (arrayValue && arrayValue->getType()->isArrayTy()) {
+                    llvmState.Builder->CreateStore(arrayValue, alloca);
+                    return alloca;
+                }
+                if (arrayValue) {
+                    llvm::Value *value = nullptr;
+                    value = (arrayValue->getType()->isPointerTy())
+                                ? arrayValue
+                                : getLoadStorePointerOperand(arrayValue);
+                    const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                    const size_t size = DL.getTypeAllocSize(varType);
+
+                    llvmState.Builder->CreateMemCpy(alloca,
+                                                    llvm::MaybeAlign(),
+                                                    value,
+                                                    llvm::MaybeAlign(),
+                                                    size);
+                }
+                return alloca;
             }
             if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
                 llvmState.Builder->CreateStore(initValue, alloca);
@@ -1757,6 +1870,14 @@ namespace llvm_backend {
                     llvm::cast<llvm::PointerType>(varType));
                 llvmState.Builder->CreateStore(defaultValue, alloca);
             } else if (varType->isStructTy()) {
+                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+                const size_t size = DL.getTypeAllocSize(varType);
+                llvmState.Builder->CreateMemSetInline(alloca, llvm::MaybeAlign(),
+                                                      llvm::ConstantInt::get(
+                                                          llvm::Type::getInt8Ty(*llvmState.TheContext), 0),
+                                                      llvm::ConstantInt::get(
+                                                          llvm::Type::getInt32Ty(*llvmState.TheContext), size));
+            } else if (varType->isArrayTy()) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                 const size_t size = DL.getTypeAllocSize(varType);
                 llvmState.Builder->CreateMemSetInline(alloca, llvm::MaybeAlign(),
@@ -1863,7 +1984,8 @@ namespace llvm_backend {
         }
         std::vector<llvm::Value *> args;
         const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                     types::TypeKind::SLICE);
         llvm::Value *returnAlloca = nullptr;
         if (isStructReturn) {
             const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState);
@@ -2015,7 +2137,8 @@ namespace llvm_backend {
             const auto argType = node->args()[actualArgNum]->expressionType();
 
             // struct arguments that cannot be passed as value need to be passed by pointer with the byval attribute
-            if (argType.has_value() && argType.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (argType.has_value() && (argType.value()->typeKind() == types::TypeKind::STRUCT or argType.value()->
+                                        typeKind() == types::TypeKind::SLICE)) {
                 const auto llvmArgType = resolveLlvmType(argType.value(), llvmState);
 
                 call->addParamAttr(static_cast<unsigned>(argNum), llvm::Attribute::NoUndef);
@@ -2080,7 +2203,8 @@ namespace llvm_backend {
         llvmState.newScope();
         const auto returnTypeKind = node->resolvedReturnType().value()->typeKind();
         const auto llvmReturnType = resolveLlvmType(node->resolvedReturnType().value(), llvmState, false, true);
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT and not canStructBeAValue(
+        const bool isStructReturn = ((returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                      types::TypeKind::SLICE) and not canStructBeAValue(
                                          node->expressionType().value(), llvmState));
         const auto resultType = isStructReturn
                                     ? llvm::Type::getVoidTy(*llvmState.TheContext)
@@ -2090,7 +2214,8 @@ namespace llvm_backend {
             params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
         }
         for (const auto &param: node->args()) {
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT and !canStructBeAValue(
+            if ((param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                 types::TypeKind::SLICE) and !canStructBeAValue(
                     param.type.value(), llvmState)) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
@@ -2098,7 +2223,7 @@ namespace llvm_backend {
             }
         }
         llvm::FunctionType *FT = llvm::FunctionType::get(resultType, params, false);
-        auto linkage = llvm::Function::PrivateLinkage;
+        constexpr auto linkage = llvm::Function::PrivateLinkage;
 
         const auto functionDefinition = llvm::Function::Create(FT, linkage, "",
                                                                llvmState.TheModule.get());
@@ -2138,7 +2263,8 @@ namespace llvm_backend {
                 alloca = llvmState.Builder->CreateAlloca(varType, nullptr, arg.getName() + ".addr");
             }
             // Store the initial value into the alloca.
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                 const size_t size = DL.getTypeAllocSize(varType);
                 llvmState.Builder->CreateMemCpy(alloca,
@@ -2156,7 +2282,8 @@ namespace llvm_backend {
             // Add arguments to variable symbol table.
             llvmState.addNamedAllocation(std::string(arg.getName()), alloca, param.type.value());
             argNames.push_back(arg.getName().str());
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 arg.addAttr(llvm::Attribute::getWithByValType(*llvmState.TheContext,
                                                               resolveLlvmType(param.type.value(), llvmState)));
                 arg.addAttr(llvm::Attribute::NoUndef);
@@ -2215,7 +2342,8 @@ namespace llvm_backend {
 
         const auto llvmReturnType = resolveLlvmType(node->expressionType().value(), llvmState, false, true);
 
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT and not canStructBeAValue(
+        const bool isStructReturn = ((returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                      types::TypeKind::SLICE) and not canStructBeAValue(
                                          node->expressionType().value(), llvmState));
 
 
@@ -2227,7 +2355,8 @@ namespace llvm_backend {
             params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
         }
         for (const auto &param: node->args()) {
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT and !canStructBeAValue(
+            if ((param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                 types::TypeKind::SLICE) and !canStructBeAValue(
                     param.type.value(), llvmState)) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
@@ -2290,7 +2419,8 @@ namespace llvm_backend {
 
     void codegen_functionstub(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                     types::TypeKind::SLICE);
         const auto resultType = isStructReturn
                                     ? llvm::Type::getVoidTy(*llvmState.TheContext)
                                     : resolveLlvmType(node->expressionType().value(), llvmState);
@@ -2299,7 +2429,8 @@ namespace llvm_backend {
             params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
         }
         for (const auto &param: node->args()) {
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
@@ -2358,7 +2489,8 @@ namespace llvm_backend {
 
 
         for (const auto &param: node->args()) {
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
@@ -2383,7 +2515,8 @@ namespace llvm_backend {
 
 
         const auto returnTypeKind = node->expressionType().value()->typeKind();
-        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT);
+        const bool isStructReturn = (returnTypeKind == types::TypeKind::STRUCT or returnTypeKind ==
+                                     types::TypeKind::SLICE);
 
         if (isStructReturn) {
             functionDefinition->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
@@ -2411,7 +2544,8 @@ namespace llvm_backend {
                 alloca = llvmState.Builder->CreateAlloca(varType, nullptr, arg.getName() + ".addr");
             }
             // Store the initial value into the alloca.
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                 const size_t size = DL.getTypeAllocSize(varType);
                 llvmState.Builder->CreateMemCpy(alloca,
@@ -2429,7 +2563,8 @@ namespace llvm_backend {
             // Add arguments to variable symbol table.
             llvmState.addNamedAllocation(std::string(arg.getName()), alloca, param.type.value());
             argNames.push_back(arg.getName().str());
-            if (param.type.value()->typeKind() == types::TypeKind::STRUCT) {
+            if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
+                types::TypeKind::SLICE) {
                 arg.addAttr(llvm::Attribute::getWithByValType(*llvmState.TheContext,
                                                               resolveLlvmType(param.type.value(), llvmState)));
                 arg.addAttr(llvm::Attribute::NoUndef);
@@ -2515,10 +2650,12 @@ namespace llvm_backend {
             context.TheFPM->addPass(llvm::SCCPPass());
 
             context.TheFPM->addPass(llvm::LoopSimplifyPass());
+            context.TheFPM->addPass(llvm::LoopUnrollPass());
 
             context.TheFPM->addPass(llvm::MemCpyOptPass());
 
             context.TheFPM->addPass(llvm::DCEPass());
+            context.TheFPM->addPass(llvm::SinkingPass());
             context.TheMPM->addPass(llvm::AlwaysInlinerPass());
 
 
@@ -2585,7 +2722,7 @@ namespace llvm_backend {
             } else if (varType->isFloatingPointTy()) {
                 initializer = llvm::ConstantFP::get(varType, 0.0);
             } else if (varType->isPointerTy()) {
-                llvm::Value *defaultValue = llvm::ConstantPointerNull::get(
+                initializer = llvm::ConstantPointerNull::get(
                     llvm::cast<llvm::PointerType>(varType));
             } else if (varType->isStructTy()) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
