@@ -1,0 +1,2 @@
+Panic: FILENAME:4:5: error: Index out of bounds
+

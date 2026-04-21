@@ -41,22 +41,8 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSli
     if (auto foundType = getTypeByName(typeName, false)) {
         return foundType;
     }
-    std::vector<StructField> fields = {
-        {
-            .type = std::make_shared<types::IntegerType>("u64", 8, false),
-            .name = "length"
-        },
-        {
-            .type = std::make_shared<types::PointerType>("*" + value->name(), value),
-            .name = "data"
-        }
-    };
-    std::vector<std::unique_ptr<ast::FunctionDefinition> > methods = {
 
-    };
-    std::optional<std::shared_ptr<VariableType> > genericParam;
-    auto slice = std::make_shared<types::StructType>(typeName, fields, std::move(methods),
-                                                     std::nullopt);
+    auto slice = std::make_shared<types::SliceType>(typeName, value);
     registerType(slice);
     return std::make_optional(slice);
 }

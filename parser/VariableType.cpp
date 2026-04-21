@@ -120,3 +120,19 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
     }
     return structType;
 }
+
+types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> baseType) : StructType(
+    std::move(name),
+    {
+        {
+            .type = std::make_shared<types::IntegerType>("u64", 8, false),
+            .name = "length"
+        },
+        {
+            .type = std::make_shared<types::PointerType>("*" + baseType->name(), baseType),
+            .name = "data"
+        }
+    },
+    std::move(std::vector<std::unique_ptr<ast::FunctionDefinition> >{}), std::nullopt) {
+    setTypeKind(TypeKind::SLICE);
+}

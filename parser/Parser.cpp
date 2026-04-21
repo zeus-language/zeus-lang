@@ -72,7 +72,7 @@ namespace parser {
         return Color::FG_DEFAULT;
     }
 
-    void ParserMessasge::msg(std::ostream &ostream, const bool printColor) const {
+    void ParserMessasge::msg(std::ostream &ostream, const bool printColor, bool withDetails) const {
         if (printColor)
             ostream << token.source_location.filename << ":" << token.source_location.row << ":" << token.
                     source_location.col << ": "
@@ -84,14 +84,16 @@ namespace parser {
                     source_location.col << ": "
                     << outputTypeString(outputType) << ": " << message << "\n";
 
-        ostream << token.source_location.sourceline() << "\n";
-        const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-        const size_t endOffset = std::min(token.source_location.num_bytes,
-                                          token.source_location.lineEnd() - token.source_location.byte_offset);
+        if (withDetails) {
+            ostream << token.source_location.sourceline() << "\n";
+            const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
+            const size_t endOffset = std::min(token.source_location.num_bytes,
+                                              token.source_location.lineEnd() - token.source_location.byte_offset);
 
-        ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
-                    static_cast<int>(endOffset)) <<
-                std::setfill('-') << "\n";
+            ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(
+                        static_cast<int>(endOffset)) <<
+                    std::setfill('-') << "\n";
+        }
     }
 
     class Parser {

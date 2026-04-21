@@ -1,0 +1,3 @@
+FILENAME:4:5: error: Cannot assign to an element of an immutable array.
+    hello[0] = 1;
+    ^----
