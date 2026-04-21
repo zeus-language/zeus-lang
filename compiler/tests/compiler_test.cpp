@@ -289,7 +289,7 @@ TEST_P(PanicTest, PanicTest) {
 
 
     ASSERT_EQ(result, expected);
-    ASSERT_EQ(erstream.str(), "");
+    ASSERT_EQ(erstream.str(), "program could not be executed!\n");
 }
 
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,

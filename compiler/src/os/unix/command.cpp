@@ -32,5 +32,5 @@ bool execute_command_list(std::ostream &outstream, std::ostream &errorStream, co
 
     fclose(perr);
     close(pfd[0]), close(pfd[1]);
-    return status != -1;
+    return WEXITSTATUS(status) == 0;
 }
