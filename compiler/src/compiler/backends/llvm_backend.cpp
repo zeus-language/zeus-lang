@@ -2755,21 +2755,61 @@ namespace llvm_backend {
             codegen_globalnode(varDecl, context);
         }
     }
+
+
+    void registerFunction(const std::shared_ptr<parser::Module> &module, LLVMBackendState &context) {
+        for (auto &node: module->functions) {
+            if (auto function = dynamic_cast<ast::FunctionDefinitionBase *>(node.get())) {
+                context.registerFunction(function);
+            }
+        }
+        for (auto &sub: module->modules) {
+            registerFunction(sub, context);
+        }
+    }
+
+    void codegen_module(const std::shared_ptr<parser::Module> &module, LLVMBackendState &context,
+                        std::vector<std::string> &visitedModules) {
+        visitedModules.push_back(module->modulePathName());
+        for (auto &sub: module->modules) {
+            if (visitedModules.end() != std::ranges::find(visitedModules,
+                                                          sub->modulePathName())) {
+                continue;
+            }
+            codegen_module(sub, context, visitedModules);
+            visitedModules.push_back(sub->modulePathName());
+        }
+        for (auto &node: module->nodes) {
+            codegen_global(node.get(), context);
+        }
+        for (auto &node: module->functions) {
+            codegen_global(node.get(), context);
+        }
+    }
+
+    void codegen_functions(const std::shared_ptr<parser::Module> &module, LLVMBackendState &context) {
+        for (auto &node: module->modules) {
+            codegen_functions(node, context);
+        }
+
+
+        for (auto &node: module->functions) {
+            if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
+                llvm_backend::codegen(funcDef, context);
+            }
+        }
+    }
 }
 
 void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, const std::string &moduleName,
                                       std::ostream &errorStream,
                                       std::ostream &outputStream,
-                                      const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
+                                      const std::shared_ptr<parser::Module> &module,
                                       const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes) {
     initializeLLVMBackend();
     LLVMBackendState context;
     init_context(context, moduleName, options);
-    for (auto &node: nodes) {
-        if (auto function = dynamic_cast<ast::FunctionDefinitionBase *>(node.get())) {
-            context.registerFunction(function);
-        }
-    }
+    registerFunction(module, context);
     auto TargetTriple = llvm::sys::getDefaultTargetTriple();
     std::string Error;
 
@@ -2787,10 +2827,8 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     context.TheModule->setDataLayout(TheTargetMachine->createDataLayout());
 
     createPrintfCall(*context.TheContext, *context.TheModule);
-
-    for (auto &node: nodes) {
-        codegen_global(node.get(), context);
-    }
+    std::vector<std::string> visitedModules;
+    codegen_module(module, context, visitedModules);
     for (auto &type: registeredTypes) {
         if (auto structType = std::dynamic_pointer_cast<types::StructType>(type)) {
             if (structType->genericParam() and structType->genericParam().value()->typeKind() ==
@@ -2807,11 +2845,8 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
             }
         }
     }
-    for (auto &node: nodes) {
-        if (auto funcDef = dynamic_cast<ast::FunctionDefinition *>(node.get())) {
-            llvm_backend::codegen(funcDef, context);
-        }
-    }
+
+    codegen_functions(module, context);
     if (!llvm::verifyModule(*context.TheModule, &llvm::errs())) {
         if (options.buildMode == compiler::BuildMode::Release) {
             context.TheMPM->run(*context.TheModule, *context.TheMAM);
@@ -2882,6 +2917,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         flags.push_back("-L" + libDir.string());
     }
 
+    if (options.fuseLd) {
+        flags.push_back("-fuse-ld=" + *options.fuseLd);
+    } else if (auto linker = detect_linker()) {
+        flags.push_back("-fuse-ld=" + *linker);
+    }
+    
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {
         return;
     }

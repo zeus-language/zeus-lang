@@ -15,10 +15,10 @@ namespace compiler {
     void compile(CompilerOptions options, const std::string &moduleName,
                  std::ostream &errorStream,
                  std::ostream &outputStream,
-                 const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
+                 const std::shared_ptr<parser::Module> &module,
                  const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes) {
         llvm_backend::generateExecutable(options, moduleName, errorStream, outputStream,
-                                         nodes, registeredTypes);
+                                         module, registeredTypes);
     }
 
     std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
@@ -40,31 +40,6 @@ namespace compiler {
         file.seekg(0);
         file.read(&buffer[0], size);
         return buffer;
-    }
-
-    std::vector<std::unique_ptr<ast::ASTNode> > moveNodesFromResult(const std::shared_ptr<parser::Module> &module,
-                                                                    std::vector<std::string> &visitedModules) {
-        std::vector<std::unique_ptr<ast::ASTNode> > nodes;
-        for (auto &sub: module->modules) {
-            if (visitedModules.end() != std::ranges::find(visitedModules,
-                                                          sub->modulePathName())) {
-                continue;
-            }
-            visitedModules.push_back(sub->modulePathName());
-            for (auto subNodes = moveNodesFromResult(sub, visitedModules); auto &node: subNodes) {
-                nodes.push_back(std::move(node));
-            }
-        }
-
-        for (auto &node: module->nodes) {
-            nodes.push_back(std::move(node));
-        }
-
-        for (auto &node: module->functions) {
-            nodes.push_back(std::move(node));
-        }
-
-        return nodes;
     }
 
     void parse_and_compile(const compiler::CompilerOptions &options,
@@ -94,12 +69,10 @@ namespace compiler {
         for (const auto &message: typeCheckResult.messages) {
             message.msg(errorStream, options.colorOutput);
         }
-        std::vector<std::string> visitedModules;
-        const auto nodes = moveNodesFromResult(result.module, visitedModules);
 
         if (!result.hasError() && !typeCheckResult.hasError()) {
             compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
-                    nodes, typeCheckResult.registeredTypes);
+                    result.module, typeCheckResult.registeredTypes);
         }
     }
 }

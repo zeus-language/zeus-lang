@@ -11,9 +11,10 @@ namespace compiler {
     void compile(CompilerOptions options, const std::string &moduleName,
                  std::ostream &errorStream,
                  std::ostream &outputStream,
-                 const std::vector<std::unique_ptr<ast::ASTNode> > &nodes,
+                 const std::shared_ptr<parser::Module> &module,
                  const std::vector<std::shared_ptr<types::VariableType> > &registeredTypes);
 
-    void parse_and_compile(const compiler::CompilerOptions &options,const env::Environment &environment,modules::ModuleCache& moduleCache, const std::filesystem::path &inputPath,
+    void parse_and_compile(const compiler::CompilerOptions &options, const env::Environment &environment,
+                           modules::ModuleCache &moduleCache, const std::filesystem::path &inputPath,
                            std::ostream &errorStream, std::ostream &outputStream);
 }

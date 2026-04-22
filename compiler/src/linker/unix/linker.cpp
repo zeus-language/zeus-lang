@@ -1,6 +1,6 @@
 #include "linker/linker.h"
 #include "os/command.h"
-#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Program.h"
 
 bool link_modules(std::ostream &errStream, const std::filesystem::path &baseDir, const std::string &program_name,
                   const std::vector<std::string> &flags, const std::vector<std::string> &object_files) {
@@ -17,4 +17,17 @@ bool link_modules(std::ostream &errStream, const std::filesystem::path &baseDir,
     //args.emplace_back("-fuse-ld=gold");
 
     return execute_command_list(errStream, errStream, "cc", args);
+}
+
+std::optional<std::string> detect_linker() {
+    std::optional<std::string> linker = std::nullopt;
+    if (auto found = llvm::sys::findProgramByName("ld.mold")) {
+        linker = "mold";
+    } else {
+        found = llvm::sys::findProgramByName("ld.gold");
+        if (found) {
+            linker = "gold";
+        }
+    }
+    return linker;
 }
