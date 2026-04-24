@@ -2777,7 +2777,6 @@ namespace llvm_backend {
                 continue;
             }
             codegen_module(sub, context, visitedModules);
-            visitedModules.push_back(sub->modulePathName());
         }
         for (auto &node: module->nodes) {
             codegen_global(node.get(), context);
@@ -2922,7 +2921,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     } else if (auto linker = detect_linker()) {
         flags.push_back("-fuse-ld=" + *linker);
     }
-    
+
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {
         return;
     }

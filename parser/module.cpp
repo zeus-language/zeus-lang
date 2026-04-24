@@ -110,7 +110,8 @@ namespace modules {
 
     std::shared_ptr<parser::Module> ModuleCache::getModule(const std::string &path) const {
         if (entries.contains(path)) {
-            return entries.at(path);
+            const auto module = entries.at(path);
+            return std::make_shared<parser::Module>(*module);
         }
         return nullptr;
     }
@@ -118,7 +119,7 @@ namespace modules {
     void ModuleCache::addModule(const std::string &path, const std::shared_ptr<parser::Module> &module) {
         if (!isEnabled)
             return;
-        entries[path] = std::make_shared<parser::Module>(*module);
+        entries[path] = module; //std::make_shared<parser::Module>(*module);
     }
 
     std::vector<std::shared_ptr<parser::Module> > ModuleCache::findModulesByPathStart(

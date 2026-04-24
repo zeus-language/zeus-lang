@@ -55,6 +55,9 @@ namespace ast {
             cloneNode->setExpressionType(expressionType().value());
         if (resolvedReturnType())
             cloneNode->setResolvedReturnType(resolvedReturnType().value());
+        for (const auto &annotation: annotations()) {
+            cloneNode->addAnnotation(annotation);
+        }
         cloneNode->setModulePath(modulePath());
         return std::move(cloneNode);
     }
