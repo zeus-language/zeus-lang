@@ -13,11 +13,16 @@ namespace ast {
         for (auto &annotation: rawAnnotations()) {
             annotationsClones.push_back(annotation->cloneAnnotation());
         }
+
+
         auto cloneNode = std::make_unique<ExternFunctionDefinition>(expressionToken(),
                                                                     args(),
                                                                     std::move(returnTypeClone),
                                                                     std::move(annotationsClones),
                                                                     visibilityModifier());
+        for (const auto &annotation: annotations()) {
+            cloneNode->addAnnotation(annotation);
+        }
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);

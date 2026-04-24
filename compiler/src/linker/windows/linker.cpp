@@ -19,3 +19,7 @@ bool link_modules(std::ostream &errStream, const std::filesystem::path &baseDir,
 
     return execute_command_list(errStream, errStream, "clang", args);
 }
+
+std::optional<std::string> detect_linker() {
+    return std::nullopt;
+}

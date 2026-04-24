@@ -39,6 +39,8 @@ namespace compiler {
                 options.libraryDirectories.emplace_back(arg.substr(2));
             } else if (arg.starts_with("-I")) {
                 options.includeDirectories.emplace_back(arg.substr(2));
+            } else if (arg.starts_with("--fuse-ld=")) {
+                options.fuseLd = arg.substr(10);
             } else {
                 argList.push_back(arg);
                 break;

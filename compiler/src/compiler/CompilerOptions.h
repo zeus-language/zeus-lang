@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <optional>
 #include <vector>
 
 namespace compiler {
@@ -24,6 +25,7 @@ namespace compiler {
         bool colorOutput = true;
         bool ggdb = false;
         std::vector<std::string> runArguments;
+        std::optional<std::string> fuseLd = std::nullopt;
     };
 
     std::string shiftarg(std::vector<std::string> &args);
