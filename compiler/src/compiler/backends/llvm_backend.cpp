@@ -1461,6 +1461,14 @@ namespace llvm_backend {
         if (node->operatorFunction()) {
             return codegenStructOperatorNodeCall(node, llvmState);
         }
+        const auto lhsType = node->lhs()->expressionType().value();
+        const auto rhsType = node->rhs()->expressionType().value();
+        bool isSigned = true;
+        if (lhsType->typeKind() == types::TypeKind::INT) {
+            isSigned = std::dynamic_pointer_cast<types::IntegerType>(lhsType)->isSigned();
+        } else if (rhsType->typeKind() == types::TypeKind::INT) {
+            isSigned = std::dynamic_pointer_cast<types::IntegerType>(rhsType)->isSigned();
+        }
         llvm::CmpInst::Predicate pred = llvm::CmpInst::ICMP_EQ;
         if (lhs->getType()->isDoubleTy() || lhs->getType()->isFloatTy()) {
             pred = llvm::CmpInst::FCMP_OEQ;
@@ -1495,24 +1503,35 @@ namespace llvm_backend {
 
                     break;
                 case ast::CMPOperator::GREATER:
-                    pred = llvm::CmpInst::ICMP_SGT;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SGT;
+                    else
+                        pred = llvm::CmpInst::ICMP_UGT;
                     break;
                 case ast::CMPOperator::GREATER_EQUAL:
-                    pred = llvm::CmpInst::ICMP_SGE;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SGE;
+                    else
+                        pred = llvm::CmpInst::ICMP_UGE;
                     break;
                 case ast::CMPOperator::LESS:
-                    pred = llvm::CmpInst::ICMP_SLT;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SLT;
+                    else
+                        pred = llvm::CmpInst::ICMP_ULT;
                     break;
                 case ast::CMPOperator::LESS_EQUAL:
-                    pred = llvm::CmpInst::ICMP_SLE;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SLE;
+                    else
+                        pred = llvm::CmpInst::ICMP_ULE;
                     break;
                 default:
                     break;
             }
         }
 
-        const auto lhsType = node->lhs()->expressionType().value();
-        const auto rhsType = node->rhs()->expressionType().value();
+
         if (lhsType && rhsType) {
             if (lhsType->name() == rhsType->name() && lhsType->typeKind() == types::TypeKind::INT) {
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
@@ -1685,6 +1704,21 @@ namespace llvm_backend {
             case ast::BinaryOperator::MOD:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
                     return llvmState.Builder->CreateSRem(lhs, rhs, "modtmp");
+                }
+                break;
+            case ast::BinaryOperator::AND:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAdd(lhs, rhs, "andtmp");
+                }
+                break;
+            case ast::BinaryOperator::OR:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateOr(lhs, rhs, "andtmp");
+                }
+                break;
+            case ast::BinaryOperator::LEFT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
                 }
                 break;
             default:

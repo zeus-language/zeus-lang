@@ -466,6 +466,17 @@ namespace lexer {
                     col += 2;
                     continue;
                 }
+                if (source_code[start] == '<' && source_code[start + 1] == '<') {
+                    SourceLocation source_location = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                        .row = row,
+                        .col = col
+                    };
+                    tokens.emplace_back(Token::LEFT_SHIFT, std::move(source_location));
+                    start++;
+                    col += 2;
+                    continue;
+                }
                 if (source_code[start] == ':' && source_code[start + 1] == ':') {
                     SourceLocation source_location = {
                         .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,

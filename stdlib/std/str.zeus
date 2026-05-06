@@ -10,8 +10,11 @@ struct string {
     pub fn as_c_str(self : &string) : *u8 {
         return self.data;
     }
+    /**
+    * returns the length of the string in code points
+    */
     pub fn length(self : &string) : u32 {
-        return self.length as u32;
+        return utf8_string_length(self.data);
     }
     pub fn capacity(self : &string) : u32 {
         return self.capacity as u32;
@@ -283,6 +286,51 @@ struct string {
     }
 }
 
+pub fn utf8_string_length(s : *u8) : u32 {
+    let mut length : u32 = 0 as u32;
+    let mut i : i32 = 0;
+    while s[i] != 0 as u8 {
+        length = length + 1 as u32;
+        let byte : u8 = s[i];
+        let codepoint : u32 = utf8_codepoint_from_offset(s,i);
+        let len = utf8_codepoint_length(codepoint) as i32;
+        i = i + len;
+    }
+    return length;
+}
+
+pub fn utf8_codepoint_from_offset(s : *u8, offset : i32) : u32 {
+    let first_byte : u8 = s[offset];
+    if first_byte <= 0x7F as u8 {
+        return first_byte as u32;
+    } else if first_byte <= 0xDF  as u8{
+        let second_byte : u8 = s[offset + 1];
+        return ((first_byte as u32 & 0x1F) << 6 as u32) | (second_byte as u32 & 0x3F);
+    } else if first_byte <= 0xEF as u8 {
+        let second_byte : u8 = s[offset + 1];
+        let third_byte : u8 = s[offset + 2];
+        return ((first_byte as u32 & 0x0F) << 12 as u32) | ((second_byte as u32 & 0x3F) << 6 as u32) | (third_byte as u32 & 0x3F as u32);
+    } else if first_byte <= 0xF7  as u8{
+        let second_byte : u8 = s[offset + 1];
+        let third_byte : u8 = s[offset + 2];
+        let fourth_byte : u8 = s[offset + 3];
+        return ((first_byte as u32 & 0x07) << 18 as u32) | ((second_byte as u32 & 0x3F) << 12 as u32) | ((third_byte as u32 & 0x3F) << 6 as u32) | (fourth_byte as u32 & 0x3F);
+    }
+    return -1 as u32; // Invalid UTF-8 sequence
+}
+
+pub fn utf8_codepoint_length(codepoint : u32) : i32 {
+    if codepoint <= 0x7F {
+        return 1;
+    } else if codepoint <= 0x7FF {
+        return 2;
+    } else if codepoint <= 0xFFFF {
+        return 3;
+    } else if codepoint <= 0x10FFFF {
+        return 4;
+    }
+    return -1; // Invalid code point
+}
 
 // Converts an integer to string
 pub fn char(value : i32) : u8 {

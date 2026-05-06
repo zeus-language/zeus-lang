@@ -775,6 +775,50 @@ namespace parser {
                                                operatorToken, ast::BinaryOperator::MOD,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
+
+                if (tryConsume(Token::AND)) {
+                    auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after 'and' operator",
+                        });
+                        return lhs;
+                    }
+                    return parseExpression(false,
+                                           std::make_unique<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::AND,
+                                               std::move(lhs.value()), std::move(rhs.value())));
+                }
+
+                if (tryConsume(Token::PIPE)) {
+                    auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after 'or' operator",
+                        });
+                        return lhs;
+                    }
+                    return parseExpression(false,
+                                           std::make_unique<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::OR,
+                                               std::move(lhs.value()), std::move(rhs.value())));
+                }
+                if (tryConsume(Token::LEFT_SHIFT)) {
+                    auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after 'left shift' operator",
+                        });
+                        return lhs;
+                    }
+                    return parseExpression(false,
+                                           std::make_unique<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::AND,
+                                               std::move(lhs.value()), std::move(rhs.value())));
+                }
             }
 
             if (canConsume(Token::LEFT_CURLY)) {

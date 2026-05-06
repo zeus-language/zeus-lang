@@ -91,6 +91,8 @@ public:
         INTERPOLATION_START,
         INTERPOLATION_END,
         INTERPOLATED_STRING,
+        LEFT_SHIFT,
+        RIGHT_SHIFT,
     } type;
 
     SourceLocation source_location;
