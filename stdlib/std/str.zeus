@@ -309,7 +309,8 @@ pub fn utf8_codepoint_from_offset(s : *u8, offset : i32) : u32 {
     } else if first_byte <= 0xEF as u8 {
         let second_byte : u8 = s[offset + 1];
         let third_byte : u8 = s[offset + 2];
-        return ((first_byte as u32 & 0x0F) << 12 as u32) | ((second_byte as u32 & 0x3F) << 6 as u32) | (third_byte as u32 & 0x3F as u32);
+        let result =  ((first_byte as u32 & 0x0F) << 12 as u32) | ((second_byte as u32 & 0x3F) << 6 as u32) | (third_byte as u32 & 0x3F as u32);
+        return result;
     } else if first_byte <= 0xF7  as u8{
         let second_byte : u8 = s[offset + 1];
         let third_byte : u8 = s[offset + 2];

@@ -864,10 +864,17 @@ namespace llvm_backend {
             return value; // No cast needed
         }
         if (targetType->isIntegerTy()) {
+            const auto isSigned = std::dynamic_pointer_cast<types::IntegerType>(node->expressionType().value())->
+                    isSigned();
             if (value->getType()->isFloatingPointTy()) {
-                return llvmState.Builder->CreateFPToSI(value, targetType, "float_to_int_cast");
+                if (isSigned)
+                    return llvmState.Builder->CreateFPToSI(value, targetType, "float_to_int_cast");
+                else
+                    return llvmState.Builder->CreateFPToUI(value, targetType, "float_to_int_cast");
             }
-            return llvmState.Builder->CreateIntCast(value, targetType, true, "int_cast");
+
+
+            return llvmState.Builder->CreateIntCast(value, targetType, isSigned, "int_cast");
         }
         if (targetType->isFloatingPointTy()) {
             if (value->getType()->isIntegerTy()) {
@@ -1556,9 +1563,9 @@ namespace llvm_backend {
         const auto rhs = node->rhs();
         switch (node->logical_operator()) {
             case ast::LogicalOperator::AND:
-                return llvmState.Builder->CreateAnd(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+                return llvmState.Builder->CreateLogicalAnd(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
             case ast::LogicalOperator::OR:
-                return llvmState.Builder->CreateOr(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+                return llvmState.Builder->CreateLogicalOr(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
             case ast::LogicalOperator::NOT:
                 return llvmState.Builder->CreateNot(codegen_base(rhs, llvmState));
             default:
@@ -1708,12 +1715,12 @@ namespace llvm_backend {
                 break;
             case ast::BinaryOperator::AND:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateAdd(lhs, rhs, "andtmp");
+                    return llvmState.Builder->CreateAnd(lhs, rhs, "andtmp");
                 }
                 break;
             case ast::BinaryOperator::OR:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateOr(lhs, rhs, "andtmp");
+                    return llvmState.Builder->CreateOr(lhs, rhs, "ortmp");
                 }
                 break;
             case ast::BinaryOperator::LEFT_SHIFT:

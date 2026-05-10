@@ -597,6 +597,7 @@ namespace parser {
             }
 
             if (result) {
+                assert(result.has_value() && result.value() != nullptr && "Parsed expression is null");
                 if (canParseMemberAccess()) {
                     result = std::move(parseMemberAccess(std::move(result)).value());
                 }
@@ -816,7 +817,7 @@ namespace parser {
                     }
                     return parseExpression(false,
                                            std::make_unique<ast::BinaryExpression>(
-                                               operatorToken, ast::BinaryOperator::AND,
+                                               operatorToken, ast::BinaryOperator::LEFT_SHIFT,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
             }

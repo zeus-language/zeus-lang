@@ -1,0 +1,5 @@
+Hello, World!
+This is a test of escape characters:
+This is a test of utf-8 characters: 😀
+😁😂😃
+This is a test of printf with unicode: 😀
