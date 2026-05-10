@@ -1,6 +1,7 @@
 
 fn main() : i32 {
-    let helloworld = string::from_slice("你好世界");
+    let mut helloworld = string::from_slice("你好世界");
+    defer helloworld.destroy();
     let slice = helloworld.as_slice();
     let byte_length = slice.length;
     let length = helloworld.length() as i32;
