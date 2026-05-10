@@ -320,7 +320,7 @@ TEST_P(EncodingTest, TestNoError) {
     std::stringstream erstream;
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
-
+    options.ggdb = true;
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();
