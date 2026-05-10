@@ -2162,9 +2162,7 @@ namespace parser {
                 fields.push_back(ast::StructField{
                     .visibilityModifier = visibilityModifier, .name = fieldName, .type = std::move(type.value())
                 });
-                if (!tryConsume(Token::COMMA)) {
-                    break;
-                }
+                tryConsume(Token::COMMA);
             }
 
 

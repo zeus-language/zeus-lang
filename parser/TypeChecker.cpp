@@ -1965,7 +1965,7 @@ namespace types {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function retu."
+                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the lambda return."
                 });
             }
         } else {
@@ -2105,7 +2105,7 @@ namespace types {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
-                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function retu."
+                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function return."
                 });
             }
         } else {
