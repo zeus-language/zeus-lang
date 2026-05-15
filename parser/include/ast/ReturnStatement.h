@@ -12,13 +12,13 @@
 
 namespace ast {
     class ReturnStatement final : public ASTNode {
-        std::optional<std::shared_ptr<ASTNode> > m_returnValue;
+        std::shared_ptr<ASTNode> m_returnValue;
 
     public:
-        explicit ReturnStatement(Token returnToken, std::optional<std::shared_ptr<ASTNode> > returnValue);
+        explicit ReturnStatement(Token returnToken, const std::shared_ptr<ASTNode> &returnValue);
 
         [[nodiscard]] std::optional<ASTNode *> returnValue() const {
-            return m_returnValue.has_value() ? std::make_optional(m_returnValue.value().get()) : std::nullopt;
+            return m_returnValue ? std::make_optional(m_returnValue.get()) : std::nullopt;
         }
 
         ~ReturnStatement() override = default;
@@ -32,16 +32,16 @@ namespace ast {
         ReturnStatement &operator=(const ReturnStatement &) = delete;
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            if (m_returnValue.has_value()) {
-                return m_returnValue.value()->getNodeByToken(token);
+            if (m_returnValue) {
+                return m_returnValue->getNodeByToken(token);
             }
             return std::nullopt;
         }
 
         std::shared_ptr<ASTNode> clone() override {
-            std::optional<std::shared_ptr<ASTNode> > returnValueClone = std::nullopt;
-            if (m_returnValue.has_value()) {
-                returnValueClone = std::make_optional<std::shared_ptr<ASTNode> >(m_returnValue.value()->clone());
+            std::shared_ptr<ASTNode> returnValueClone = nullptr;
+            if (m_returnValue) {
+                returnValueClone = m_returnValue->clone();
             }
             auto cloneNode = std::make_shared<ReturnStatement>(expressionToken(), std::move(returnValueClone));
             if (expressionType())
@@ -51,8 +51,8 @@ namespace ast {
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
             ASTNode::makeNonGeneric(genericParam);
-            if (m_returnValue.has_value()) {
-                m_returnValue.value()->makeNonGeneric(genericParam);
+            if (m_returnValue) {
+                m_returnValue->makeNonGeneric(genericParam);
             }
         }
     };

@@ -27,6 +27,8 @@ namespace modules {
 
         std::vector<std::string> modulePaths() const;
 
+        void clear();
+
         explicit ModuleCache(bool enabled) : isEnabled(enabled) {
         }
     };

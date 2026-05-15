@@ -25,7 +25,7 @@ namespace types {
     public:
         TypeRegistry();
 
-        virtual ~TypeRegistry() = default;
+        ~TypeRegistry();
 
 
         const std::vector<std::shared_ptr<VariableType> > &registeredTypes() const;
@@ -35,13 +35,13 @@ namespace types {
         static std::optional<std::shared_ptr<VariableType> > getRangeType(
             const std::optional<std::shared_ptr<types::VariableType> >::value_type &value);
 
-        static std::optional<std::shared_ptr<VariableType> > getArrayType(
+        std::optional<std::shared_ptr<VariableType> > getArrayType(
             const std::shared_ptr<VariableType> &base_type, size_t size);
 
-        static std::optional<std::shared_ptr<VariableType> > getPointerType(
+        std::optional<std::shared_ptr<VariableType> > getPointerType(
             const std::shared_ptr<VariableType> &base_type);
 
-        static std::optional<std::shared_ptr<VariableType> > getReferenceType(
+        std::optional<std::shared_ptr<VariableType> > getReferenceType(
             const std::shared_ptr<VariableType> &base_type);
 
         TypeRegistry(const TypeRegistry &) = default;

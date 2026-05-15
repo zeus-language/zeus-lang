@@ -27,14 +27,11 @@ namespace types {
 
     public:
         explicit Scope(const TypeRegistry &typeRegistry,
-                       const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope),
-                                                                    m_typeRegistry(typeRegistry) {
-        }
+                       const std::shared_ptr<Scope> &parentScope);
 
-        explicit Scope() : m_parentScope(nullptr) {
-        }
+        explicit Scope();
 
-        virtual ~Scope() = default;
+        virtual ~Scope();
 
         [[nodiscard]] std::optional<std::shared_ptr<VariableType> > getTypeByName(
             const std::string &name, const bool rawGenericName = false) const;
@@ -57,5 +54,14 @@ namespace types {
 
         std::optional<std::shared_ptr<types::VariableType> >
         getSliceType(const std::shared_ptr<VariableType> &baseType);
+
+        std::optional<std::shared_ptr<VariableType> > getPointerType(
+            const std::shared_ptr<VariableType> &base_type);
+
+        std::optional<std::shared_ptr<VariableType> > getReferenceType(
+            const std::shared_ptr<VariableType> &base_type);
+
+        std::optional<std::shared_ptr<VariableType> > getArrayType(
+            const std::shared_ptr<VariableType> &base_type, size_t size);
     };
 }

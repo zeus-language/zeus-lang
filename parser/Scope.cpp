@@ -6,6 +6,18 @@
 
 #include <algorithm>
 
+types::Scope::Scope(const TypeRegistry &typeRegistry,
+                    const std::shared_ptr<Scope> &parentScope) : m_parentScope(parentScope),
+                                                                 m_typeRegistry(typeRegistry) {
+}
+
+types::Scope::Scope() : m_parentScope(nullptr) {
+}
+
+types::Scope::~Scope() {
+    m_parentScope = nullptr;
+}
+
 std::optional<std::shared_ptr<types::VariableType> > types::Scope::getTypeByName(
     const std::string &name, const bool rawGenericName) const {
     auto type = m_typeRegistry.getTypeByName(name, rawGenericName);
@@ -73,5 +85,29 @@ bool types::Scope::isGlobalScope() const {
 
 std::optional<std::shared_ptr<types::VariableType> > types::Scope::getSliceType(
     const std::shared_ptr<VariableType> &baseType) {
-    return m_typeRegistry.getSliceType(baseType);
+    if (const auto type = m_typeRegistry.getSliceType(baseType); type.has_value()) {
+        registerType(type.value());
+        return type;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::Scope::getPointerType(
+    const std::shared_ptr<VariableType> &base_type) {
+    const auto type = m_typeRegistry.getPointerType(base_type);
+    if (type.has_value()) {
+        registerType(type.value());
+        return type.value();
+    }
+    return std::nullopt;
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::Scope::getReferenceType(
+    const std::shared_ptr<VariableType> &base_type) {
+    return m_typeRegistry.getReferenceType(base_type);
+}
+
+std::optional<std::shared_ptr<types::VariableType> > types::Scope::getArrayType(
+    const std::shared_ptr<VariableType> &base_type, size_t size) {
+    return m_typeRegistry.getArrayType(base_type, size);
 }

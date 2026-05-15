@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iomanip>
+#include <utility>
 
 #include "ast/RawAnnotation.h"
 #include "ast/ArrayAccess.h"
@@ -24,6 +25,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
@@ -101,11 +103,10 @@ namespace parser {
         std::vector<Token> m_tokens;
         std::vector<ParserMessasge> m_messages;
         std::vector<std::shared_ptr<ast::RawAnnotation> > m_pendingAnnotations;
-        std::vector<std::shared_ptr<ast::ASTNode> > m_blockNodes;
         size_t m_currentTempVarIndex = 0;
 
     public:
-        explicit Parser(std::vector<Token> tokens) : m_tokens(tokens) {
+        explicit Parser(std::vector<Token> tokens) : m_tokens(std::move(tokens)) {
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseNumber() {
@@ -233,7 +234,8 @@ namespace parser {
                                                        std::nullopt);
             auto tempString = std::make_shared<ast::VariableDeclaration>(tempToken, type,
                                                                          constant, std::nullopt);
-            m_blockNodes.push_back(tempString); {
+            auto nodes = std::vector<std::shared_ptr<ast::ASTNode> >();
+            nodes.push_back(tempString); {
                 auto stringConstant = std::make_shared<ast::StringConstant>(stringToken);
                 auto args = std::vector<std::shared_ptr<ast::ASTNode> >();
                 args.push_back(stringConstant);
@@ -241,7 +243,7 @@ namespace parser {
                 auto accessNode = std::make_shared<ast::VariableAccess>(tempToken);
                 auto instanceNode = std::make_shared<ast::ReferenceAccess>(accessNode->expressionToken(),
                                                                            accessNode);
-                m_blockNodes.push_back(
+                nodes.push_back(
                     std::make_shared<ast::MethodCallNode>(appendToken, instanceNode,
                                                           args));
             }
@@ -256,7 +258,7 @@ namespace parser {
                     destroyToken, instanceNode,
                     args);
 
-                m_blockNodes.push_back(
+                nodes.push_back(
                     std::make_shared<ast::DeferStatement>(stringToken, destroyCallNode)
                 );
             }
@@ -271,7 +273,7 @@ namespace parser {
                     auto accessNode = std::make_shared<ast::VariableAccess>(tempToken);
                     auto instanceNode = std::make_shared<ast::ReferenceAccess>(accessNode->expressionToken(),
                                                                                accessNode);
-                    m_blockNodes.push_back(
+                    nodes.push_back(
                         std::make_shared<ast::MethodCallNode>(appendToken, instanceNode,
                                                               args));
                 } else if (tryConsume(Token::INTERPOLATION_START)) {
@@ -283,7 +285,7 @@ namespace parser {
                         auto accessNode = std::make_shared<ast::VariableAccess>(tempToken);
                         auto instanceNode = std::make_shared<ast::ReferenceAccess>(accessNode->expressionToken(),
                             accessNode);
-                        m_blockNodes.push_back(
+                        nodes.push_back(
                             std::make_shared<ast::MethodCallNode>(appendToken, instanceNode,
                                                                   args));
                     }
@@ -299,7 +301,8 @@ namespace parser {
             }
 
             const auto token = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
-            return std::make_shared<ast::VariableAccess>(token);
+            return std::make_shared<
+                ast::InterpolatedString>(token, std::make_shared<ast::VariableAccess>(token), nodes);
         }
 
         std::optional<std::shared_ptr<ast::ReturnStatement> > parseReturnStatement() {
@@ -308,8 +311,8 @@ namespace parser {
 
             consumeKeyWord("return");
             auto returnToken = current();
-            auto returnValue = parseExpression(true);
-            return std::make_shared<ast::ReturnStatement>(returnToken, returnValue);
+            const auto returnValue = parseExpression(true);
+            return std::make_shared<ast::ReturnStatement>(returnToken, returnValue.value_or(nullptr));
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseArrayInitializer(bool allowInit) {
@@ -375,7 +378,7 @@ namespace parser {
             if (!canParseTypeCast()) {
                 return value;
             }
-            Token asToken = current();
+            Token &asToken = current();
             consumeKeyWord("as");
             auto rawType = parseRawType();
             if (!rawType) {
@@ -414,7 +417,7 @@ namespace parser {
             if (!isStructInitializationAhead() || !allowInit) {
                 return std::nullopt;
             }
-            auto structNameToken = current();
+            auto &structNameToken = current();
             consume(Token::IDENTIFIER);
 
             std::optional<Token> genericParam = std::nullopt;
@@ -444,7 +447,7 @@ namespace parser {
                     });
                     return std::nullopt;
                 }
-                auto fieldNameToken = current();
+                const auto &fieldNameToken = current();
                 consume(Token::IDENTIFIER);
                 if (!canConsume(Token::COLON)) {
                     m_messages.push_back(ParserMessasge{
@@ -701,10 +704,10 @@ namespace parser {
             if (!canConsume(Token::IDENTIFIER)) {
                 return std::nullopt;
             }
-            auto &nameToken = current();
+            auto nameToken = current();
             consume(Token::IDENTIFIER);
 
-            return std::make_shared<ast::VariableAccess>(std::move(nameToken));
+            return std::make_shared<ast::VariableAccess>(nameToken);
         }
 
 
@@ -975,24 +978,24 @@ namespace parser {
                 return std::nullopt;
 
             std::optional<std::shared_ptr<ast::ASTNode> > result = std::nullopt;
-            if (auto rhs = parseLogicalExpression(parseBaseExpression(allowInit, lhs)))
+            if (const auto rhs = parseLogicalExpression(parseBaseExpression(allowInit, lhs)))
                 result = rhs;
             else
                 result = lhs;
 
             if (result) {
                 if (canParseMemberAccess()) {
-                    result = std::move(parseMemberAccess(result).value());
+                    result = std::move(parseMemberAccess(std::move(result)).value());
                 }
                 if (canParseTypeCast()) {
-                    result = std::move(tryParseTypeCast(result).value());
+                    result = std::move(tryParseTypeCast(std::move(result)).value());
                 }
 
                 if (canParseArrayAccess()) {
-                    result = std::move(parseArrayAccess(result).value());
+                    result = std::move(parseArrayAccess(std::move(result)).value());
                 }
                 if (canParseRange()) {
-                    result = std::move(parseRange(result).value());
+                    result = std::move(parseRange(std::move(result)).value());
                 }
             }
             return result;
@@ -1003,7 +1006,7 @@ namespace parser {
                 return std::nullopt;
             }
             Token nameToken = current();
-            auto varAccess = parseMemberAccess(parseVariableAccess());
+            auto varAccess = parseMemberAccess(std::move(parseVariableAccess()));
             if (!varAccess) {
                 return std::nullopt;
             }
@@ -1600,13 +1603,12 @@ namespace parser {
             Token &token = current();
             consume(Token::Type::OPEN_BRACE);
             std::vector<std::shared_ptr<ast::ASTNode> > nodes;
-            std::vector<std::shared_ptr<ast::ASTNode> > oldBLockNodes = m_blockNodes;
-            m_blockNodes.clear();
+
             while (!canConsume(Token::CLOSE_BRACE)) {
                 if (auto stmt = parseStatement()) {
-                    m_blockNodes.push_back(std::move(stmt.value()));
+                    nodes.push_back(stmt.value());
                 } else if (auto ifMacro = parseIfMacro()) {
-                    m_blockNodes.push_back(std::move(ifMacro.value()));
+                    nodes.push_back(ifMacro.value());
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -1620,17 +1622,6 @@ namespace parser {
                 }
             }
             consume(Token::Type::CLOSE_BRACE);
-            for (const auto &node: m_blockNodes) {
-                nodes.emplace_back(node);
-            }
-            //
-            // nodes.insert(
-            //     nodes.end(),
-            //     std::make_move_iterator(m_blockNodes.begin()),
-            //     std::make_move_iterator(m_blockNodes.end())
-            // );
-            m_blockNodes.clear();
-            m_blockNodes = oldBLockNodes;
 
             return std::make_shared<ast::BlockNode>(token, nodes);
         }
@@ -2399,10 +2390,10 @@ namespace parser {
         for (auto &node: nodes) {
             if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 if (structDecl->expressionType()) {
-                    auto structType = std::dynamic_pointer_cast<
+                    const auto structType = std::dynamic_pointer_cast<
                         types::StructType>(structDecl->expressionType().value());
                     for (auto &method: structType->methods()) {
-                        for (auto &innerNode: method->block()->statements()) {
+                        for (const auto &innerNode: method->block()->statements()) {
                             if (const auto result = innerNode->getNodeByToken(token)) {
                                 return std::make_pair(method.get(), result.value());
                             }
@@ -2410,7 +2401,7 @@ namespace parser {
                     }
                 }
                 for (const auto &method: structDecl->methods()) {
-                    for (auto &innerNode: method->block()->statements()) {
+                    for (const auto &innerNode: method->block()->statements()) {
                         if (const auto result = innerNode->getNodeByToken(token)) {
                             return std::make_pair(method.get(), result.value());
                         }

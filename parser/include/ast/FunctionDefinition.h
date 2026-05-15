@@ -6,7 +6,7 @@ namespace ast {
     class FunctionDefinition final : public FunctionDefinitionBase {
         std::shared_ptr<BlockNode> m_blockNode;
         std::optional<Token> genericParam;
-        std::optional<types::VariableType *> m_parentStruct = std::nullopt;
+        types::VariableType *m_parentStruct = nullptr;
 
     public:
         explicit FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
@@ -17,7 +17,7 @@ namespace ast {
                                     const VisibilityModifier visibilityModifier
         );
 
-        ~FunctionDefinition() override = default;
+        ~FunctionDefinition() override;
 
 
         [[nodiscard]] BlockNode *block() const { return m_blockNode.get(); }
@@ -44,11 +44,11 @@ namespace ast {
         [[nodiscard]] bool isMethod() const override;
 
         [[nodiscard]] std::optional<types::VariableType *> parentStruct() const override {
-            return m_parentStruct;
+            return (m_parentStruct) ? std::make_optional(m_parentStruct) : std::nullopt;
         }
 
         void setParentStruct(types::VariableType *structType) {
-            m_parentStruct = std::make_optional(structType);
+            m_parentStruct = structType;
         }
 
         std::optional<ASTNode *> getNodeByToken(const Token &token) const override;

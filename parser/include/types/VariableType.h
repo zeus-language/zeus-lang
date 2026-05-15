@@ -84,47 +84,47 @@ namespace types {
 
     class PointerType final : public VariableType {
     private:
-        std::shared_ptr<VariableType> m_baseType;
+        std::weak_ptr<VariableType> m_baseType;
 
     public:
-        PointerType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
-                std::move(name), TypeKind::POINTER),
-            m_baseType(std::move(baseType)) {
+        PointerType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
+                                                                                  std::move(name), TypeKind::POINTER),
+                                                                              m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
 
         std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
     };
 
     class ReferenceType final : public VariableType {
     private:
-        std::shared_ptr<VariableType> m_baseType;
+        std::weak_ptr<VariableType> m_baseType;
 
     public:
-        ReferenceType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
+        ReferenceType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::POINTER),
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
     };
 
 
     class ArrayType final : public VariableType {
     private:
         size_t m_size;
-        std::shared_ptr<VariableType> m_baseType;
+        std::weak_ptr<VariableType> m_baseType;
 
     public:
-        ArrayType(std::string name, const size_t size, std::shared_ptr<VariableType> baseType) : VariableType(
+        ArrayType(std::string name, const size_t size, std::weak_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::ARRAY),
             m_size(size), m_baseType(std::move(baseType)) {
         }
 
         [[nodiscard]] size_t size() const { return m_size; }
 
-        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
     };
 
     struct StructField {
@@ -136,20 +136,32 @@ namespace types {
     class StructType : public VariableType {
     private:
         std::vector<StructField> m_fields;
-        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
+        std::vector<std::weak_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
         std::string m_typename;
         std::string m_linkageName;
 
     public:
         StructType(std::string name, const std::vector<StructField> &fields,
-                   std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
+                   const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
                    std::optional<std::shared_ptr<VariableType> > genericParam);
+
+        ~StructType() override {
+            m_fields.clear();
+            m_methods.clear();
+            m_genericParam.reset();
+        }
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
 
-        [[nodiscard]] const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods() const {
-            return m_methods;
+        [[nodiscard]] virtual std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const {
+            std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
+            for (const auto &method: m_methods) {
+                if (auto methodPtr = method.lock()) {
+                    methods.push_back(methodPtr);
+                }
+            }
+            return methods;
         }
 
         [[nodiscard]] const ast::FunctionDefinition *getMethodByName(const std::string &methodName) const;
@@ -197,6 +209,22 @@ namespace types {
         int64_t value;
         // Additional fields can be added here for variant data
     };
+
+    class NonGenericStructType : public StructType {
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
+
+    public:
+        NonGenericStructType(std::string name, const std::vector<StructField> &fields,
+                             const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) : StructType(
+                std::move(name), fields, {}, std::nullopt),
+            m_methods(methods) {
+        }
+
+        [[nodiscard]] std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const override {
+            return m_methods;
+        }
+    };
+
 
     class EnumType final : public VariableType {
         std::vector<EnumVariant> m_variants;

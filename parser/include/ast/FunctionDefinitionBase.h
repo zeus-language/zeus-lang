@@ -59,7 +59,7 @@ namespace ast {
 
         void setModulePath(const std::vector<Token> &module_path);
 
-        [[nodiscard]] std::vector<Token> modulePath() const {
+        [[nodiscard]] const std::vector<Token> &modulePath() const {
             return m_namespacePrefix;
         }
 
@@ -100,7 +100,7 @@ namespace ast {
             return std::nullopt;
         }
 
-        void setResolvedReturnType(std::shared_ptr<types::VariableType> type) {
+        void setResolvedReturnType(const std::shared_ptr<types::VariableType> &type) {
             m_resolvedReturnTyoe = type;
         }
 

@@ -321,7 +321,7 @@ void LanguageServer::handleRequest() {
                         m_openDocuments[uriString] = LspDocument{.uri = uriString, .text = text};
 
                         // compute diagnostics asynchronously using a detached thread and send PublishDiagnostics
-                        std::ignore = std::async(std::launch::async,
+                        std::ignore = std::async(std::launch::deferred,
                                                  [ uri = std::move(uri), text = std::move(text), &messageHandler, rtl =
                                                      this->m_options.stdlibDirectories, &cache = m_moduleCache,
                                                      &env = this->m_env
@@ -355,7 +355,7 @@ void LanguageServer::handleRequest() {
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
                         auto *cache = &m_moduleCache;
                         // async diagnostics
-                        std::ignore = std::async(std::launch::async,
+                        std::ignore = std::async(std::launch::deferred,
                                                  [ uri = uri, text = std::move(text), &messageHandler, rtl = this->
                                                      m_options.stdlibDirectories, cache,
                                                      &env = this->m_env]() {

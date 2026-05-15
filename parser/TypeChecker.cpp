@@ -26,6 +26,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
@@ -346,6 +347,8 @@ namespace types {
 
     void type_check_lambda(ast::LambdaExpression *node, Context &context);
 
+    void type_check(ast::InterpolatedString *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -382,7 +385,7 @@ namespace types {
         const auto u8Type = context.currentScope->getTypeByName("u8").value();
 
         node->setExpressionType(
-            types::TypeRegistry::getArrayType(u8Type, node->value().size()).value());
+            context.currentScope->getArrayType(u8Type, node->value().size()).value());
     }
 
     void type_check(ast::NumberConstant *node, const Context &context) {
@@ -419,7 +422,7 @@ namespace types {
                 break;
             case ast::NumberType::NULLPTR:
                 node->setExpressionType(
-                    types::TypeRegistry::getPointerType(context.currentScope->getTypeByName("void").value()).value());
+                    context.currentScope->getPointerType(context.currentScope->getTypeByName("void").value()).value());
                 break;
             default:
                 assert(false && "Unknown number type");
@@ -550,6 +553,10 @@ namespace types {
             return type_check_lambda(lambdaExpr, context);
         }
 
+        if (const auto interpolatedString = dynamic_cast<ast::InterpolatedString *>(node)) {
+            return type_check(interpolatedString, context);
+        }
+
         DBG_ASSERT(node != nullptr, "Node is null");
 
         context.messages.insert({
@@ -559,11 +566,28 @@ namespace types {
         });
     }
 
+    void type_check(ast::InterpolatedString *node, Context &context) {
+        for (auto &part: node->nodes()) {
+            type_check_base(part.get(), context);
+        }
+        type_check_base(node->accessNode().get(), context);
+        const auto type = node->accessNode()->expressionType();
+        if (type) {
+            node->setExpressionType(type.value());
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of interpolated string expression."
+            });
+        }
+    }
+
     void type_check_deref(ast::DerefNode *node, Context &context) {
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType()) {
             auto accessType = node->accessNode()->expressionType().value();
-            node->setExpressionType(TypeRegistry::getPointerType(accessType).value());
+            node->setExpressionType(context.currentScope->getPointerType(accessType).value());
         } else {
             context.messages.insert({
                 parser::OutputType::ERROR,
@@ -840,7 +864,7 @@ namespace types {
                 return;
             }
             node->setExpressionType(
-                types::TypeRegistry::getReferenceType(node->accessNode()->expressionType().value()).value());
+                context.currentScope->getReferenceType(node->accessNode()->expressionType().value()).value());
         } else {
             context.messages.insert({
                 parser::OutputType::ERROR,
@@ -1260,8 +1284,8 @@ namespace types {
             }
         }
         node->setExpressionType(
-            types::TypeRegistry::getArrayType(node->value()->expressionType().value(),
-                                              countValue).value());
+            context.currentScope->getArrayType(node->value()->expressionType().value(),
+                                               countValue).value());
     }
 
     void type_check(ast::ArrayInitializer *node, Context &context) {
@@ -1292,8 +1316,8 @@ namespace types {
                         return;
                     }
                     node->setExpressionType(
-                        types::TypeRegistry::getArrayType(element->expressionType().value(),
-                                                          node->elements().size()).
+                        context.currentScope->getArrayType(element->expressionType().value(),
+                                                           node->elements().size()).
                         value());
                 } else {
                     context.messages.insert({
@@ -1623,7 +1647,8 @@ namespace types {
             } else {
                 node->setExpressionType(context.currentScope->getTypeByName("void").value());
             }
-            node->setNamespacePrefix(funcDef->modulePath());
+            const auto modulePath = funcDef->modulePath();
+            node->setNamespacePrefix(modulePath);
             return;
         }
         // look for variable with function name
@@ -2439,18 +2464,18 @@ namespace types {
                         .name = name.lexical()
                     });
                 }
-                // std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
-                // //methods.reserve(structDecl->methods().size());
-                // for (const auto &method: structDecl->methods()) {
-                //     methods.push_back(method->cloneFunction2());
-                // }
+                std::vector<std::weak_ptr<ast::FunctionDefinition> > methods;
+                methods.reserve(structDecl->methods().size());
+                for (const auto &method: structDecl->methods()) {
+                    methods.push_back(method);
+                }
                 //structDecl->methods().clear();
 
 
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                                structFields, structDecl->methods(), genericType);
+                                                                structFields, methods, genericType);
 
-
+                const auto parentScope = context.currentScope->parentScope();
                 context.currentScope->registerType(type);
                 for (const auto &method: type->methods()) {
                     method->setParentStruct(type.get());
@@ -2459,7 +2484,7 @@ namespace types {
                     type_check_funcdef(method.get(), context);
                 }
                 structDecl->setExpressionType(type);
-                context.currentScope = context.currentScope->parentScope();
+                context.currentScope = parentScope;
             } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
                 std::vector<EnumVariant> enumVariants;
                 int64_t nextValue = 0;
@@ -2492,6 +2517,8 @@ namespace types {
         type_check_internal(module, environment, context);
         std::ranges::copy(context.messages, std::back_inserter(result.messages));
         result.registeredTypes = std::move(context.currentScope->registeredTypes());
+        context.currentScope = nullptr; // release scope memory
+        context.module = nullptr;
     }
 
 
@@ -2526,5 +2553,7 @@ namespace types {
         }
         module->nodes = std::move(oldNodes);
         std::ranges::copy(context.messages, std::back_inserter(result.messages));
+        context.currentScope = nullptr; // release scope memory
+        context.module = nullptr;
     }
 }

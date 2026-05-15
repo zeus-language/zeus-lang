@@ -74,5 +74,8 @@ namespace compiler {
             compile(options, inputPath.filename().replace_extension().string(), errorStream, outputStream,
                     result.module, typeCheckResult.registeredTypes);
         }
+        typeCheckResult.registeredTypes.clear();
+        result.module = nullptr;
+        moduleCache.clear();
     }
 }

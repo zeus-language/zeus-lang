@@ -51,6 +51,7 @@
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/IfCondition.h"
+#include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
@@ -483,6 +484,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::LambdaExpression *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState);
+
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
             return;
@@ -600,10 +603,20 @@ namespace llvm_backend {
         if (const auto lambdaExpr = dynamic_cast<ast::LambdaExpression *>(node)) {
             return llvm_backend::codegen(lambdaExpr, llvmState);
         }
+        if (const auto interpolatedString = dynamic_cast<ast::InterpolatedString *>(node)) {
+            return llvm_backend::codegen(interpolatedString, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState) {
+        for (const auto &part: node->nodes()) {
+            const auto value = codegen_base(part.get(), llvmState);
+        }
+        return codegen_base(node->accessNode().get(), llvmState);
     }
 
     llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState) {
@@ -2876,12 +2889,10 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
                 continue;
             }
             for (auto &method: structType->methods()) {
-                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
-                llvm_backend::codegen_functionstub(methodDef, context);
+                llvm_backend::codegen_functionstub(method.get(), context);
             }
             for (auto &method: structType->methods()) {
-                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
-                llvm_backend::codegen(dynamic_cast<ast::FunctionDefinition *>(method.get()), context);
+                llvm_backend::codegen(method.get(), context);
             }
         }
     }

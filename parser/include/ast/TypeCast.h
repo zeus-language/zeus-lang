@@ -7,8 +7,9 @@ namespace ast {
         std::shared_ptr<RawType> m_type;
 
     public:
-        TypeCast(const Token &token, std::shared_ptr<RawType> type, std::shared_ptr<ASTNode> value) : ASTNode(token),
-            m_value(std::move(value)), m_type(std::move(type)) {
+        TypeCast(const Token &token, std::shared_ptr<RawType> type,
+                 std::shared_ptr<ASTNode> value) : ASTNode(token, NodeType::TYPE_CAST),
+                                                   m_value(std::move(value)), m_type(std::move(type)) {
         }
 
         ~TypeCast() override = default;

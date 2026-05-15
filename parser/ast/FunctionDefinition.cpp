@@ -18,6 +18,11 @@ namespace ast {
           m_blockNode(std::move(blockNode)), genericParam(std::move(genericParam)) {
     }
 
+    FunctionDefinition::~FunctionDefinition() {
+        m_blockNode.reset();
+        m_parentStruct = nullptr;
+    }
+
     std::optional<ASTNode *> FunctionDefinition::getVariableDefinition(const Token &token) const {
         if (auto accessNode = m_blockNode->getVariableDefinition(token.lexical()); accessNode.has_value()) {
             return accessNode;
@@ -63,7 +68,7 @@ namespace ast {
     }
 
     bool FunctionDefinition::isMethod() const {
-        return m_parentStruct.has_value();
+        return m_parentStruct != nullptr;
     }
 
     std::optional<ASTNode *> FunctionDefinition::getNodeByToken(const Token &token) const {

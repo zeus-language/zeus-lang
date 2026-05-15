@@ -138,6 +138,8 @@ namespace parser {
 
         Module() = default;
 
+        ~Module() = default;
+
         // Copy constructor
         Module(const Module &other);
     };

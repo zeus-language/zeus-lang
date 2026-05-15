@@ -49,7 +49,7 @@ namespace ast {
     private:
         Token m_token;
         NodeType m_nodeType = NodeType::OTHER;
-        std::shared_ptr<types::VariableType> m_expressionType = nullptr;
+        std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
 
     protected:
         explicit ASTNode(Token token, NodeType nodeType) : m_token(std::move(token)), m_nodeType(nodeType) {
@@ -67,14 +67,14 @@ namespace ast {
         }
 
         virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) {
-            if (!m_expressionType) {
+            if (!m_expressionType.has_value()) {
                 return;
             }
-            if (m_expressionType->typeKind() == types::TypeKind::GENERIC) {
+            if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
                 m_expressionType = genericParam;
-            } else if (m_expressionType->typeKind() == types::TypeKind::POINTER ||
-                       m_expressionType->typeKind() == types::TypeKind::ARRAY) {
-                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType)) {
+            } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
+                       m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
+                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
                     if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
                         auto newBaseType = genericParam;
                         const auto newPtrType = std::make_shared<types::PointerType>(
@@ -94,11 +94,15 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
-            return (m_expressionType == nullptr) ? std::nullopt : std::make_optional(m_expressionType);
+        [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
+            return (m_expressionType.has_value())
+                       ? std::make_optional(m_expressionType.value())
+                       : std::nullopt;
         }
 
+
         void setExpressionType(const std::shared_ptr<types::VariableType> &type) {
+            assert(type != nullptr);
             m_expressionType = type;
         }
 

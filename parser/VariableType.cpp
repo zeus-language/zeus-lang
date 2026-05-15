@@ -17,11 +17,11 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
 }
 
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
-                              std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
+                              const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
                               std::optional<std::shared_ptr<VariableType> > genericParam) : VariableType(
         std::move(name),
         TypeKind::STRUCT), m_fields(fields),
-    m_methods(std::move(methods)), m_genericParam(std::move(genericParam)) {
+    m_methods(methods), m_genericParam(std::move(genericParam)) {
     m_typename = VariableType::name() + (
                      m_genericParam.has_value() ? "<" + m_genericParam.value()->name() + ">" : "");
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
@@ -29,8 +29,8 @@ types::StructType::StructType(std::string name, const std::vector<StructField> &
 
 const ast::FunctionDefinition *types::StructType::getMethodByName(const std::string &methodName) const {
     for (const auto &method: m_methods) {
-        if (method->functionName() == methodName) {
-            return method.get();
+        if (method.lock()->functionName() == methodName) {
+            return method.lock().get();
         }
     }
     return nullptr;
@@ -46,7 +46,8 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
     }
     std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
 
-    for (const auto &method: this->m_methods) {
+    for (const auto &methodPtr: this->m_methods) {
+        auto method = methodPtr.lock();
         auto returnType = std::make_optional(method->returnType().value()->clone());
         Token token = method->expressionToken();
         std::vector<ast::FunctionArgument> args;
@@ -98,11 +99,10 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
         for (auto &stmt: functionClone->block()->statements()) {
             stmt->makeNonGeneric(genericParam);
         }
-        methods.push_back(std::move(functionClone));
+        methods.push_back(functionClone);
     }
 
-    auto structType = std::make_shared<StructType>(VariableType::rawTypeName(), fields, std::move(methods),
-                                                   genericParam);
+    auto structType = std::make_shared<NonGenericStructType>(VariableType::rawTypeName(), fields, std::move(methods));
 
     for (auto &method: structType->methods()) {
         for (auto &arg: method->args()) {
@@ -133,6 +133,6 @@ types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> base
             .name = "data"
         }
     },
-    std::move(std::vector<std::shared_ptr<ast::FunctionDefinition> >{}), std::nullopt) {
+    std::vector<std::weak_ptr<ast::FunctionDefinition> >{}, std::nullopt) {
     setTypeKind(TypeKind::SLICE);
 }
