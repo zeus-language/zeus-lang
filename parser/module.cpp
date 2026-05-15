@@ -122,6 +122,10 @@ namespace modules {
         entries[path] = module; //std::make_shared<parser::Module>(*module);
     }
 
+    void ModuleCache::removeModule(const std::string &path) {
+        entries.erase(path);
+    }
+
     std::vector<std::shared_ptr<parser::Module> > ModuleCache::findModulesByPathStart(
         const std::vector<Token> &pathTokens) const {
         std::vector<std::shared_ptr<parser::Module> > result;

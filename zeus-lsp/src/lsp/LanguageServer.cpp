@@ -103,6 +103,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
 
     auto result = parser::parse_tokens(tokens);
     std::vector<std::filesystem::path> includeDirs;
+    includeDirs.reserve(rtlDirectories.size() + 1);
     for (auto &dir: rtlDirectories) {
         if (std::filesystem::exists(dir)) {
             includeDirs.push_back(dir);
@@ -154,6 +155,8 @@ std::optional<int> mapTokenType(const Token::Type type) {
         case Token::Type::INTERPOLATED_STRING:
         case Token::Type::INTERPOLATION_START:
         case Token::Type::INTERPOLATION_END:
+        case Token::Type::UNCLOSED_RAW_WIDE_STRING:
+        case Token::Type::RAW_WIDE_STRING:
         case Token::Type::CHAR:
             return 16;
         case Token::Type::NUMBER:
@@ -378,6 +381,7 @@ void LanguageServer::handleRequest() {
                 .add<lsp::notifications::TextDocument_DidClose>(
                     [&](lsp::notifications::TextDocument_DidClose::Params &&params) {
                         m_openDocuments.erase(params.textDocument.uri.toString());
+                        m_moduleCache.removeModule(params.textDocument.uri.toString());
                     })
                 .add<lsp::requests::TextDocument_Definition>(
                     [&](lsp::requests::TextDocument_Definition::Params &&params) {
@@ -463,14 +467,18 @@ void LanguageServer::handleRequest() {
 lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semanticTokensFull(const
     lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
     auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+    auto startTime = std::chrono::high_resolution_clock::now();
     const auto uri = params.textDocument.uri.toString();
     const auto [documentUri, text] = m_openDocuments.at(uri);
     const auto tokens = lexer::lex_file(uri, text, false);
+    std::cerr << "Lexing took " << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - startTime).count() << "ms\n";
     auto semanticTokens = lsp::SemanticTokens{
         .data = std::vector<uint32_t>{}
     };
     size_t lastRow = 0;
     size_t lastCol = 0;
+
     for (const auto &token: tokens) {
         if (auto tokenType = mapTokenType(token.type)) {
             // Use helper function to properly handle multi-line tokens
@@ -480,6 +488,8 @@ lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semantic
         }
     }
     result.emplace(semanticTokens);
+    std::cerr << "Semantic tokenization took " << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - startTime).count() << "ms\n";
     return result;
 }
 

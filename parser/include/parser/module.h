@@ -16,6 +16,8 @@ namespace modules {
 
         void addModule(const std::string &path, const std::shared_ptr<parser::Module> &module);
 
+        void removeModule(const std::string &path);
+
         [[nodiscard]] bool containsModule(const std::string &path) const {
             return entries.contains(path);
         }

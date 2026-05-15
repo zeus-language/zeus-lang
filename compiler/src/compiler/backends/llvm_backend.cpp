@@ -2964,6 +2964,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {
+        delete TheTargetMachine;
         return;
     }
 
@@ -2972,4 +2973,5 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
             errorStream << "program could not be executed!\n";
         }
     }
+    delete TheTargetMachine;
 }

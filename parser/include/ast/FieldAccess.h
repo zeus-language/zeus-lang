@@ -18,7 +18,7 @@ namespace ast {
             m_accessNode(std::move(accessNode)) {
         }
 
-        [[nodiscard]] const Token& fieldName() const {
+        [[nodiscard]] const Token &fieldName() const {
             return expressionToken();
         }
 
@@ -36,7 +36,7 @@ namespace ast {
 
         FieldAccess &operator=(const FieldAccess &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> >& structType() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > &structType() const {
             return m_structType;
         }
 
@@ -58,7 +58,7 @@ namespace ast {
         }
 
         std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<FieldAccess>(expressionToken(), m_accessNode->clone());
+            auto cloneNode = std::make_unique<FieldAccess>(expressionToken(), std::move(m_accessNode->clone()));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             if (m_structType)

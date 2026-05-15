@@ -2440,7 +2440,7 @@ namespace types {
                     });
                 }
                 std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
-                methods.reserve(structDecl->methods().size());
+                //methods.reserve(structDecl->methods().size());
                 for (const auto &method: structDecl->methods()) {
                     methods.push_back(method->cloneFunction2());
                 }

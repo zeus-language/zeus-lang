@@ -49,7 +49,7 @@ namespace ast {
     private:
         Token m_token;
         NodeType m_nodeType = NodeType::OTHER;
-        std::optional<std::shared_ptr<types::VariableType> > m_expressionType = std::nullopt;
+        std::shared_ptr<types::VariableType> m_expressionType = nullptr;
 
     protected:
         explicit ASTNode(Token token, NodeType nodeType) : m_token(std::move(token)), m_nodeType(nodeType) {
@@ -67,18 +67,19 @@ namespace ast {
         }
 
         virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) {
-            if (!m_expressionType.has_value()) {
+            if (!m_expressionType) {
                 return;
             }
-            if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
-                m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
-            } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
-                       m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
-                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
+            if (m_expressionType->typeKind() == types::TypeKind::GENERIC) {
+                m_expressionType = genericParam;
+            } else if (m_expressionType->typeKind() == types::TypeKind::POINTER ||
+                       m_expressionType->typeKind() == types::TypeKind::ARRAY) {
+                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType)) {
                     if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
                         auto newBaseType = genericParam;
-                        auto newPtrType = std::make_shared<types::PointerType>("*" + newBaseType->name(), newBaseType);
-                        m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(newPtrType);
+                        const auto newPtrType = std::make_shared<types::PointerType>(
+                            "*" + newBaseType->name(), newBaseType);
+                        m_expressionType = newPtrType;
                     }
                 }
             }
@@ -93,12 +94,12 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > &expressionType() const {
-            return m_expressionType;
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
+            return (m_expressionType == nullptr) ? std::nullopt : std::make_optional(m_expressionType);
         }
 
         void setExpressionType(const std::shared_ptr<types::VariableType> &type) {
-            m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
+            m_expressionType = type;
         }
 
         [[nodiscard]] virtual bool constant() const {
