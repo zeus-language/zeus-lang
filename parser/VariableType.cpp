@@ -17,7 +17,7 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
 }
 
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
-                              std::vector<std::unique_ptr<ast::FunctionDefinition> > methods,
+                              std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
                               std::optional<std::shared_ptr<VariableType> > genericParam) : VariableType(
         std::move(name),
         TypeKind::STRUCT), m_fields(fields),
@@ -44,7 +44,7 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
             field.type = genericParam;
         }
     }
-    std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
+    std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
 
     for (const auto &method: this->m_methods) {
         auto returnType = std::make_optional(method->returnType().value()->clone());
@@ -66,12 +66,12 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
         }
         auto statements = method->block()->cloneBlock();
 
-        auto annotations = std::vector<std::unique_ptr<ast::RawAnnotation> >();
+        auto annotations = std::vector<std::shared_ptr<ast::RawAnnotation> >();
         for (auto &annotationOld: method->rawAnnotations()) {
             annotations.push_back(std::move(annotationOld->cloneAnnotation()));
         }
 
-        auto functionClone = std::make_unique<ast::FunctionDefinition>(
+        auto functionClone = std::make_shared<ast::FunctionDefinition>(
             std::move(token),
             std::move(args),
             std::move(returnType),
@@ -133,6 +133,6 @@ types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> base
             .name = "data"
         }
     },
-    std::move(std::vector<std::unique_ptr<ast::FunctionDefinition> >{}), std::nullopt) {
+    std::move(std::vector<std::shared_ptr<ast::FunctionDefinition> >{}), std::nullopt) {
     setTypeKind(TypeKind::SLICE);
 }

@@ -12,14 +12,14 @@
 namespace ast {
     class ArrayAssignment final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
-        std::unique_ptr<ASTNode> m_value;
-        std::unique_ptr<ASTNode> m_index;
+        std::shared_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_value;
+        std::shared_ptr<ASTNode> m_index;
         std::shared_ptr<types::VariableType> m_arrayType = nullptr;
 
     public:
-        explicit ArrayAssignment(Token name, std::unique_ptr<ASTNode> accessNode, std::unique_ptr<ASTNode> expression,
-                                 std::unique_ptr<ASTNode> index)
+        explicit ArrayAssignment(Token name, std::shared_ptr<ASTNode> accessNode, std::shared_ptr<ASTNode> expression,
+                                 std::shared_ptr<ASTNode> index)
             : ASTNode(std::move(name)), m_accessNode(std::move(accessNode)), m_value(std::move(expression)),
               m_index(std::move(index)) {
         }
@@ -75,8 +75,8 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<ArrayAssignment *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<ArrayAssignment>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<ArrayAssignment>(expressionToken(),
                                                                m_accessNode->clone(),
                                                                m_value->clone(),
                                                                m_index->clone());

@@ -10,13 +10,13 @@ namespace ast {
 
     class OperatorNode : public ASTNode {
     protected:
-        std::unique_ptr<ASTNode> m_lhs;
-        std::unique_ptr<ASTNode> m_rhs;
+        std::shared_ptr<ASTNode> m_lhs;
+        std::shared_ptr<ASTNode> m_rhs;
         std::optional<ast::FunctionDefinitionBase *> m_operatorFunction = std::nullopt;
 
     public:
-        explicit OperatorNode(Token name, const NodeType type, std::unique_ptr<ASTNode> lhs,
-                              std::unique_ptr<ASTNode> rhs) : ASTNode(std::move(name), type),
+        explicit OperatorNode(Token name, const NodeType type, std::shared_ptr<ASTNode> lhs,
+                              std::shared_ptr<ASTNode> rhs) : ASTNode(std::move(name), type),
                                                               m_lhs(std::move(lhs)),
                                                               m_rhs(std::move(rhs)) {
         }
@@ -24,10 +24,10 @@ namespace ast {
         ~OperatorNode() override = default;
 
         [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
-        [[nodiscard]] std::unique_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
+        [[nodiscard]] std::shared_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
         [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
-        void setLhs(std::unique_ptr<ASTNode> lhs) { m_lhs = std::move(lhs); }
-        void setRhs(std::unique_ptr<ASTNode> rhs) { m_rhs = std::move(rhs); }
+        void setLhs(std::shared_ptr<ASTNode> lhs) { m_lhs = std::move(lhs); }
+        void setRhs(std::shared_ptr<ASTNode> rhs) { m_rhs = std::move(rhs); }
 
         [[nodiscard]] virtual std::string operatorFunctionName() const = 0;
 

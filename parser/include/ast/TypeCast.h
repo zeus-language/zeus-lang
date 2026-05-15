@@ -3,11 +3,11 @@
 
 namespace ast {
     class TypeCast : public ASTNode {
-        std::unique_ptr<ASTNode> m_value;
-        std::unique_ptr<RawType> m_type;
+        std::shared_ptr<ASTNode> m_value;
+        std::shared_ptr<RawType> m_type;
 
     public:
-        TypeCast(const Token &token, std::unique_ptr<RawType> type, std::unique_ptr<ASTNode> value) : ASTNode(token),
+        TypeCast(const Token &token, std::shared_ptr<RawType> type, std::shared_ptr<ASTNode> value) : ASTNode(token),
             m_value(std::move(value)), m_type(std::move(type)) {
         }
 
@@ -32,8 +32,8 @@ namespace ast {
             return m_value->constant();
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<TypeCast>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<TypeCast>(expressionToken(),
                                                         m_type->clone(),
                                                         m_value->clone());
             if (expressionType())

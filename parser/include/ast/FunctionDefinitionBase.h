@@ -11,12 +11,12 @@
 namespace ast {
     struct FunctionArgument {
         Token name;
-        std::optional<std::unique_ptr<RawType> > rawType;
+        std::optional<std::shared_ptr<RawType> > rawType;
         bool isConstant;
 
         std::optional<std::shared_ptr<types::VariableType> > type = std::nullopt;
 
-        FunctionArgument(Token name, std::optional<std::unique_ptr<RawType> > type, const bool isConstant)
+        FunctionArgument(Token name, std::optional<std::shared_ptr<RawType> > type, const bool isConstant)
             : name(std::move(name)), rawType(std::move(type)), isConstant(isConstant) {
         }
 
@@ -30,10 +30,10 @@ namespace ast {
     class FunctionDefinitionBase : public AnnotatedNode {
         std::string m_functionName;
         std::vector<FunctionArgument> m_args;
-        std::optional<std::unique_ptr<RawType> > m_returnType;
+        std::optional<std::shared_ptr<RawType> > m_returnType;
         std::optional<std::shared_ptr<types::VariableType> > m_resolvedReturnTyoe = std::nullopt;
         std::vector<Token> m_namespacePrefix;
-        std::vector<std::unique_ptr<RawAnnotation> > m_rawAnnotations;
+        std::vector<std::shared_ptr<RawAnnotation> > m_rawAnnotations;
         VisibilityModifier m_visibilityModifier = VisibilityModifier::PRIVATE;
         std::string m_modulePathName;
 
@@ -44,8 +44,8 @@ namespace ast {
 
     public:
         explicit FunctionDefinitionBase(const Token &functionName, std::vector<FunctionArgument> args,
-                                        std::optional<std::unique_ptr<RawType> > returnType,
-                                        std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                        std::optional<std::shared_ptr<RawType> > returnType,
+                                        std::vector<std::shared_ptr<RawAnnotation> > annotations,
                                         const VisibilityModifier visibilityModifier);
 
         [[nodiscard]] std::optional<RawType *> returnType() const {
@@ -53,7 +53,7 @@ namespace ast {
         }
 
 
-        void setReturnType(std::unique_ptr<ast::RawType> type) {
+        void setReturnType(std::shared_ptr<ast::RawType> type) {
             m_returnType = std::move(type);
         }
 
@@ -82,7 +82,7 @@ namespace ast {
 
         [[nodiscard]] std::shared_ptr<types::VariableType> asFunctionType() const;
 
-        std::vector<std::unique_ptr<RawAnnotation> > &rawAnnotations() {
+        std::vector<std::shared_ptr<RawAnnotation> > &rawAnnotations() {
             return m_rawAnnotations;
         }
 
@@ -92,7 +92,7 @@ namespace ast {
             return m_visibilityModifier;
         }
 
-        virtual std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() = 0;
+        virtual std::shared_ptr<ast::FunctionDefinitionBase> cloneFunction() = 0;
 
         [[nodiscard]] virtual bool isMethod() const = 0;
 

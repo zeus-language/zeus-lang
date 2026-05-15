@@ -10,31 +10,31 @@
 #include "ast/WhileLoop.h"
 
 namespace ast {
-    BlockNode::BlockNode(const Token &token, std::vector<std::unique_ptr<ASTNode> > statements)
+    BlockNode::BlockNode(const Token &token, std::vector<std::shared_ptr<ASTNode> > statements)
         : ASTNode(token), m_statements(std::move(statements)) {
     }
 
-    std::vector<std::unique_ptr<ASTNode> > &BlockNode::statements() {
+    std::vector<std::shared_ptr<ASTNode> > &BlockNode::statements() {
         return m_statements;
     }
 
-    void BlockNode::setStatements(std::vector<std::unique_ptr<ASTNode> > statements) {
+    void BlockNode::setStatements(std::vector<std::shared_ptr<ASTNode> > statements) {
         m_statements = std::move(statements);
     }
 
-    std::unique_ptr<BlockNode> BlockNode::cloneBlock() const {
-        std::vector<std::unique_ptr<ASTNode> > statementsClone;
+    std::shared_ptr<BlockNode> BlockNode::cloneBlock() const {
+        std::vector<std::shared_ptr<ASTNode> > statementsClone;
         statementsClone.reserve(m_statements.size());
         for (const auto &statement: m_statements) {
             statementsClone.push_back(statement->clone());
         }
-        auto cloneNode = std::make_unique<BlockNode>(expressionToken(), std::move(statementsClone));
+        auto cloneNode = std::make_shared<BlockNode>(expressionToken(), std::move(statementsClone));
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);
     }
 
-    std::unique_ptr<ASTNode> BlockNode::clone() {
+    std::shared_ptr<ASTNode> BlockNode::clone() {
         return cloneBlock();
     }
 

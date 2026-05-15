@@ -8,12 +8,12 @@
 
 namespace ast {
     class MethodCallNode : public ASTNode {
-        std::unique_ptr<ASTNode> m_instanceNode;
-        std::vector<std::unique_ptr<ASTNode> > m_args;
+        std::shared_ptr<ASTNode> m_instanceNode;
+        std::vector<std::shared_ptr<ASTNode> > m_args;
 
     public:
-        explicit MethodCallNode(Token functionName, std::unique_ptr<ASTNode> instanceNode,
-                                std::vector<std::unique_ptr<ASTNode> > args) : ASTNode(std::move(functionName),
+        explicit MethodCallNode(Token functionName, std::shared_ptr<ASTNode> instanceNode,
+                                std::vector<std::shared_ptr<ASTNode> > args) : ASTNode(std::move(functionName),
                                                                                    ast::NodeType::METHOD_CALL),
                                                                                m_instanceNode(std::move(instanceNode)),
                                                                                m_args(std::move(args)) {
@@ -24,7 +24,7 @@ namespace ast {
         [[nodiscard]] std::string functionName() const { return expressionToken().lexical(); }
 
 
-        std::vector<std::unique_ptr<ASTNode> > &args() { return m_args; }
+        std::vector<std::shared_ptr<ASTNode> > &args() { return m_args; }
 
         [[nodiscard]] std::string functionSignature() const {
             std::string signature;
@@ -75,13 +75,13 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<MethodCallNode *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            std::vector<std::unique_ptr<ASTNode> > argsClones;
+        std::shared_ptr<ASTNode> clone() override {
+            std::vector<std::shared_ptr<ASTNode> > argsClones;
             argsClones.reserve(m_args.size());
             for (const auto &arg: m_args) {
                 argsClones.push_back(arg->clone());
             }
-            auto cloneNode = std::make_unique<MethodCallNode>(expressionToken(),
+            auto cloneNode = std::make_shared<MethodCallNode>(expressionToken(),
                                                               m_instanceNode->clone(),
                                                               std::move(argsClones));
             if (expressionType())

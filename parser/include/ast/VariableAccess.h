@@ -33,9 +33,9 @@ namespace ast {
             return m_constant;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             auto name = expressionToken();
-            auto cloneNode = std::make_unique<VariableAccess>(name);
+            auto cloneNode = std::make_shared<VariableAccess>(name);
             cloneNode->setConstant(m_constant);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

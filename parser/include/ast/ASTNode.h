@@ -61,7 +61,7 @@ namespace ast {
     public:
         virtual ~ASTNode() = default;
 
-        virtual std::unique_ptr<ASTNode> clone() {
+        virtual std::shared_ptr<ASTNode> clone() {
             assert(false && "clone not implemented for this ASTNode type");
             return nullptr;
         }

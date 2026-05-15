@@ -2,8 +2,8 @@
 
 namespace ast {
     FunctionDefinitionBase::FunctionDefinitionBase(const Token &functionName, std::vector<FunctionArgument> args,
-                                                   std::optional<std::unique_ptr<RawType> > returnType,
-                                                   std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                                   std::optional<std::shared_ptr<RawType> > returnType,
+                                                   std::vector<std::shared_ptr<RawAnnotation> > annotations,
                                                    const VisibilityModifier visibilityModifier) : AnnotatedNode(
             functionName, ast::NodeType::FUNCTION_DEFINITION),
         m_functionName(expressionToken().lexical()),

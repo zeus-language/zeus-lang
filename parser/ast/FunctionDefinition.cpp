@@ -8,10 +8,10 @@
 
 namespace ast {
     FunctionDefinition::FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
-                                           std::optional<std::unique_ptr<RawType> > returnType,
-                                           std::unique_ptr<BlockNode> blockNode,
+                                           std::optional<std::shared_ptr<RawType> > returnType,
+                                           std::shared_ptr<BlockNode> blockNode,
                                            std::optional<Token> genericParam,
-                                           std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                           std::vector<std::shared_ptr<RawAnnotation> > annotations,
                                            const VisibilityModifier visibilityModifier)
         : FunctionDefinitionBase(functionName, std::move(args), std::move(returnType),
                                  std::move(annotations), visibilityModifier),
@@ -31,20 +31,20 @@ namespace ast {
         return std::nullopt;
     }
 
-    std::unique_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
+    std::shared_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
         return cloneFunction2();
     }
 
-    std::unique_ptr<ast::FunctionDefinition> FunctionDefinition::cloneFunction2() {
+    std::shared_ptr<ast::FunctionDefinition> FunctionDefinition::cloneFunction2() {
         auto returnTypeClone = returnType().has_value()
-                                   ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                   ? std::make_optional<std::shared_ptr<RawType> >(returnType().value()->clone())
                                    : std::nullopt;
         auto block = m_blockNode->cloneBlock();
-        std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
+        std::vector<std::shared_ptr<RawAnnotation> > annotationsClones;
         for (const auto &annotation: rawAnnotations()) {
             annotationsClones.push_back(annotation->cloneAnnotation());
         }
-        auto cloneNode = std::make_unique<FunctionDefinition>(expressionToken(),
+        auto cloneNode = std::make_shared<FunctionDefinition>(expressionToken(),
                                                               args(),
                                                               std::move(returnTypeClone),
                                                               std::move(block),
@@ -67,7 +67,7 @@ namespace ast {
     }
 
     std::optional<ASTNode *> FunctionDefinition::getNodeByToken(const Token &token) const {
-        if (auto result = FunctionDefinitionBase::getNodeByToken(token)) {
+        if (const auto result = FunctionDefinitionBase::getNodeByToken(token)) {
             return result;
         }
         for (const auto &arg: args()) {
@@ -75,7 +75,7 @@ namespace ast {
                 return std::make_optional<ASTNode *>(const_cast<FunctionDefinition *>(this));
             }
         }
-        if (auto result = block()->getNodeByToken(token)) {
+        if (const auto result = block()->getNodeByToken(token)) {
             return result;
         }
         return std::nullopt;

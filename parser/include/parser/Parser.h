@@ -80,11 +80,11 @@ namespace parser {
     public:
         bool isTypeChecked = false;
         std::vector<std::shared_ptr<Module> > modules;
-        std::vector<std::unique_ptr<ast::ASTNode> > nodes;
-        std::vector<std::unique_ptr<ast::RawType> > externTypes;
-        std::vector<std::unique_ptr<ast::FunctionDefinitionBase> > functions;
+        std::vector<std::shared_ptr<ast::ASTNode> > nodes;
+        std::vector<std::shared_ptr<ast::RawType> > externTypes;
+        std::vector<std::shared_ptr<ast::FunctionDefinitionBase> > functions;
 
-        std::vector<std::unique_ptr<ast::UseModule> > useModuleNodes;
+        std::vector<std::shared_ptr<ast::UseModule> > useModuleNodes;
 
         std::optional<std::string> aliasName;
         std::filesystem::path sourceFilePath;

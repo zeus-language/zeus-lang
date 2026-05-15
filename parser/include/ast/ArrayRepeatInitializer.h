@@ -4,12 +4,12 @@
 namespace ast {
     class ArrayRepeatInitializer final : public ASTNode {
     private:
-        std::unique_ptr<ast::ASTNode> m_value;
-        std::unique_ptr<ast::ASTNode> m_count;
+        std::shared_ptr<ast::ASTNode> m_value;
+        std::shared_ptr<ast::ASTNode> m_count;
 
     public:
-        ArrayRepeatInitializer(Token token, std::unique_ptr<ast::ASTNode> value,
-                               std::unique_ptr<ast::ASTNode> count)
+        ArrayRepeatInitializer(Token token, std::shared_ptr<ast::ASTNode> value,
+                               std::shared_ptr<ast::ASTNode> count)
             : ASTNode(std::move(token)), m_value(std::move(value)), m_count(std::move(count)) {
         }
 
@@ -35,10 +35,10 @@ namespace ast {
             return true;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             auto values = m_value->clone();
             auto counts = m_count->clone();
-            auto cloneNode = std::make_unique<ArrayRepeatInitializer>(expressionToken(),
+            auto cloneNode = std::make_shared<ArrayRepeatInitializer>(expressionToken(),
                                                                       std::move(values), std::move(counts));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

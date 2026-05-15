@@ -12,10 +12,10 @@
 
 namespace ast {
     class ReturnStatement final : public ASTNode {
-        std::optional<std::unique_ptr<ASTNode> > m_returnValue;
+        std::optional<std::shared_ptr<ASTNode> > m_returnValue;
 
     public:
-        explicit ReturnStatement(Token returnToken, std::optional<std::unique_ptr<ASTNode> > returnValue);
+        explicit ReturnStatement(Token returnToken, std::optional<std::shared_ptr<ASTNode> > returnValue);
 
         [[nodiscard]] std::optional<ASTNode *> returnValue() const {
             return m_returnValue.has_value() ? std::make_optional(m_returnValue.value().get()) : std::nullopt;
@@ -38,12 +38,12 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            std::optional<std::unique_ptr<ASTNode> > returnValueClone = std::nullopt;
+        std::shared_ptr<ASTNode> clone() override {
+            std::optional<std::shared_ptr<ASTNode> > returnValueClone = std::nullopt;
             if (m_returnValue.has_value()) {
-                returnValueClone = std::make_optional<std::unique_ptr<ASTNode> >(m_returnValue.value()->clone());
+                returnValueClone = std::make_optional<std::shared_ptr<ASTNode> >(m_returnValue.value()->clone());
             }
-            auto cloneNode = std::make_unique<ReturnStatement>(expressionToken(), std::move(returnValueClone));
+            auto cloneNode = std::make_shared<ReturnStatement>(expressionToken(), std::move(returnValueClone));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

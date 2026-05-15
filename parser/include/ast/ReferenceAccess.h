@@ -9,10 +9,10 @@
 namespace ast {
     class ReferenceAccess final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_accessNode;
 
     public:
-        explicit ReferenceAccess(Token name, std::unique_ptr<ASTNode> accessNode) : ASTNode(std::move(name),
+        explicit ReferenceAccess(Token name, std::shared_ptr<ASTNode> accessNode) : ASTNode(std::move(name),
                 NodeType::REFERENCE_ACCESS),
             m_accessNode(std::move(accessNode)) {
         }
@@ -47,8 +47,8 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<ReferenceAccess *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<ReferenceAccess>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<ReferenceAccess>(expressionToken(),
                                                                m_accessNode->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

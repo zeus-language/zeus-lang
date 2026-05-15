@@ -5,17 +5,17 @@
 #include "ast/ExternFunctionDefinition.h"
 
 namespace ast {
-    std::unique_ptr<ast::FunctionDefinitionBase> ExternFunctionDefinition::cloneFunction() {
+    std::shared_ptr<ast::FunctionDefinitionBase> ExternFunctionDefinition::cloneFunction() {
         auto returnTypeClone = returnType().has_value()
-                                   ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                   ? std::make_optional<std::shared_ptr<RawType> >(returnType().value()->clone())
                                    : std::nullopt;
-        std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
+        std::vector<std::shared_ptr<RawAnnotation> > annotationsClones;
         for (auto &annotation: rawAnnotations()) {
             annotationsClones.push_back(annotation->cloneAnnotation());
         }
 
 
-        auto cloneNode = std::make_unique<ExternFunctionDefinition>(expressionToken(),
+        auto cloneNode = std::make_shared<ExternFunctionDefinition>(expressionToken(),
                                                                     args(),
                                                                     std::move(returnTypeClone),
                                                                     std::move(annotationsClones),

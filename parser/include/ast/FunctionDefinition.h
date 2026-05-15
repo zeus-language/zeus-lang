@@ -4,16 +4,16 @@
 
 namespace ast {
     class FunctionDefinition final : public FunctionDefinitionBase {
-        std::unique_ptr<BlockNode> m_blockNode;
+        std::shared_ptr<BlockNode> m_blockNode;
         std::optional<Token> genericParam;
         std::optional<types::VariableType *> m_parentStruct = std::nullopt;
 
     public:
         explicit FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
-                                    std::optional<std::unique_ptr<RawType> > returnType,
-                                    std::unique_ptr<BlockNode> blockNode,
+                                    std::optional<std::shared_ptr<RawType> > returnType,
+                                    std::shared_ptr<BlockNode> blockNode,
                                     std::optional<Token> genericParam,
-                                    std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                    std::vector<std::shared_ptr<RawAnnotation> > annotations,
                                     const VisibilityModifier visibilityModifier
         );
 
@@ -37,9 +37,9 @@ namespace ast {
             return genericParam;
         }
 
-        std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
+        std::shared_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
 
-        std::unique_ptr<ast::FunctionDefinition> cloneFunction2();
+        std::shared_ptr<ast::FunctionDefinition> cloneFunction2();
 
         [[nodiscard]] bool isMethod() const override;
 

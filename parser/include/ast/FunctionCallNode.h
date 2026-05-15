@@ -13,13 +13,13 @@
 namespace ast {
     class FunctionCallNode : public ASTNode {
         std::vector<Token> m_namespacePrefix;
-        std::vector<std::unique_ptr<ASTNode> > m_args;
+        std::vector<std::shared_ptr<ASTNode> > m_args;
         std::optional<Token> m_genericParam;
         std::optional<std::shared_ptr<types::VariableType> > m_genericType = std::nullopt;
 
     public:
         explicit FunctionCallNode(Token functionName, std::vector<Token> namespacePrefix,
-                                  std::vector<std::unique_ptr<ASTNode> > args, std::optional<Token> genericParam);
+                                  std::vector<std::shared_ptr<ASTNode> > args, std::optional<Token> genericParam);
 
         ~FunctionCallNode() override = default;
 
@@ -37,7 +37,7 @@ namespace ast {
             return name;
         }
 
-        std::vector<std::unique_ptr<ASTNode> > &args() { return m_args; }
+        std::vector<std::shared_ptr<ASTNode> > &args() { return m_args; }
 
         [[nodiscard]] std::string functionSignature() const;
 
@@ -72,7 +72,7 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<FunctionCallNode *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
 
         void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
             ASTNode::makeNonGeneric(genericParam);

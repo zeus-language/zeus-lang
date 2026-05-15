@@ -4,19 +4,19 @@
 
 namespace ast {
     class TypeDefinition : public ASTNode {
-        std::unique_ptr<ast::RawType> m_type;
+        std::shared_ptr<ast::RawType> m_type;
 
     public:
         TypeDefinition(const Token &token,
-                       std::unique_ptr<ast::RawType> type) : ASTNode(token), m_type(std::move(type)) {
+                       std::shared_ptr<ast::RawType> type) : ASTNode(token), m_type(std::move(type)) {
         }
 
-        const std::unique_ptr<ast::RawType> &getType() const {
+        const std::shared_ptr<ast::RawType> &getType() const {
             return m_type;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloned = std::make_unique<TypeDefinition>(expressionToken(), m_type->clone());
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloned = std::make_shared<TypeDefinition>(expressionToken(), m_type->clone());
             if (expressionType()) {
                 cloned->setExpressionType(expressionType().value());
             }

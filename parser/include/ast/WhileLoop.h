@@ -3,12 +3,12 @@
 
 namespace ast {
     class WhileLoop final : public ASTNode {
-        std::unique_ptr<BlockNode> m_block;
-        std::unique_ptr<ASTNode> m_condition;
+        std::shared_ptr<BlockNode> m_block;
+        std::shared_ptr<ASTNode> m_condition;
 
     public:
-        WhileLoop(Token whileToken, std::unique_ptr<ASTNode> condition,
-                  std::unique_ptr<BlockNode> block) : ASTNode(std::move(whileToken), NodeType::WHILE_LOOP),
+        WhileLoop(Token whileToken, std::shared_ptr<ASTNode> condition,
+                  std::shared_ptr<BlockNode> block) : ASTNode(std::move(whileToken), NodeType::WHILE_LOOP),
                                                       m_block(std::move(block)),
                                                       m_condition(std::move(condition)) {
         }
@@ -35,9 +35,9 @@ namespace ast {
             return m_block->getNodeByToken(token);
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             auto blockClones = m_block->cloneBlock();
-            auto cloneNode = std::make_unique<WhileLoop>(expressionToken(),
+            auto cloneNode = std::make_shared<WhileLoop>(expressionToken(),
                                                          m_condition->clone(),
                                                          std::move(blockClones));
             if (expressionType())

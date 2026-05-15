@@ -5,13 +5,13 @@
 
 namespace ast {
     class IfCondition final : public ASTNode {
-        std::unique_ptr<ASTNode> m_condition;
-        std::unique_ptr<BlockNode> m_ifBlock;
-        std::optional<std::unique_ptr<BlockNode> > m_elseBlock;
+        std::shared_ptr<ASTNode> m_condition;
+        std::shared_ptr<BlockNode> m_ifBlock;
+        std::optional<std::shared_ptr<BlockNode> > m_elseBlock;
 
     public:
-        IfCondition(Token token, std::unique_ptr<ASTNode> condition, std::unique_ptr<BlockNode> ifBlock,
-                    std::optional<std::unique_ptr<BlockNode> > elseBlock) : ASTNode(std::move(token),
+        IfCondition(Token token, std::shared_ptr<ASTNode> condition, std::shared_ptr<BlockNode> ifBlock,
+                    std::optional<std::shared_ptr<BlockNode> > elseBlock) : ASTNode(std::move(token),
                                                                                 NodeType::IF_STATEMENT),
                                                                             m_condition(std::move(condition)),
                                                                             m_ifBlock(std::move(ifBlock)),
@@ -54,14 +54,14 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             auto ifBlock = m_ifBlock->cloneBlock();
 
             auto elseBlock = m_elseBlock.has_value()
-                                 ? std::make_optional<std::unique_ptr<BlockNode> >(m_elseBlock.value()->cloneBlock())
+                                 ? std::make_optional<std::shared_ptr<BlockNode> >(m_elseBlock.value()->cloneBlock())
                                  : std::nullopt;
             auto conditionClone = m_condition->clone();
-            auto cloneNode = std::make_unique<IfCondition>(expressionToken(), std::move(conditionClone),
+            auto cloneNode = std::make_shared<IfCondition>(expressionToken(), std::move(conditionClone),
                                                            std::move(ifBlock), std::move(elseBlock));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

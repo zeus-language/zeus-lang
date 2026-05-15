@@ -45,14 +45,14 @@ namespace ast {
             return (m_alias.has_value()) ? std::make_optional(m_alias.value().lexical()) : std::nullopt;
         }
 
-        std::unique_ptr<UseModule> cloneModule() {
-            auto cloneNode = std::make_unique<UseModule>(m_modulePath, m_alias);
+        std::shared_ptr<UseModule> cloneModule() {
+            auto cloneNode = std::make_shared<UseModule>(m_modulePath, m_alias);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             return cloneModule();
         }
     };

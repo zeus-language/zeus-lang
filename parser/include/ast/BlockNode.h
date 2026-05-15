@@ -4,18 +4,18 @@
 namespace ast {
     class BlockNode : public ASTNode {
     private:
-        std::vector<std::unique_ptr<ASTNode> > m_statements;
+        std::vector<std::shared_ptr<ASTNode> > m_statements;
 
     public:
-        BlockNode(const Token &token, std::vector<std::unique_ptr<ASTNode> > statements);
+        BlockNode(const Token &token, std::vector<std::shared_ptr<ASTNode> > statements);
 
-        [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &statements();
+        [[nodiscard]] std::vector<std::shared_ptr<ASTNode> > &statements();
 
-        void setStatements(std::vector<std::unique_ptr<ASTNode> > statements);
+        void setStatements(std::vector<std::shared_ptr<ASTNode> > statements);
 
-        [[nodiscard]] std::unique_ptr<BlockNode> cloneBlock() const;
+        [[nodiscard]] std::shared_ptr<BlockNode> cloneBlock() const;
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
 

@@ -16,8 +16,8 @@ namespace ast {
         CMPOperator m_operator;
 
     public:
-        explicit Comparisson(Token name, CMPOperator op, std::unique_ptr<ASTNode> lhs,
-                             std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name), ast::NodeType::OTHER,
+        explicit Comparisson(Token name, CMPOperator op, std::shared_ptr<ASTNode> lhs,
+                             std::shared_ptr<ASTNode> rhs) : OperatorNode(std::move(name), ast::NodeType::OTHER,
                                                                           std::move(lhs), std::move(rhs)
                                                              ), m_operator(op) {
         }
@@ -65,8 +65,8 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<Comparisson>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<Comparisson>(expressionToken(),
                                                            m_operator,
                                                            m_lhs->clone(),
                                                            m_rhs->clone());

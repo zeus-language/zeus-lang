@@ -136,19 +136,19 @@ namespace types {
     class StructType : public VariableType {
     private:
         std::vector<StructField> m_fields;
-        std::vector<std::unique_ptr<ast::FunctionDefinition> > m_methods;
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
         std::string m_typename;
         std::string m_linkageName;
 
     public:
         StructType(std::string name, const std::vector<StructField> &fields,
-                   std::vector<std::unique_ptr<ast::FunctionDefinition> > methods,
+                   std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
                    std::optional<std::shared_ptr<VariableType> > genericParam);
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
 
-        [[nodiscard]] const std::vector<std::unique_ptr<ast::FunctionDefinition> > &methods() const {
+        [[nodiscard]] const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods() const {
             return m_methods;
         }
 

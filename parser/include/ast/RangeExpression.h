@@ -4,13 +4,13 @@
 namespace ast {
     class RangeExpression final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_start;
-        std::unique_ptr<ASTNode> m_end;
+        std::shared_ptr<ASTNode> m_start;
+        std::shared_ptr<ASTNode> m_end;
         bool m_is_inclusive = false;
 
     public:
-        explicit RangeExpression(Token name, std::unique_ptr<ASTNode> start,
-                                 std::unique_ptr<ASTNode> end, const bool is_inclusive) : ASTNode(std::move(name)),
+        explicit RangeExpression(Token name, std::shared_ptr<ASTNode> start,
+                                 std::shared_ptr<ASTNode> end, const bool is_inclusive) : ASTNode(std::move(name)),
             m_start(std::move(start)),
             m_end(std::move(end)), m_is_inclusive(is_inclusive) {
         }
@@ -53,8 +53,8 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<RangeExpression>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<RangeExpression>(expressionToken(),
                                                                m_start->clone(),
                                                                m_end->clone(),
                                                                m_is_inclusive);

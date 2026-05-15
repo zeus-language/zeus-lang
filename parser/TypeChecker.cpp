@@ -2251,7 +2251,7 @@ namespace types {
     }
 
 
-    std::optional<int64_t> resolveEnumValue(const std::optional<std::unique_ptr<ast::ASTNode> > &value,
+    std::optional<int64_t> resolveEnumValue(const std::optional<std::shared_ptr<ast::ASTNode> > &value,
                                             Context &context) {
         if (!value)
             return std::nullopt;
@@ -2315,9 +2315,9 @@ namespace types {
     }
 
 
-    std::vector<std::unique_ptr<ast::ASTNode> > eval_if_macro(ast::IfMacro *node, Context &context) {
+    std::vector<std::shared_ptr<ast::ASTNode> > eval_if_macro(ast::IfMacro *node, Context &context) {
         type_check_base(node->condition(), context);
-        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
+        std::vector<std::shared_ptr<ast::ASTNode> > resultNodes;
         if (node->condition()->expressionType()) {
             if (node->condition()->expressionType().value()->name() != "bool") {
                 context.messages.insert({
@@ -2366,7 +2366,7 @@ namespace types {
 
 
     void eval_block(ast::BlockNode *block, Context &context) {
-        std::vector<std::unique_ptr<ast::ASTNode> > resultNodes;
+        std::vector<std::shared_ptr<ast::ASTNode> > resultNodes;
         for (auto &old: block->statements()) {
             switch (old->nodeType()) {
                 case ast::NodeType::IF_MACRO: {
@@ -2439,16 +2439,16 @@ namespace types {
                         .name = name.lexical()
                     });
                 }
-                std::vector<std::unique_ptr<ast::FunctionDefinition> > methods;
-                //methods.reserve(structDecl->methods().size());
-                for (const auto &method: structDecl->methods()) {
-                    methods.push_back(method->cloneFunction2());
-                }
+                // std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
+                // //methods.reserve(structDecl->methods().size());
+                // for (const auto &method: structDecl->methods()) {
+                //     methods.push_back(method->cloneFunction2());
+                // }
                 //structDecl->methods().clear();
 
 
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                                structFields, std::move(methods), genericType);
+                                                                structFields, structDecl->methods(), genericType);
 
 
                 context.currentScope->registerType(type);
@@ -2497,7 +2497,7 @@ namespace types {
 
     void evaluate_macros(std::shared_ptr<parser::Module> &module, const env::Environment &environment,
                          TypeCheckResult &result) {
-        std::vector<std::unique_ptr<ast::ASTNode> > oldNodes;
+        std::vector<std::shared_ptr<ast::ASTNode> > oldNodes;
         Context context;
         context.module = module;
         registerEnvironmentVariables(environment, context);

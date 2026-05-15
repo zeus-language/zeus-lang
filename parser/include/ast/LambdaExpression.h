@@ -4,29 +4,29 @@
 
 namespace ast {
     class LambdaExpression : public FunctionDefinitionBase {
-        std::unique_ptr<BlockNode> m_blockNode;
+        std::shared_ptr<BlockNode> m_blockNode;
 
     public:
         LambdaExpression(const Token &functionName, const std::vector<FunctionArgument> &args,
-                         std::optional<std::unique_ptr<RawType> > returnType,
-                         std::unique_ptr<BlockNode> blockNode,
-                         std::vector<std::unique_ptr<RawAnnotation> > annotations)
+                         std::optional<std::shared_ptr<RawType> > returnType,
+                         std::shared_ptr<BlockNode> blockNode,
+                         std::vector<std::shared_ptr<RawAnnotation> > annotations)
             : FunctionDefinitionBase(functionName, args, std::move(returnType), std::move(annotations),
                                      VisibilityModifier::PRIVATE), m_blockNode(std::move(blockNode)) {
             setFunctionName("fn");
         }
 
 
-        [[nodiscard]] std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override {
+        [[nodiscard]] std::shared_ptr<ast::FunctionDefinitionBase> cloneFunction() override {
             auto returnTypeClone = returnType().has_value()
-                                       ? std::make_optional<std::unique_ptr<RawType> >(returnType().value()->clone())
+                                       ? std::make_optional<std::shared_ptr<RawType> >(returnType().value()->clone())
                                        : std::nullopt;
             auto block = m_blockNode->cloneBlock();
-            std::vector<std::unique_ptr<RawAnnotation> > annotationsClones;
+            std::vector<std::shared_ptr<RawAnnotation> > annotationsClones;
             for (const auto &annotation: rawAnnotations()) {
                 annotationsClones.push_back(annotation->cloneAnnotation());
             }
-            auto cloneNode = std::make_unique<LambdaExpression>(expressionToken(),
+            auto cloneNode = std::make_shared<LambdaExpression>(expressionToken(),
                                                                 args(),
                                                                 std::move(returnTypeClone),
                                                                 std::move(block),
@@ -39,7 +39,7 @@ namespace ast {
             return std::move(cloneNode);
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             return cloneFunction();
         }
 

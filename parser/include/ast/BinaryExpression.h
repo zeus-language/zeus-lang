@@ -19,8 +19,8 @@ namespace ast {
         BinaryOperator m_operator;
 
     public:
-        explicit BinaryExpression(Token name, BinaryOperator op, std::unique_ptr<ASTNode> lhs,
-                                  std::unique_ptr<ASTNode> rhs) : OperatorNode(std::move(name),
+        explicit BinaryExpression(Token name, BinaryOperator op, std::shared_ptr<ASTNode> lhs,
+                                  std::shared_ptr<ASTNode> rhs) : OperatorNode(std::move(name),
                                                                                NodeType::BINARY_EXPRESSION,
                                                                                std::move(lhs), std::move(rhs)),
                                                                   m_operator(op) {
@@ -45,6 +45,12 @@ namespace ast {
                     return "__mod__";
                 case BinaryOperator::POW:
                     return "__pow__";
+                case BinaryOperator::AND:
+                    break;
+                case BinaryOperator::OR:
+                    break;
+                case BinaryOperator::LEFT_SHIFT:
+                    break;
             }
             return "";
         }
@@ -75,8 +81,8 @@ namespace ast {
         }
 
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<BinaryExpression>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<BinaryExpression>(expressionToken(),
                                                                 m_operator,
                                                                 m_lhs->clone(),
                                                                 m_rhs->clone());
