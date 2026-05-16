@@ -1741,6 +1741,11 @@ namespace llvm_backend {
                     return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
                 }
                 break;
+            case ast::BinaryOperator::RIGHT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAShr(lhs, rhs, "shrtmp");
+                }
+                break;
             default:
                 assert(false && "Unsupported binary operator");
         }

@@ -20,6 +20,7 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
     registerType(std::make_shared<types::VariableType>("bool", types::TypeKind::BOOL));
     registerType(std::make_shared<types::IntegerType>("u8", 1, false));
+    registerType(std::make_shared<types::IntegerType>("char", 32, false));
     registerType(std::make_shared<types::IntegerType>("u16", 2, false));
     registerType(std::make_shared<types::IntegerType>("u32", 4, false));
     registerType(std::make_shared<types::IntegerType>("i8", 1, true));

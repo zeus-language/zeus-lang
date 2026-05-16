@@ -1,5 +1,5 @@
 use std::str;
-
+use core::libc;
 pub fn print(fmt: [u8]) : void {
     printf(fmt.data);
 }
@@ -18,6 +18,14 @@ pub fn print(fmt: i32) : void {
 pub fn println(value: i32) : void {
     printf(r"%d\n",value);
 }
+
+pub fn print(fmt: u32) : void {
+    printf(r"%d",fmt);
+}
+pub fn println(value: u32) : void {
+    printf(r"%d\n",value);
+}
+
 pub fn print(fmt: u64) : void {
     printf(r"%ld",fmt);
 }
@@ -45,6 +53,13 @@ pub fn println(fmt: float) : void {
 pub fn print(fmt: u8) : void {
     printf(r"%c",fmt);
 }
+
+pub fn print(fmt: char) : void {
+    let mut s : [u8;5];
+    utf8chr(fmt as i32,s as *u8);
+    printf(r"%s",s);
+}
+
 pub fn println(fmt: u8) : void {
     printf(r"%c\n",fmt);
 }

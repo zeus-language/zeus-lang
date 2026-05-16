@@ -760,6 +760,13 @@ namespace parser {
                 }
                 if (tryConsume(Token::MUL)) {
                     auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '*' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::MUL,
@@ -821,6 +828,21 @@ namespace parser {
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::LEFT_SHIFT,
+                                               std::move(lhs.value()), std::move(rhs.value())));
+                }
+
+                if (tryConsume(Token::RIGHT_SHIFT)) {
+                    auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after 'right shift' operator",
+                        });
+                        return lhs;
+                    }
+                    return parseExpression(false,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::RIGHT_SHIFT,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
             }
