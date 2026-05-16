@@ -1,0 +1,7 @@
+String: café
+Codepoint count: 4
+Characters:
+  Position 0: 99
+  Position 1: 97
+  Position 2: 102
+  Position 3: 233

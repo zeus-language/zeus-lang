@@ -1,0 +1,14 @@
+fn main() : i32 {
+    let mut empty_str : string = string::from_slice("");
+    defer empty_str.destroy();
+    let slice = empty_str.as_slice();
+
+    let codepoint_length = empty_str.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("Empty string codepoint count: ${codepoint_length}"); // should output 0
+    println("Empty string byte count: ${byte_length}"); // should output 0
+
+    return 0;
+}
+

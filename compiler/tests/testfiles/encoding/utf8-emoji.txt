@@ -1,0 +1,2 @@
+Emoji codepoint count: 1
+Emoji byte count: 4

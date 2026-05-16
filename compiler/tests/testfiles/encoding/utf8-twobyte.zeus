@@ -1,0 +1,14 @@
+fn main() : i32 {
+    let mut two_byte_str : string = string::from_slice("café");
+    defer two_byte_str.destroy();
+    let slice = two_byte_str.as_slice();
+
+    let codepoint_length = two_byte_str.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("Codepoint count: ${codepoint_length}"); // should output 4
+    println("Byte count: ${byte_length}"); // should output 5 (c=1, a=1, f=1, é=2)
+
+    return 0;
+}
+

@@ -1,0 +1,17 @@
+fn main() : i32 {
+    let mut test_str : string = string::from_slice("A café");
+    defer test_str.destroy();
+
+    let char_0 = test_str.get_codepoint(0 as u32) as i32;
+    let char_2 = test_str.get_codepoint(2 as u32) as i32;
+    let char_5 = test_str.get_codepoint(5 as u32) as i32;
+
+    println("Character at index 0: ${char_0}"); // should be 'A' (65)
+    println("Character at index 2: ${char_2}"); // should be 'c' (99)
+    println("Character at index 5: ${char_5}"); // should be 'é' (233) - but may vary by encoding
+    let len = test_str.length();
+    println("Total length: ${len}"); // should output 6
+
+    return 0;
+}
+

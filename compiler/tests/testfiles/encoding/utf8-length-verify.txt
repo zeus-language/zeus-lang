@@ -1,0 +1,3 @@
+π codepoint length: 1
+π byte length: 2
+LENGTH HANDLING CORRECT: Codepoint and byte lengths differ as expected

@@ -1,0 +1,2 @@
+Empty string codepoint count: 0
+Empty string byte count: 0

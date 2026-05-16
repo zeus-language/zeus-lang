@@ -1,0 +1,14 @@
+fn main() : i32 {
+    let mut cjk_str : string = string::from_slice("你好");
+    defer cjk_str.destroy();
+    let slice = cjk_str.as_slice();
+
+    let codepoint_length = cjk_str.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("Codepoint count: ${codepoint_length}"); // should output 2
+    println("Byte count: ${byte_length}"); // should output 6 (each Chinese character is 3 bytes)
+
+    return 0;
+}
+

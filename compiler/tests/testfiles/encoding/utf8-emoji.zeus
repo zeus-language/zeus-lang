@@ -1,0 +1,15 @@
+fn main() : i32 {
+    // Using Unicode escape for 😀 (grinning face emoji - U+1F600)
+    let mut emoji_str : string = string::from_slice("\u{1F600}");
+    defer emoji_str.destroy();
+    let slice = emoji_str.as_slice();
+
+    let codepoint_length = emoji_str.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("Emoji codepoint count: ${codepoint_length}"); // should output 1
+    println("Emoji byte count: ${byte_length}"); // should output 4
+
+    return 0;
+}
+

@@ -1,0 +1,22 @@
+fn main() : i32 {
+    let mut text1 : string = string::from_slice("café");
+    let mut text2 : string = string::from_slice("你好");
+    let mut emoji : string = string::from_slice("\u{1F600}");
+
+    defer text1.destroy();
+    defer text2.destroy();
+    defer emoji.destroy();
+
+    let l1 = text1.length() as i32;
+    let l2 = text2.length() as i32;
+    let l3 = emoji.length() as i32;
+
+    println("café: ${l1} codepoints");
+    println("你好: ${l2} codepoints");
+    println("😀: ${l3} codepoints");
+    let total = l1 + l2 + l3;
+    println("Total: ${total} codepoints");
+
+    return 0;
+}
+

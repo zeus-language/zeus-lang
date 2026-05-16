@@ -184,6 +184,12 @@ namespace llvm_backend {
         }
     };
 
+    struct Defer {
+        std::vector<ast::ASTNode *> deferedStatements;
+
+        llvm::BasicBlock *deferBlock;
+    };
+
     struct LLVMBackendState {
     private:
         std::vector<ast::FunctionDefinitionBase *> function_definition;
@@ -202,7 +208,7 @@ namespace llvm_backend {
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
         llvm::Triple target;
-        std::vector<ast::ASTNode *> deferedStatements;
+        std::vector<Defer> deferStack;
 
         std::vector<std::string> linkerFlags;
 
@@ -294,6 +300,24 @@ namespace llvm_backend {
             llvm::DICompileUnit *TheCU = nullptr;
             std::vector<llvm::DIScope *> LexicalBlocks;
         } KSDbgInfo;
+
+
+        Defer &findDeferForBlock(llvm::BasicBlock *block) {
+            for (auto &defer: deferStack) {
+                if (defer.deferBlock == block) {
+                    return defer;
+                }
+            }
+            deferStack.emplace_back();
+            deferStack.back().deferBlock = block;
+            return deferStack.back();
+        }
+
+        void removeDeferForBlock(llvm::BasicBlock *block) {
+            deferStack.erase(std::remove_if(deferStack.begin(), deferStack.end(),
+                                            [block](const Defer &defer) { return defer.deferBlock == block; }),
+                             deferStack.end());
+        }
     };
 
 
@@ -393,6 +417,8 @@ namespace llvm_backend {
                 break;
             case types::TypeKind::POINTER:
                 return llvm::PointerType::getUnqual(*context.TheContext);
+            case types::TypeKind::SLICE:
+                break;
         }
         assert(false && "Unknown type");
         return nullptr;
@@ -625,16 +651,30 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState) {
-        llvmState.deferedStatements.push_back(node->deferredNode());
+        auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+        defer.deferedStatements.push_back(node->deferredNode());
         return nullptr;
     }
 
 
     llvm::Value *codegen(ast::BlockNode *node, LLVMBackendState &llvmState) {
         llvm::Value *lastValue = nullptr;
+        // const auto block = llvm::BasicBlock::Create(*llvmState.TheContext, "block",
+        //                                             llvmState.Builder->GetInsertBlock()->getParent());
+        // llvmState.Builder->CreateBr(block);
+        // llvmState.Builder->SetInsertPoint(block);
+        auto block = llvmState.Builder->GetInsertBlock();
+
         for (const auto &statement: node->statements()) {
             lastValue = codegen_base(statement.get(), llvmState);
         }
+
+        auto &defer = llvmState.findDeferForBlock(block);
+        for (auto deferedExpression: defer.deferedStatements) {
+            codegen_base(deferedExpression, llvmState);
+        }
+        llvmState.removeDeferForBlock(block);
+
         return lastValue;
     }
 
@@ -2214,10 +2254,12 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
         llvmState.currentBreakBlock.BlockUsed = true;
-        for (auto deferedExpression: llvmState.deferedStatements) {
-            codegen_base(deferedExpression, llvmState);
+        for (auto &defer: llvmState.deferStack) {
+            for (auto deferedExpression: defer.deferedStatements) {
+                codegen_base(deferedExpression, llvmState);
+            }
         }
-
+        llvmState.deferStack.clear();
         if (const auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
             const auto parentFunction = llvmState.Builder->GetInsertBlock()->getParent();
@@ -2377,9 +2419,11 @@ namespace llvm_backend {
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
         if (!node->expressionType() || node->expressionType().value()->typeKind() == types::TypeKind::VOID) {
-            for (auto deferedExpression: llvmState.deferedStatements) {
+            auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+            for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
+            llvmState.removeDeferForBlock(llvmState.Builder->GetInsertBlock());
             llvmState.Builder->CreateRetVoid();
         }
 
@@ -2530,7 +2574,7 @@ namespace llvm_backend {
 
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         llvmState.newScope();
-        llvmState.deferedStatements.clear();
+        llvmState.deferStack.clear();
         std::vector<llvm::Type *> params;
         if (llvmState.DBuilder) {
             const auto &sourceLocation = node->expressionToken().source_location;
@@ -2658,9 +2702,11 @@ namespace llvm_backend {
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
         if (!node->expressionType() || node->expressionType().value()->typeKind() == types::TypeKind::VOID) {
-            for (auto deferedExpression: llvmState.deferedStatements) {
+            auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+            for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
+            llvmState.removeDeferForBlock(llvmState.Builder->GetInsertBlock());
             llvmState.Builder->CreateRetVoid();
         }
 

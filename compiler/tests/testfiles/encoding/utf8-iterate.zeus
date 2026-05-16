@@ -1,0 +1,17 @@
+fn main() : i32 {
+    let mut text : string = string::from_slice("café");
+    defer text.destroy();
+
+    let len = text.length() as i32;
+    println("String: ${text}");
+    println("Codepoint count: ${len}");
+    println("Characters:");
+
+    for i in 0 .. len {
+        let cp = text.get_codepoint(i as u32) as i32;
+        println("  Position ${i}: ${cp}");
+    }
+
+    return 0;
+}
+

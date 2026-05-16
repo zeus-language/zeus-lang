@@ -344,7 +344,7 @@ TEST_P(EncodingTest, TestNoError) {
 
     result.erase(std::ranges::remove(result, '\r').begin(), result.end());
 
-
+ 
     ASSERT_EQ(erstream.str(), "");
     ASSERT_EQ(result, expected);
 }
@@ -377,4 +377,18 @@ INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
 INSTANTIATE_TEST_SUITE_P(PanicTest, PanicTest,
                          testing::Values("runtime-slice-range-error","runtime-slice-range-set-error"));
 INSTANTIATE_TEST_SUITE_P(EncodingTest, EncodingTest,
-                         testing::Values("utf8-simple","helloworld-cn","test-escape-chars"));
+                         testing::Values("helloworld-cn",
+                             "test-escape-chars",
+                             "utf8-ascii",
+                             "utf8-comprehensive",
+                             "utf8-concat",
+                             "utf8-emoji",
+                             "utf8-empty",
+                             "utf8-indexing",
+                             "utf8-iterate",
+                             "utf8-length-verify",
+                             "utf8-loop",
+                             "utf8-mixed",
+                             "utf8-simple",
+                             "utf8-threebyte",
+                             "utf8-twobyte"));
