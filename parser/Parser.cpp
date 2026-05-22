@@ -2508,22 +2508,22 @@ namespace parser {
         // Deep copy of nodes
         nodes.reserve(other.nodes.size());
         for (const auto &node: other.nodes) {
-            nodes.push_back(node->clone());
+            nodes.push_back(node);
         }
         // Deep copy of externTypes
         externTypes.reserve(other.externTypes.size());
         for (const auto &extType: other.externTypes) {
-            externTypes.push_back(extType->clone());
+            externTypes.push_back(extType);
         }
         // Deep copy of functions
         functions.reserve(other.functions.size());
         for (const auto &func: other.functions) {
-            functions.push_back(func->cloneFunction());
+            functions.push_back(func);
         }
         // Deep copy of useModuleNodes
         useModuleNodes.reserve(other.useModuleNodes.size());
         for (const auto &useNode: other.useModuleNodes) {
-            useModuleNodes.push_back(useNode->cloneModule());
+            useModuleNodes.push_back(useNode);
         }
         // Deep copy of sub-modules
         modules.reserve(other.modules.size());
