@@ -121,6 +121,13 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
     return structType;
 }
 
+void types::StructType::setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) {
+    m_methods.clear();
+    for (const auto &method: methods) {
+        m_methods.push_back(method);
+    }
+}
+
 types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> baseType) : StructType(
     std::move(name),
     {

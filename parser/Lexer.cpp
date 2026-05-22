@@ -6,23 +6,23 @@
 #include <algorithm>
 
 namespace lexer {
-    static const std::vector<std::string> possible_tokens = {
+    static const std::vector<std::string_view> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue",
         "use", "or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not", "pub", "defer"
     };
 
-    static const std::vector<std::string> macro_tokens = {"#if", "#else", "#endif", "#elif"};
+    static const std::vector<std::string_view> macro_tokens = {"#if", "#else", "#endif", "#elif"};
 
 
-    constexpr bool validStartNameChar(const char value) {
+    static constexpr bool validStartNameChar(const char value) {
         return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || value == '_';
     }
 
-    constexpr bool validNameChar(const char value) {
+    static constexpr bool validNameChar(const char value) {
         return validStartNameChar(value) || (value >= '0' && value <= '9');
     }
 
-    constexpr bool find_macro_token(const std::string &content, const size_t start, size_t *endPosition) {
+    static constexpr bool find_macro_token(const std::string &content, const size_t start, size_t *endPosition) {
         char current = content[start];
         *endPosition = start + 1;
         if (current != '#')
@@ -35,10 +35,10 @@ namespace lexer {
         }
 
         const auto tmp = std::string_view(content.data() + start, *endPosition - start);
-        return std::ranges::any_of(macro_tokens, [tmp](const std::string &token) { return tmp == token; });
+        return std::ranges::any_of(macro_tokens, [tmp](const std::string_view &token) { return tmp == token; });
     }
 
-    constexpr bool find_fixed_token(const std::string &content, const size_t start, size_t *endPosition) {
+    static constexpr bool find_fixed_token(const std::string &content, const size_t start, size_t *endPosition) {
         char current = content[start];
         *endPosition = start + 1;
         if (!validStartNameChar(current))
@@ -50,12 +50,12 @@ namespace lexer {
         }
 
         const auto tmp = std::string_view(content.data() + start, *endPosition - start);
-        return std::ranges::any_of(possible_tokens, [tmp](const std::string &token) { return tmp == token; });
+        return std::ranges::any_of(possible_tokens, [tmp](const std::string_view &token) { return tmp == token; });
     }
 
-    constexpr bool isNumber(const char c) { return (c >= '0' && c <= '9'); }
+    static constexpr bool isNumber(const char c) { return (c >= '0' && c <= '9'); }
 
-    constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
+    static constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
 
     class Lexer {
         std::vector<Token> tokens;
@@ -394,7 +394,8 @@ namespace lexer {
                     };
                     tokens.emplace_back(Token::MACRO_KEYWORD, std::move(source_location));
                     start = endPosition;
-                    col += offset;
+                    col += offset - 1;
+                    continue;
                 }
 
                 found = find_fixed_token(source_code, start, &endPosition);
@@ -601,7 +602,7 @@ namespace lexer {
         return lexer.lex_file(file_path, source_code, skipComments);
     }
 
-    std::vector<std::string> keywords() {
+    std::vector<std::string_view> keywords() {
         return possible_tokens;
     }
 }

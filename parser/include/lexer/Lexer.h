@@ -119,7 +119,7 @@ public:
 namespace lexer {
     std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments = true);
 
-    std::vector<std::string> keywords();
+    std::vector<std::string_view> keywords();
 };
 
 

@@ -2483,6 +2483,20 @@ namespace types {
                 for (const auto &method: type->methods()) {
                     type_check_funcdef(method.get(), context);
                 }
+                // check for duplicate type names in the same scope
+                if (auto existingType = context.currentScope->getTypeByName(type->name())) {
+                    if (auto existingStruct = std::dynamic_pointer_cast<types::StructType>(existingType.value())) {
+                        existingStruct->setMethods(type->methods());
+                    } else {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            structDecl->expressionToken(),
+                            "Type name conflict: '" + type->name() +
+                            "' is already used for a different type in this scope."
+                        });
+                    }
+                }
+
                 structDecl->setExpressionType(type);
                 context.currentScope = parentScope;
             } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {

@@ -111,7 +111,7 @@ namespace modules {
     std::shared_ptr<parser::Module> ModuleCache::getModule(const std::string &path) const {
         if (entries.contains(path)) {
             const auto module = entries.at(path);
-            return std::make_shared<parser::Module>(*module);
+            return module; //return std::make_shared<parser::Module>(*module);
         }
         return nullptr;
     }

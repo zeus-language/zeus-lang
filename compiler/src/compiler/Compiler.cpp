@@ -76,6 +76,5 @@ namespace compiler {
         }
         typeCheckResult.registeredTypes.clear();
         result.module = nullptr;
-        moduleCache.clear();
     }
 }

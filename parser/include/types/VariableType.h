@@ -157,6 +157,9 @@ namespace types {
         [[nodiscard]] virtual std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const {
             std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
             for (const auto &method: m_methods) {
+                if (method.expired()) {
+                    throw std::runtime_error("Method pointer expired for struct " + name());
+                }
                 if (auto methodPtr = method.lock()) {
                     methods.push_back(methodPtr);
                 }
@@ -196,6 +199,8 @@ namespace types {
 
         std::shared_ptr<VariableType> makeNonGenericType(
             const std::shared_ptr<VariableType> &genericParam) override;
+
+        void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods);
     };
 
     class SliceType final : public StructType {
