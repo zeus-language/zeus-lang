@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <stdexcept>
 
 #include "ast/VisibilityModifier.h"
 
