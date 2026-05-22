@@ -1,0 +1,6 @@
+
+fn main() : i32 {
+    println("café: ${l1} codepoints");
+    println("你好: ${l2} codepoints");
+    return 0;
+}

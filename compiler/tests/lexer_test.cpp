@@ -28,10 +28,24 @@ void VerifyTokenPosition(const Token &token, const std::string &source, size_t e
     EXPECT_EQ(token.source_location.byte_offset, expectedStart)
         << "Token byte offset mismatch for: " << expectedText;
     EXPECT_EQ(token.source_location.num_bytes, expectedLength)
-        << "Token byte length mismatch for: " << expectedText;
+        << "Token string length mismatch for: " << expectedText;
     EXPECT_EQ(token.lexical(), expectedText) << "Token text mismatch";
     EXPECT_EQ(token.source_location.text(), source.substr(expectedStart, expectedLength))
         << "Token text does not match source at given position";
+}
+
+void verifyUnicodeTokenPosition(const Token &token, const std::string &source, size_t expectedStart, int row, int col,
+                                size_t expectedByteLength, size_t expectedUnicodeLength,
+                                const std::string &expectedText) {
+    EXPECT_EQ(token.source_location.byte_offset, expectedStart)
+        << "Token byte offset mismatch for: " << expectedText;
+    EXPECT_EQ(token.source_location.unicode_length(), expectedUnicodeLength)
+        << "Token unicode length mismatch for: " << expectedText;
+    EXPECT_EQ(token.lexical(), expectedText) << "Token text mismatch";
+    EXPECT_EQ(token.source_location.text(), source.substr(expectedStart, expectedByteLength))
+        << "Token text does not match source at given position";
+    EXPECT_EQ(token.source_location.row, row) << "Token row mismatch for: " << expectedText;
+    EXPECT_EQ(token.source_location.col, col) << "Token column mismatch for: " << expectedText;
 }
 
 TEST(LexerTest, LexIncomplete) {
@@ -466,6 +480,35 @@ TEST(LexerStringTest, TestUnclosedRawString) {
     VerifyTokenPosition(tokens[3], source, 10, 15, "r\"Hello, World;");
 }
 
+TEST(LexerStringTest, TestUtf8String) {
+    const std::string source = R"(let str = "Hello, 世界";)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 6); // let, str, =, "Hello, 世界"; + EOF
+    EXPECT_EQ(tokens[3].type, Token::Type::STRING);
+    verifyUnicodeTokenPosition(tokens[3], source, 10, 1, 11, 15, 11, "\"Hello, 世界\"");
+}
+
+TEST(LexerStringTest, MultiLineUtf8Mix) {
+    const std::string source = R"( println("café: ${l1} codepoints");
+    println("你好: ${l2} codepoints");
+    println("😀: ${l3} codepoints");
+    let total = l1 + l2 + l3;
+    println("Total: ${total} codepoints");)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 46); // 5 lines with 5 tokens each + EOF
+    EXPECT_EQ(tokens[0].type, Token::Type::IDENTIFIER);
+    verifyUnicodeTokenPosition(tokens[0], source, 1, 1, 2, 7, 7, "println");
+    EXPECT_EQ(tokens[1].type, Token::Type::LEFT_CURLY);
+    verifyUnicodeTokenPosition(tokens[1], source, 8, 1, 9, 1, 1, "(");
+    EXPECT_EQ(tokens[2].type, Token::Type::INTERPOLATED_STRING);
+    verifyUnicodeTokenPosition(tokens[2], source, 9, 1, 10, 8, 7, "\"café: ");
+    EXPECT_EQ(tokens[3].type, Token::Type::INTERPOLATION_START);
+    verifyUnicodeTokenPosition(tokens[3], source, 17, 1, 18, 2, 2, "${");
+    EXPECT_EQ(tokens[4].type, Token::Type::IDENTIFIER);
+    verifyUnicodeTokenPosition(tokens[4], source, 19, 1, 20, 2, 2, "l1");
+}
 
 TEST(LexerLexCommentTest, TestMulipleSingleLineComments) {
     const std::string source = R"(let x = 5; // first comment

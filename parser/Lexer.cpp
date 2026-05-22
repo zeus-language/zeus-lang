@@ -330,9 +330,9 @@ namespace lexer {
         }
 
     public:
-        std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments) {
+        std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code, bool skipComments) {
             contentPtr = std::make_shared<std::string>(source_code);
-            this->file_path = file_path;
+            this->file_path = filepath;
             tokens.reserve(contentPtr->size() / 4);
 
             for (start = 0; start < source_code.length(); start++) {
@@ -605,4 +605,31 @@ namespace lexer {
     std::vector<std::string_view> keywords() {
         return possible_tokens;
     }
+}
+
+size_t count_unicode_characters(const std::string &str, size_t start, size_t length) {
+    size_t count = 0;
+    size_t i = start;
+    const size_t end = std::min(start + length, str.size());
+    while (i < end) {
+        unsigned char c = str[i];
+        if ((c & 0x80) == 0) {
+            // 1-byte character
+            i += 1;
+        } else if ((c & 0xE0) == 0xC0) {
+            // 2-byte character
+            i += 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            // 3-byte character
+            i += 3;
+        } else if ((c & 0xF8) == 0xF0) {
+            // 4-byte character
+            i += 4;
+        } else {
+            // Invalid UTF-8, skip
+            i += 1;
+        }
+        count++;
+    }
+    return count;
 }

@@ -77,19 +77,22 @@ namespace parser {
     void ParserMessasge::msg(std::ostream &ostream, const bool printColor, bool withDetails) const {
         if (printColor)
             ostream << token.source_location.filename << ":" << token.source_location.row << ":" << token.
-                    source_location.col << ": "
+                    source_location.unicode_col() << ": "
                     << outputTypeToColor(outputType) << outputTypeString(outputType) << Color::Modifier(
                         Color::FG_DEFAULT)
                     << ": " << message << "\n";
         else
             ostream << token.source_location.filename << ":" << token.source_location.row << ":" << token.
-                    source_location.col << ": "
+                    source_location.unicode_col() << ": "
                     << outputTypeString(outputType) << ": " << message << "\n";
 
         if (withDetails) {
             ostream << token.source_location.sourceline() << "\n";
-            const size_t startOffset = token.source_location.byte_offset - token.source_location.lineStart() + 1;
-            const size_t endOffset = std::min(token.source_location.num_bytes,
+            const size_t startOffset = count_unicode_characters(*token.source_location.source,
+                                                                token.source_location.lineStart(),
+                                                                token.source_location.byte_offset - token.
+                                                                source_location.lineStart()) + 1;
+            const size_t endOffset = std::min(token.source_location.unicode_length(),
                                               token.source_location.lineEnd() - token.source_location.byte_offset);
 
             ostream << std::setw(static_cast<int>(startOffset)) << std::setfill(' ') << '^' << std::setw(

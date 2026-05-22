@@ -9,6 +9,9 @@
 #include <vector>
 #include <string>
 
+
+size_t count_unicode_characters(const std::string &str, size_t start, size_t length);
+
 struct SourceLocation {
     std::string filename;
     std::shared_ptr<std::string> source;
@@ -19,6 +22,16 @@ struct SourceLocation {
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
     [[nodiscard]] size_t lineStart() const { return source->rfind('\n', byte_offset) + 1; }
+
+    [[nodiscard]] size_t unicode_col() const {
+        return count_unicode_characters(*source, lineStart(), byte_offset - lineStart()) + 1;
+    }
+
+
+    [[nodiscard]] size_t unicode_length() const {
+        return count_unicode_characters(*source, byte_offset, num_bytes);
+    }
+
 
     [[nodiscard]] size_t lineEnd() const {
 #ifdef _WIN32

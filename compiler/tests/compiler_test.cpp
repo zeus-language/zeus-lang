@@ -344,7 +344,7 @@ TEST_P(EncodingTest, TestNoError) {
 
     result.erase(std::ranges::remove(result, '\r').begin(), result.end());
 
- 
+
     ASSERT_EQ(erstream.str(), "");
     ASSERT_EQ(result, expected);
 }
@@ -368,7 +368,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "private_fields","private_function",
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
-                             "try-infer-void-return","keyword-as-identifier","array-assign-immutable"
+                             "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
+                             "interpolation-utf8-error"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,

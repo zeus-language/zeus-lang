@@ -68,9 +68,11 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
         // adjust to 0-based indexing
 
         diag.range.start.line = static_cast<int>(token.source_location.row) - 1;
-        diag.range.start.character = static_cast<int>(token.source_location.col) - 1;
+        diag.range.start.character = static_cast<int>(token.source_location.unicode_col()) - 1;
         diag.range.end.line = static_cast<int>(token.source_location.row) - 1;
-        diag.range.end.character = static_cast<int>(token.source_location.col + token.source_location.num_bytes) - 1;
+        diag.range.end.character = static_cast<int>(
+                                       token.source_location.unicode_col() + token.source_location.unicode_length()) -
+                                   1;
         diag.severity = mapOutputTypeToSeverity(outputType);
         diag.message = message;
         diag.source = std::string("zeus");
@@ -202,16 +204,16 @@ void processMultiLineToken(const Token &token, const int tokenType,
         semanticTokens.push_back(
             static_cast<uint32_t>(token.source_location.row - lastRow - 1)); // line delta
         semanticTokens.push_back(
-            static_cast<uint32_t>(token.source_location.col - lastCol - 1)); // startChar delta
-        semanticTokens.push_back(static_cast<uint32_t>(token.source_location.num_bytes)); // length
+            static_cast<uint32_t>(token.source_location.unicode_col() - lastCol - 1)); // startChar delta
+        semanticTokens.push_back(static_cast<uint32_t>(token.source_location.unicode_length())); // length
         semanticTokens.push_back(tokenType); // tokenType
         semanticTokens.push_back(0); // tokenModifiers
 
         lastRow = token.source_location.row - 1;
-        lastCol = token.source_location.col - 1;
+        lastCol = token.source_location.unicode_col() - 1;
     } else {
         // Multi-line token
-        size_t startCol = token.source_location.col - 1;
+        size_t startCol = token.source_location.unicode_col() - 1;
         size_t currentRow = token.source_location.row - 1;
 
         size_t segmentStart = 0;
@@ -228,7 +230,9 @@ void processMultiLineToken(const Token &token, const int tokenType,
                         static_cast<uint32_t>(currentRow - lastRow)); // line delta
                     semanticTokens.push_back(
                         static_cast<uint32_t>(startCol - lastCol)); // startChar delta
-                    semanticTokens.push_back(static_cast<uint32_t>(segmentLength)); // length
+
+                    semanticTokens.push_back(
+                        static_cast<uint32_t>(count_unicode_characters(text, segmentStart, segmentLength))); // length
                     semanticTokens.push_back(tokenType); // tokenType
                     semanticTokens.push_back(0); // tokenModifiers
 
