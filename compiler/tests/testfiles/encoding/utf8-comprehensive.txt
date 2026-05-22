@@ -1,0 +1,4 @@
+café: 4 codepoints
+你好: 2 codepoints
+😀: 1 codepoints
+Total: 7 codepoints

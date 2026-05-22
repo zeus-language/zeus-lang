@@ -2,7 +2,7 @@
 #include "ast/DerefNode.h"
 
 ast::DerefNode::DerefNode(const Token &token,
-                          std::unique_ptr<ASTNode> accessNode) : ASTNode(token, NodeType::DEREFERENCE),
+                          std::shared_ptr<ASTNode> accessNode) : ASTNode(token, NodeType::DEREFERENCE),
                                                                  m_accessNode(std::move(accessNode)) {
 }
 
@@ -17,6 +17,6 @@ ast::ASTNode *ast::DerefNode::accessNode() const {
     return m_accessNode.get();
 }
 
-std::unique_ptr<ast::ASTNode> ast::DerefNode::clone() {
-    return std::make_unique<DerefNode>(*this);
+std::shared_ptr<ast::ASTNode> ast::DerefNode::clone() {
+    return std::make_shared<DerefNode>(*this);
 }

@@ -6,23 +6,23 @@
 #include <algorithm>
 
 namespace lexer {
-    static const std::vector<std::string> possible_tokens = {
+    static const std::vector<std::string_view> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue",
         "use", "or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not", "pub", "defer"
     };
 
-    static const std::vector<std::string> macro_tokens = {"#if", "#else", "#endif", "#elif"};
+    static const std::vector<std::string_view> macro_tokens = {"#if", "#else", "#endif", "#elif"};
 
 
-    constexpr bool validStartNameChar(const char value) {
+    static constexpr bool validStartNameChar(const char value) {
         return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || value == '_';
     }
 
-    constexpr bool validNameChar(const char value) {
+    static constexpr bool validNameChar(const char value) {
         return validStartNameChar(value) || (value >= '0' && value <= '9');
     }
 
-    constexpr bool find_macro_token(const std::string &content, const size_t start, size_t *endPosition) {
+    static constexpr bool find_macro_token(const std::string &content, const size_t start, size_t *endPosition) {
         char current = content[start];
         *endPosition = start + 1;
         if (current != '#')
@@ -35,10 +35,10 @@ namespace lexer {
         }
 
         const auto tmp = std::string_view(content.data() + start, *endPosition - start);
-        return std::ranges::any_of(macro_tokens, [tmp](const std::string &token) { return tmp == token; });
+        return std::ranges::any_of(macro_tokens, [tmp](const std::string_view &token) { return tmp == token; });
     }
 
-    constexpr bool find_fixed_token(const std::string &content, const size_t start, size_t *endPosition) {
+    static constexpr bool find_fixed_token(const std::string &content, const size_t start, size_t *endPosition) {
         char current = content[start];
         *endPosition = start + 1;
         if (!validStartNameChar(current))
@@ -50,12 +50,12 @@ namespace lexer {
         }
 
         const auto tmp = std::string_view(content.data() + start, *endPosition - start);
-        return std::ranges::any_of(possible_tokens, [tmp](const std::string &token) { return tmp == token; });
+        return std::ranges::any_of(possible_tokens, [tmp](const std::string_view &token) { return tmp == token; });
     }
 
-    constexpr bool isNumber(const char c) { return (c >= '0' && c <= '9'); }
+    static constexpr bool isNumber(const char c) { return (c >= '0' && c <= '9'); }
 
-    constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
+    static constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
 
     class Lexer {
         std::vector<Token> tokens;
@@ -330,9 +330,9 @@ namespace lexer {
         }
 
     public:
-        std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments) {
+        std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code, bool skipComments) {
             contentPtr = std::make_shared<std::string>(source_code);
-            this->file_path = file_path;
+            this->file_path = filepath;
             tokens.reserve(contentPtr->size() / 4);
 
             for (start = 0; start < source_code.length(); start++) {
@@ -394,7 +394,8 @@ namespace lexer {
                     };
                     tokens.emplace_back(Token::MACRO_KEYWORD, std::move(source_location));
                     start = endPosition;
-                    col += offset;
+                    col += offset - 1;
+                    continue;
                 }
 
                 found = find_fixed_token(source_code, start, &endPosition);
@@ -462,6 +463,28 @@ namespace lexer {
                         .col = col
                     };
                     tokens.emplace_back(Token::RANGE, std::move(source_location));
+                    start++;
+                    col += 2;
+                    continue;
+                }
+                if (source_code[start] == '<' && source_code[start + 1] == '<') {
+                    SourceLocation source_location = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                        .row = row,
+                        .col = col
+                    };
+                    tokens.emplace_back(Token::LEFT_SHIFT, std::move(source_location));
+                    start++;
+                    col += 2;
+                    continue;
+                }
+                if (source_code[start] == '>' && source_code[start + 1] == '>') {
+                    SourceLocation source_location = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                        .row = row,
+                        .col = col
+                    };
+                    tokens.emplace_back(Token::RIGHT_SHIFT, std::move(source_location));
                     start++;
                     col += 2;
                     continue;
@@ -579,7 +602,34 @@ namespace lexer {
         return lexer.lex_file(file_path, source_code, skipComments);
     }
 
-    std::vector<std::string> keywords() {
+    std::vector<std::string_view> keywords() {
         return possible_tokens;
     }
+}
+
+size_t count_unicode_characters(const std::string &str, size_t start, size_t length) {
+    size_t count = 0;
+    size_t i = start;
+    const size_t end = std::min(start + length, str.size());
+    while (i < end) {
+        unsigned char c = str[i];
+        if ((c & 0x80) == 0) {
+            // 1-byte character
+            i += 1;
+        } else if ((c & 0xE0) == 0xC0) {
+            // 2-byte character
+            i += 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            // 3-byte character
+            i += 3;
+        } else if ((c & 0xF8) == 0xF0) {
+            // 4-byte character
+            i += 4;
+        } else {
+            // Invalid UTF-8, skip
+            i += 1;
+        }
+        count++;
+    }
+    return count;
 }

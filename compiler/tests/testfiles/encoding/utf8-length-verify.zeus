@@ -1,0 +1,20 @@
+fn main() : i32 {
+    let mut text : string = string::from_slice("π");
+    defer text.destroy();
+    let slice = text.as_slice();
+
+    let codepoint_length = text.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("π codepoint length: ${codepoint_length}"); // should be 1 (one character)
+    println("π byte length: ${byte_length}"); // should be 2 (two bytes in UTF-8)
+
+    if codepoint_length == 1 and byte_length == 2 {
+        println("LENGTH HANDLING CORRECT: Codepoint and byte lengths differ as expected");
+    } else {
+        println("LENGTH HANDLING ERROR: Unexpected lengths");
+    }
+
+    return 0;
+}
+

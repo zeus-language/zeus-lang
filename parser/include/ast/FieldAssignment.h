@@ -13,13 +13,13 @@
 namespace ast {
     class FieldAssignment final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
-        std::unique_ptr<ASTNode> m_expression;
+        std::shared_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_expression;
         std::optional<std::shared_ptr<types::VariableType> > m_structType = std::nullopt;
 
     public:
-        explicit FieldAssignment(Token name, std::unique_ptr<ASTNode> accessNode,
-                                 std::unique_ptr<ASTNode> expression) : ASTNode(std::move(name)),
+        explicit FieldAssignment(Token name, std::shared_ptr<ASTNode> accessNode,
+                                 std::shared_ptr<ASTNode> expression) : ASTNode(std::move(name)),
                                                                         m_accessNode(std::move(accessNode)),
                                                                         m_expression(std::move(expression)) {
         }
@@ -63,8 +63,8 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<FieldAssignment>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<FieldAssignment>(expressionToken(),
                                                                m_accessNode->clone(),
                                                                m_expression->clone());
             if (expressionType())

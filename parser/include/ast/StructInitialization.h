@@ -7,7 +7,7 @@
 namespace ast {
     struct StructInitField {
         Token name;
-        std::unique_ptr<ASTNode> value;
+        std::shared_ptr<ASTNode> value;
     };
 
     class StructInitialization final : public ASTNode {
@@ -40,10 +40,11 @@ namespace ast {
                                                       : "");
         }
 
-        [[nodiscard]] const std::optional<Token>& genericParam() const {
+        [[nodiscard]] const std::optional<Token> &genericParam() const {
             return m_genericParam;
         }
-        std::unique_ptr<ASTNode> clone() override {
+
+        std::shared_ptr<ASTNode> clone() override {
             std::vector<StructInitField> fieldsClone;
             fieldsClone.reserve(m_fields.size());
             for (const auto &field: m_fields) {
@@ -52,9 +53,9 @@ namespace ast {
                     .value = field.value->clone(),
                 });
             }
-            auto cloneNode = std::make_unique<StructInitialization>(expressionToken(),
-                                                                   m_genericParam,
-                                                                   std::move(fieldsClone));
+            auto cloneNode = std::make_shared<StructInitialization>(expressionToken(),
+                                                                    m_genericParam,
+                                                                    std::move(fieldsClone));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

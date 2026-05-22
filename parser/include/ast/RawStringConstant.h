@@ -29,8 +29,8 @@ namespace ast {
 
         [[nodiscard]] bool constant() const override;
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<RawStringConstant>(expressionToken());
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<RawStringConstant>(expressionToken());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

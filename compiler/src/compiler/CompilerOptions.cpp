@@ -31,8 +31,6 @@ namespace compiler {
                 options.buildMode = BuildMode::Release;
             } else if (arg == "--debug") {
                 options.buildMode = BuildMode::Debug;
-            } else if (arg == "--lsp") {
-                options.lsp = true;
             } else if (arg == "--ggdb") {
                 options.ggdb = true;
             } else if (arg.starts_with("-L")) {

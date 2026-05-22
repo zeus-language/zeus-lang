@@ -46,6 +46,14 @@ public:
     }
 };
 
+class EncodingTest : public testing::TestWithParam<std::string> {
+protected:
+public:
+    static void SetUpTestSuite() {
+    }
+};
+
+
 TEST_P(CompilerTest, TestNoError) {
     // Inside a test, access the test parameter with the GetParam() method
     // of the TestWithParam<T> class:
@@ -292,6 +300,56 @@ TEST_P(PanicTest, PanicTest) {
     ASSERT_EQ(erstream.str(), "program could not be executed!\n");
 }
 
+TEST_P(EncodingTest, TestNoError) {
+    // Inside a test, access the test parameter with the GetParam() method
+    // of the TestWithParam<T> class:
+    std::filesystem::path base_path = "testfiles";
+    base_path /= "encoding";
+    auto &name = GetParam();
+    std::filesystem::path input_path = base_path / (name + ".zeus");
+    std::filesystem::path output_path = base_path / (name + ".txt");
+    std::cerr << "current path" << std::filesystem::current_path();
+
+    if (!std::filesystem::exists(input_path))
+        std::cerr << "absolute input path: " << std::filesystem::absolute(input_path);
+    if (!std::filesystem::exists(output_path))
+        std::cerr << "absolute input path: " << std::filesystem::absolute(output_path);
+    ASSERT_TRUE(std::filesystem::exists(input_path));
+    ASSERT_TRUE(std::filesystem::exists(output_path));
+    std::stringstream ostream;
+    std::stringstream erstream;
+    compiler::CompilerOptions options;
+    options.stdlibDirectories.emplace_back("stdlib");
+    options.runProgram = true;
+    options.buildMode = compiler::BuildMode::Debug;
+    options.outputDirectory = std::filesystem::current_path();
+    compiler::parse_and_compile(options, environment, moduleCache, input_path, erstream, ostream);
+
+    std::ifstream file;
+    std::istringstream is;
+    std::string s;
+    std::string group;
+
+    file.open(output_path, std::ios::in);
+
+    if (!file.is_open()) {
+        std::cerr << input_path.string() << "\n";
+        std::cerr << std::filesystem::absolute(input_path);
+        FAIL();
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto expected = buffer.str();
+    std::string result = ostream.str();
+
+    result.erase(std::ranges::remove(result, '\r').begin(), result.end());
+
+
+    ASSERT_EQ(erstream.str(), "");
+    ASSERT_EQ(result, expected);
+}
+
+
 INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                          testing::Values("helloworld","math","functions","conditions","whileloop","forloop","arraytest",
                              "usemath","chararray","mixedtypes","structtest","nestedstructs","uselibc","nestedloops",
@@ -310,7 +368,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "private_fields","private_function",
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
-                             "try-infer-void-return","keyword-as-identifier","array-assign-immutable"
+                             "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
+                             "interpolation-utf8-error"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
@@ -318,3 +377,19 @@ INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
 //
 INSTANTIATE_TEST_SUITE_P(PanicTest, PanicTest,
                          testing::Values("runtime-slice-range-error","runtime-slice-range-set-error"));
+INSTANTIATE_TEST_SUITE_P(EncodingTest, EncodingTest,
+                         testing::Values("helloworld-cn",
+                             "test-escape-chars",
+                             "utf8-ascii",
+                             "utf8-comprehensive",
+                             "utf8-concat",
+                             "utf8-emoji",
+                             "utf8-empty",
+                             "utf8-indexing",
+                             "utf8-iterate",
+                             "utf8-length-verify",
+                             "utf8-loop",
+                             "utf8-mixed",
+                             "utf8-simple",
+                             "utf8-threebyte",
+                             "utf8-twobyte"));

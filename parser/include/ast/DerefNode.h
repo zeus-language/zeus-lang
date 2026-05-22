@@ -4,10 +4,10 @@
 namespace ast {
     class DerefNode : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_accessNode;
 
     public:
-        DerefNode(const Token &token, std::unique_ptr<ASTNode> accessNode);
+        DerefNode(const Token &token, std::shared_ptr<ASTNode> accessNode);
 
         ~DerefNode() override = default;
 
@@ -17,6 +17,6 @@ namespace ast {
 
         [[nodiscard]] ASTNode *accessNode() const;
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
     };
 }

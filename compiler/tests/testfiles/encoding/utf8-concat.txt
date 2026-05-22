@@ -1,0 +1,2 @@
+String after concatenation: Hello世
+Codepoint count after concat: 6

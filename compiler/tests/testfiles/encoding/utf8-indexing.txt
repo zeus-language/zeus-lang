@@ -1,0 +1,4 @@
+Character at index 0: 65
+Character at index 2: 99
+Character at index 5: 233
+Total length: 6

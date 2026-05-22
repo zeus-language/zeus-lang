@@ -55,8 +55,8 @@ namespace ast {
 
         NumberConstant &operator=(const NumberConstant &) = delete;
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<NumberConstant>(expressionToken(), m_numberType);
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<NumberConstant>(expressionToken(), m_numberType);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

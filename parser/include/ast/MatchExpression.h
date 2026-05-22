@@ -8,17 +8,17 @@
 
 namespace ast {
     struct MatchCase {
-        std::vector<std::unique_ptr<ASTNode> > matchKeys;
-        std::unique_ptr<ASTNode> expression;
+        std::vector<std::shared_ptr<ASTNode> > matchKeys;
+        std::shared_ptr<ASTNode> expression;
     };
 
     class MatchExpression final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_accessNode;
         std::vector<MatchCase> m_matchCases;
 
     public:
-        explicit MatchExpression(Token name, std::unique_ptr<ASTNode> accessNode,
+        explicit MatchExpression(Token name, std::shared_ptr<ASTNode> accessNode,
                                  std::vector<MatchCase> matchCases) : ASTNode(std::move(name)),
                                                                       m_accessNode(std::move(accessNode)),
                                                                       m_matchCases(std::move(matchCases)) {
@@ -67,16 +67,16 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<MatchExpression *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
+        std::shared_ptr<ASTNode> clone() override {
             std::vector<MatchCase> matchCaseClones;
-            for (auto &matchCase: m_matchCases) {
-                std::vector<std::unique_ptr<ASTNode> > keyClones;
-                for (auto &key: matchCase.matchKeys) {
+            for (auto &[matchKeys, expression]: m_matchCases) {
+                std::vector<std::shared_ptr<ASTNode> > keyClones;
+                for (const auto &key: matchKeys) {
                     keyClones.push_back(key->clone());
                 }
-                matchCaseClones.push_back(MatchCase{std::move(keyClones), matchCase.expression->clone()});
+                matchCaseClones.push_back(MatchCase{std::move(keyClones), expression->clone()});
             }
-            auto cloneNode = std::make_unique<MatchExpression>(expressionToken(),
+            auto cloneNode = std::make_shared<MatchExpression>(expressionToken(),
                                                                m_accessNode->clone(),
                                                                std::move(matchCaseClones));
             if (expressionType())

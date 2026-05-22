@@ -9,16 +9,16 @@
 namespace ast {
     class FieldAccess final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessNode;
+        std::shared_ptr<ASTNode> m_accessNode;
 
         std::optional<std::shared_ptr<types::VariableType> > m_structType = std::nullopt;
 
     public:
-        explicit FieldAccess(Token name, std::unique_ptr<ASTNode> accessNode) : ASTNode(std::move(name)),
+        explicit FieldAccess(Token name, std::shared_ptr<ASTNode> accessNode) : ASTNode(std::move(name)),
             m_accessNode(std::move(accessNode)) {
         }
 
-        [[nodiscard]] const Token& fieldName() const {
+        [[nodiscard]] const Token &fieldName() const {
             return expressionToken();
         }
 
@@ -36,7 +36,7 @@ namespace ast {
 
         FieldAccess &operator=(const FieldAccess &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> >& structType() const {
+        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > &structType() const {
             return m_structType;
         }
 
@@ -57,8 +57,8 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<FieldAccess *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<FieldAccess>(expressionToken(), m_accessNode->clone());
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<FieldAccess>(expressionToken(), std::move(m_accessNode->clone()));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             if (m_structType)

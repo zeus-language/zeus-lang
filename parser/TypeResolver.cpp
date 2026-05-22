@@ -132,13 +132,13 @@ namespace types {
         if (const auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(arrayType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
-            auto type = types::TypeRegistry::getArrayType(baseType.value(), arrayType->size);
+            auto type = currentScope->getArrayType(baseType.value(), arrayType->size);
             if (rawType->typeModifier == ast::TypeModifier::POINTER) {
                 if (!type) return std::nullopt;
-                return types::TypeRegistry::getPointerType(type.value());
+                return currentScope->getPointerType(type.value());
             } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
                 if (!type) return std::nullopt;
-                return types::TypeRegistry::getReferenceType(type.value());
+                return currentScope->getReferenceType(type.value());
             }
             return type;
         } else if (auto sliceType = dynamic_cast<ast::SliceRawType *>(rawType)) {
@@ -147,16 +147,16 @@ namespace types {
             auto type = currentScope->getSliceType(baseType.value());
             if (rawType->typeModifier == ast::TypeModifier::POINTER) {
                 if (!type) return std::nullopt;
-                return types::TypeRegistry::getPointerType(type.value());
+                return currentScope->getPointerType(type.value());
             } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
                 if (!type) return std::nullopt;
-                return types::TypeRegistry::getReferenceType(type.value());
+                return currentScope->getReferenceType(type.value());
             }
             return type;
         } else if (auto pointerType = dynamic_cast<ast::PointerRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(pointerType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getPointerType(baseType.value());
+            return currentScope->getPointerType(baseType.value());
         } else if (auto functionType = dynamic_cast<ast::FunctionRawType *>(rawType)) {
             // Function types are not supported as variable types
             std::vector<std::shared_ptr<VariableType> > argTypes;
@@ -179,11 +179,11 @@ namespace types {
         } else if (rawType->typeModifier == ast::TypeModifier::POINTER) {
             const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
             if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getPointerType(baseType.value());
+            return currentScope->getPointerType(baseType.value());
         } else if (rawType->typeModifier == ast::TypeModifier::REFERENCE) {
             const auto baseType = currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
             if (!baseType) return std::nullopt;
-            return types::TypeRegistry::getReferenceType(baseType.value());
+            return currentScope->getReferenceType(baseType.value());
         } else {
             if (useRawGenericName) {
                 auto nonGenericType = currentScope->getTypeByName(rawType->fullTypeName(), false);

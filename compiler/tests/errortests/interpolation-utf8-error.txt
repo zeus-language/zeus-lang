@@ -1,0 +1,12 @@
+FILENAME:3:13: error: No matching overload found for method 'append' with the given argument types for the signature 'append(&string, unknown)'.
+    println("café: ${l1} codepoints");
+            ^------
+FILENAME:4:13: error: No matching overload found for method 'append' with the given argument types for the signature 'append(&string, unknown)'.
+    println("你好: ${l2} codepoints");
+            ^----
+FILENAME:3:22: error: Variable 'l1' is not declared in this scope.
+    println("café: ${l1} codepoints");
+                     ^-
+FILENAME:4:20: error: Variable 'l2' is not declared in this scope.
+    println("你好: ${l2} codepoints");
+                   ^-

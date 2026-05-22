@@ -8,18 +8,18 @@ namespace ast {
     struct StructField {
         VisibilityModifier visibilityModifier;
         Token name;
-        std::unique_ptr<RawType> type;
+        std::shared_ptr<RawType> type;
     };
 
     class StructDeclaration final : public ASTNode {
     private:
         std::vector<StructField> m_fields;
-        std::vector<std::unique_ptr<ast::FunctionDefinition> > m_methods;
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<Token> m_genericParam;
 
     public:
         StructDeclaration(Token name, std::vector<StructField> fields,
-                          std::vector<std::unique_ptr<ast::FunctionDefinition> >
+                          std::vector<std::shared_ptr<ast::FunctionDefinition> >
                           methods, std::optional<Token> genericParam) : ASTNode(std::move(name),
                                                                             NodeType::STRUCT_DECLARATION),
                                                                         m_fields(std::move(fields)),
@@ -38,11 +38,11 @@ namespace ast {
         StructDeclaration &operator=(const StructDeclaration &) = delete;
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
-        std::vector<std::unique_ptr<ast::FunctionDefinition> > &methods() { return m_methods; }
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods() { return m_methods; }
 
         [[nodiscard]] const std::optional<Token> &genericParam() const { return m_genericParam; }
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             if (expressionToken() == token) {
@@ -62,7 +62,7 @@ namespace ast {
         }
     };
 
-    inline std::unique_ptr<ASTNode> StructDeclaration::clone() {
+    inline std::shared_ptr<ASTNode> StructDeclaration::clone() {
         std::vector<StructField> fieldsClone;
         fieldsClone.reserve(m_fields.size());
         for (const auto &field: m_fields) {
@@ -71,12 +71,12 @@ namespace ast {
                 .type = field.type->clone()
             });
         }
-        std::vector<std::unique_ptr<ast::FunctionDefinition> > methodsClone;
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > methodsClone;
         methodsClone.reserve(m_methods.size());
         for (const auto &method: m_methods) {
             methodsClone.push_back(method->cloneFunction2());
         }
-        auto cloneNode = std::make_unique<StructDeclaration>(expressionToken(),
+        auto cloneNode = std::make_shared<StructDeclaration>(expressionToken(),
                                                              std::move(fieldsClone),
                                                              std::move(methodsClone),
                                                              m_genericParam);

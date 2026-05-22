@@ -119,7 +119,11 @@ namespace modules {
     void ModuleCache::addModule(const std::string &path, const std::shared_ptr<parser::Module> &module) {
         if (!isEnabled)
             return;
-        entries[path] = module; //std::make_shared<parser::Module>(*module);
+        entries[path] = module;
+    }
+
+    void ModuleCache::removeModule(const std::string &path) {
+        entries.erase(path);
     }
 
     std::vector<std::shared_ptr<parser::Module> > ModuleCache::findModulesByPathStart(
@@ -156,6 +160,10 @@ namespace modules {
             result.push_back(path);
         }
         return result;
+    }
+
+    void ModuleCache::clear() {
+        entries.clear();
     }
 
     void include_modules(

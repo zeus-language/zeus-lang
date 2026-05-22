@@ -51,6 +51,7 @@
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/IfCondition.h"
+#include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
 #include "ast/MatchExpression.h"
@@ -183,6 +184,12 @@ namespace llvm_backend {
         }
     };
 
+    struct Defer {
+        std::vector<ast::ASTNode *> deferedStatements;
+
+        llvm::BasicBlock *deferBlock;
+    };
+
     struct LLVMBackendState {
     private:
         std::vector<ast::FunctionDefinitionBase *> function_definition;
@@ -201,7 +208,7 @@ namespace llvm_backend {
         std::unique_ptr<llvm::StandardInstrumentations> TheSI;
         BreakBlock currentBreakBlock;
         llvm::Triple target;
-        std::vector<ast::ASTNode *> deferedStatements;
+        std::vector<Defer> deferStack;
 
         std::vector<std::string> linkerFlags;
 
@@ -293,6 +300,24 @@ namespace llvm_backend {
             llvm::DICompileUnit *TheCU = nullptr;
             std::vector<llvm::DIScope *> LexicalBlocks;
         } KSDbgInfo;
+
+
+        Defer &findDeferForBlock(llvm::BasicBlock *block) {
+            for (auto &defer: deferStack) {
+                if (defer.deferBlock == block) {
+                    return defer;
+                }
+            }
+            deferStack.emplace_back();
+            deferStack.back().deferBlock = block;
+            return deferStack.back();
+        }
+
+        void removeDeferForBlock(llvm::BasicBlock *block) {
+            deferStack.erase(std::remove_if(deferStack.begin(), deferStack.end(),
+                                            [block](const Defer &defer) { return defer.deferBlock == block; }),
+                             deferStack.end());
+        }
     };
 
 
@@ -392,6 +417,8 @@ namespace llvm_backend {
                 break;
             case types::TypeKind::POINTER:
                 return llvm::PointerType::getUnqual(*context.TheContext);
+            case types::TypeKind::SLICE:
+                break;
         }
         assert(false && "Unknown type");
         return nullptr;
@@ -482,6 +509,8 @@ namespace llvm_backend {
     llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::LambdaExpression *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState);
 
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
@@ -600,10 +629,20 @@ namespace llvm_backend {
         if (const auto lambdaExpr = dynamic_cast<ast::LambdaExpression *>(node)) {
             return llvm_backend::codegen(lambdaExpr, llvmState);
         }
+        if (const auto interpolatedString = dynamic_cast<ast::InterpolatedString *>(node)) {
+            return llvm_backend::codegen(interpolatedString, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState) {
+        for (const auto &part: node->nodes()) {
+            const auto value = codegen_base(part.get(), llvmState);
+        }
+        return codegen_base(node->accessNode().get(), llvmState);
     }
 
     llvm::Value *codegen(ast::DerefNode *node, LLVMBackendState &llvmState) {
@@ -612,16 +651,30 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState) {
-        llvmState.deferedStatements.push_back(node->deferredNode());
+        auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+        defer.deferedStatements.push_back(node->deferredNode());
         return nullptr;
     }
 
 
     llvm::Value *codegen(ast::BlockNode *node, LLVMBackendState &llvmState) {
         llvm::Value *lastValue = nullptr;
+        // const auto block = llvm::BasicBlock::Create(*llvmState.TheContext, "block",
+        //                                             llvmState.Builder->GetInsertBlock()->getParent());
+        // llvmState.Builder->CreateBr(block);
+        // llvmState.Builder->SetInsertPoint(block);
+        auto block = llvmState.Builder->GetInsertBlock();
+
         for (const auto &statement: node->statements()) {
             lastValue = codegen_base(statement.get(), llvmState);
         }
+
+        auto &defer = llvmState.findDeferForBlock(block);
+        for (auto deferedExpression: defer.deferedStatements) {
+            codegen_base(deferedExpression, llvmState);
+        }
+        llvmState.removeDeferForBlock(block);
+
         return lastValue;
     }
 
@@ -864,10 +917,17 @@ namespace llvm_backend {
             return value; // No cast needed
         }
         if (targetType->isIntegerTy()) {
+            const auto isSigned = std::dynamic_pointer_cast<types::IntegerType>(node->expressionType().value())->
+                    isSigned();
             if (value->getType()->isFloatingPointTy()) {
-                return llvmState.Builder->CreateFPToSI(value, targetType, "float_to_int_cast");
+                if (isSigned)
+                    return llvmState.Builder->CreateFPToSI(value, targetType, "float_to_int_cast");
+                else
+                    return llvmState.Builder->CreateFPToUI(value, targetType, "float_to_int_cast");
             }
-            return llvmState.Builder->CreateIntCast(value, targetType, true, "int_cast");
+
+
+            return llvmState.Builder->CreateIntCast(value, targetType, isSigned, "int_cast");
         }
         if (targetType->isFloatingPointTy()) {
             if (value->getType()->isIntegerTy()) {
@@ -1461,6 +1521,14 @@ namespace llvm_backend {
         if (node->operatorFunction()) {
             return codegenStructOperatorNodeCall(node, llvmState);
         }
+        const auto lhsType = node->lhs()->expressionType().value();
+        const auto rhsType = node->rhs()->expressionType().value();
+        bool isSigned = true;
+        if (lhsType->typeKind() == types::TypeKind::INT) {
+            isSigned = std::dynamic_pointer_cast<types::IntegerType>(lhsType)->isSigned();
+        } else if (rhsType->typeKind() == types::TypeKind::INT) {
+            isSigned = std::dynamic_pointer_cast<types::IntegerType>(rhsType)->isSigned();
+        }
         llvm::CmpInst::Predicate pred = llvm::CmpInst::ICMP_EQ;
         if (lhs->getType()->isDoubleTy() || lhs->getType()->isFloatTy()) {
             pred = llvm::CmpInst::FCMP_OEQ;
@@ -1495,24 +1563,35 @@ namespace llvm_backend {
 
                     break;
                 case ast::CMPOperator::GREATER:
-                    pred = llvm::CmpInst::ICMP_SGT;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SGT;
+                    else
+                        pred = llvm::CmpInst::ICMP_UGT;
                     break;
                 case ast::CMPOperator::GREATER_EQUAL:
-                    pred = llvm::CmpInst::ICMP_SGE;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SGE;
+                    else
+                        pred = llvm::CmpInst::ICMP_UGE;
                     break;
                 case ast::CMPOperator::LESS:
-                    pred = llvm::CmpInst::ICMP_SLT;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SLT;
+                    else
+                        pred = llvm::CmpInst::ICMP_ULT;
                     break;
                 case ast::CMPOperator::LESS_EQUAL:
-                    pred = llvm::CmpInst::ICMP_SLE;
+                    if (isSigned)
+                        pred = llvm::CmpInst::ICMP_SLE;
+                    else
+                        pred = llvm::CmpInst::ICMP_ULE;
                     break;
                 default:
                     break;
             }
         }
 
-        const auto lhsType = node->lhs()->expressionType().value();
-        const auto rhsType = node->rhs()->expressionType().value();
+
         if (lhsType && rhsType) {
             if (lhsType->name() == rhsType->name() && lhsType->typeKind() == types::TypeKind::INT) {
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
@@ -1537,9 +1616,9 @@ namespace llvm_backend {
         const auto rhs = node->rhs();
         switch (node->logical_operator()) {
             case ast::LogicalOperator::AND:
-                return llvmState.Builder->CreateAnd(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+                return llvmState.Builder->CreateLogicalAnd(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
             case ast::LogicalOperator::OR:
-                return llvmState.Builder->CreateOr(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
+                return llvmState.Builder->CreateLogicalOr(codegen_base(lhs, llvmState), codegen_base(rhs, llvmState));
             case ast::LogicalOperator::NOT:
                 return llvmState.Builder->CreateNot(codegen_base(rhs, llvmState));
             default:
@@ -1685,6 +1764,26 @@ namespace llvm_backend {
             case ast::BinaryOperator::MOD:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
                     return llvmState.Builder->CreateSRem(lhs, rhs, "modtmp");
+                }
+                break;
+            case ast::BinaryOperator::AND:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAnd(lhs, rhs, "andtmp");
+                }
+                break;
+            case ast::BinaryOperator::OR:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateOr(lhs, rhs, "ortmp");
+                }
+                break;
+            case ast::BinaryOperator::LEFT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
+                }
+                break;
+            case ast::BinaryOperator::RIGHT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAShr(lhs, rhs, "shrtmp");
                 }
                 break;
             default:
@@ -2155,10 +2254,12 @@ namespace llvm_backend {
 
     llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
         llvmState.currentBreakBlock.BlockUsed = true;
-        for (auto deferedExpression: llvmState.deferedStatements) {
-            codegen_base(deferedExpression, llvmState);
+        for (auto &defer: llvmState.deferStack) {
+            for (auto deferedExpression: defer.deferedStatements) {
+                codegen_base(deferedExpression, llvmState);
+            }
         }
-
+        llvmState.deferStack.clear();
         if (const auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
             const auto parentFunction = llvmState.Builder->GetInsertBlock()->getParent();
@@ -2318,9 +2419,11 @@ namespace llvm_backend {
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
         if (!node->expressionType() || node->expressionType().value()->typeKind() == types::TypeKind::VOID) {
-            for (auto deferedExpression: llvmState.deferedStatements) {
+            auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+            for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
+            llvmState.removeDeferForBlock(llvmState.Builder->GetInsertBlock());
             llvmState.Builder->CreateRetVoid();
         }
 
@@ -2471,7 +2574,7 @@ namespace llvm_backend {
 
     void codegen(ast::FunctionDefinition *node, LLVMBackendState &llvmState) {
         llvmState.newScope();
-        llvmState.deferedStatements.clear();
+        llvmState.deferStack.clear();
         std::vector<llvm::Type *> params;
         if (llvmState.DBuilder) {
             const auto &sourceLocation = node->expressionToken().source_location;
@@ -2599,9 +2702,11 @@ namespace llvm_backend {
         b.addAttribute("frame-pointer", "all");
         functionDefinition->addFnAttrs(b);
         if (!node->expressionType() || node->expressionType().value()->typeKind() == types::TypeKind::VOID) {
-            for (auto deferedExpression: llvmState.deferedStatements) {
+            auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+            for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
+            llvmState.removeDeferForBlock(llvmState.Builder->GetInsertBlock());
             llvmState.Builder->CreateRetVoid();
         }
 
@@ -2835,12 +2940,10 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
                 continue;
             }
             for (auto &method: structType->methods()) {
-                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
-                llvm_backend::codegen_functionstub(methodDef, context);
+                llvm_backend::codegen_functionstub(method.get(), context);
             }
             for (auto &method: structType->methods()) {
-                auto methodDef = dynamic_cast<ast::FunctionDefinition *>(method.get());
-                llvm_backend::codegen(dynamic_cast<ast::FunctionDefinition *>(method.get()), context);
+                llvm_backend::codegen(method.get(), context);
             }
         }
     }
@@ -2923,6 +3026,7 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {
+        delete TheTargetMachine;
         return;
     }
 
@@ -2931,4 +3035,5 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
             errorStream << "program could not be executed!\n";
         }
     }
+    delete TheTargetMachine;
 }

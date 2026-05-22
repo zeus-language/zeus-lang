@@ -1,0 +1,14 @@
+fn main() : i32 {
+    let mut mixed_str : string = string::from_slice("Aáあ");
+    defer mixed_str.destroy();
+    let slice = mixed_str.as_slice();
+
+    let codepoint_length = mixed_str.length() as i32;
+    let byte_length = slice.length as i32;
+
+    println("Mixed codepoint count: ${codepoint_length}"); // should output 3
+    println("Mixed byte count: ${byte_length}"); // should output 6 (A=1, á=2, あ=3)
+
+    return 0;
+}
+

@@ -11,6 +11,9 @@ extern pub fn strlen(s: *u8) : u64;
 extern pub fn strcmp(s1: *u8, s2: *u8) : i32;
 extern pub fn strcpy(dest: *u8, src: *u8) : *u8;
 
+extern pub fn wctomb(s: *u8, wc: char) : i32;
+
+
 // file api
 extern type FILE;
 extern pub fn fopen(filename: *u8, mode: *u8) : *FILE;

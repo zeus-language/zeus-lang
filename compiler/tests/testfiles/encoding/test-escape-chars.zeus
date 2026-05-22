@@ -1,0 +1,11 @@
+
+fn main() :i32{
+    print("Hello, World!\n");
+    println("This is a test of escape characters:");
+    // utf-8 escaped characters
+    print("This is a test of utf-8 characters: ");
+    println("\u{1f600}"); // 😀
+    println("\u{1f601} \u{1f602} \u{1f603}");
+    printf(r"This is a test of printf with unicode: %s\n", r"\u{1f600}");
+    return 0;
+}

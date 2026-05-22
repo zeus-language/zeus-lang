@@ -1,0 +1,2 @@
+Codepoint count: 2
+Byte count: 6

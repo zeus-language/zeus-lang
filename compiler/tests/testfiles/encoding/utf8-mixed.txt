@@ -1,0 +1,2 @@
+Mixed codepoint count: 3
+Mixed byte count: 6

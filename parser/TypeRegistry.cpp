@@ -20,15 +20,22 @@ types::TypeRegistry::TypeRegistry() {
     registerType(std::make_shared<types::VariableType>("void", types::TypeKind::VOID));
     registerType(std::make_shared<types::VariableType>("bool", types::TypeKind::BOOL));
     registerType(std::make_shared<types::IntegerType>("u8", 1, false));
+    registerType(std::make_shared<types::IntegerType>("char", 32, false));
     registerType(std::make_shared<types::IntegerType>("u16", 2, false));
     registerType(std::make_shared<types::IntegerType>("u32", 4, false));
     registerType(std::make_shared<types::IntegerType>("i8", 1, true));
     registerType(std::make_shared<types::IntegerType>("i16", 2, true));
     registerType(std::make_shared<types::IntegerType>("i64", 8, true));
     registerType(std::make_shared<types::IntegerType>("u64", 8, false));
+    registerType(std::make_shared<types::IntegerType>("usize", 8, false));
     registerType(std::make_shared<types::VariableType>("float", types::TypeKind::FLOAT));
     registerType(std::make_shared<types::VariableType>("double", types::TypeKind::DOUBLE));
     registerType(createOstypeEnum());
+}
+
+types::TypeRegistry::~TypeRegistry() {
+    m_types.clear();
+    m_typeAliases.clear();
 }
 
 const std::vector<std::shared_ptr<types::VariableType> > &types::TypeRegistry::registeredTypes() const {
@@ -49,21 +56,39 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSli
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
     const std::shared_ptr<VariableType> &base_type) {
-    return std::make_optional(
-        std::make_shared<types::PointerType>("*" + base_type->name(), base_type));
+    auto typeName = "*" + base_type->name();
+    if (auto foundType = getTypeByName(typeName, false)) {
+        return foundType;
+    }
+
+    auto pointerType = std::make_shared<types::PointerType>(typeName, base_type);
+    registerType(pointerType);
+    return std::make_optional(pointerType);
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getReferenceType(
     const std::shared_ptr<VariableType> &base_type) {
-    return std::make_shared<types::ReferenceType>("&" + base_type->name(), base_type);
+    auto typeName = "&" + base_type->name();
+    if (auto foundType = getTypeByName(typeName, false)) {
+        return foundType;
+    }
+
+    auto pointerType = std::make_shared<types::ReferenceType>(typeName, base_type);
+    registerType(pointerType);
+    return std::make_optional(pointerType);
 }
 
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getArrayType(
     const std::shared_ptr<VariableType> &base_type, size_t size) {
-    return std::make_optional(
-        std::make_shared<types::ArrayType>("array[" + base_type->name() + "; " + std::to_string(size) + "]",
-                                           size, base_type));
+    auto typeName = "array[" + base_type->name() + "; " + std::to_string(size) + "]";
+    if (auto foundType = getTypeByName(typeName, false)) {
+        return foundType;
+    }
+
+    auto arrayType = std::make_shared<types::ArrayType>(typeName, size, base_type);
+    registerType(arrayType);
+    return std::make_optional(arrayType);
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTypeByName(

@@ -1,0 +1,9 @@
+fn main() : i32 {
+    let mut a : string = string::from_slice("á");
+    defer a.destroy();
+    let slice = a.as_slice();
+    println(a);
+    println(a.length() as i32); // should output 1
+    println(slice.length); // should output 2
+    return 0;
+}

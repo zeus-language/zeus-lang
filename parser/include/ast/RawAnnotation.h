@@ -4,7 +4,7 @@
 namespace ast {
     struct AnnotationArgument {
         std::string name;
-        std::unique_ptr<ASTNode> value;
+        std::shared_ptr<ASTNode> value;
     };
 
     class RawAnnotation : public ASTNode {
@@ -21,16 +21,16 @@ namespace ast {
 
         [[nodiscard]] const std::vector<AnnotationArgument> &args() const { return m_args; }
 
-        [[nodiscard]] std::optional<std::unique_ptr<ASTNode> > getArgumentByName(const std::string &argName) const {
+        [[nodiscard]] std::optional<std::shared_ptr<ASTNode> > getArgumentByName(const std::string &argName) const {
             for (const auto &arg: m_args) {
                 if (arg.name == argName) {
-                    return std::make_optional<std::unique_ptr<ASTNode> >(arg.value->clone());
+                    return std::make_optional<std::shared_ptr<ASTNode> >(arg.value->clone());
                 }
             }
             return std::nullopt;
         }
 
-        std::unique_ptr<RawAnnotation> cloneAnnotation() {
+        std::shared_ptr<RawAnnotation> cloneAnnotation() {
             std::vector<AnnotationArgument> clonedArgs;
             for (const auto &arg: m_args) {
                 clonedArgs.push_back(AnnotationArgument{
@@ -38,7 +38,7 @@ namespace ast {
                     .value = arg.value->clone()
                 });
             }
-            return std::make_unique<RawAnnotation>(expressionToken(), m_name, std::move(clonedArgs));
+            return std::make_shared<RawAnnotation>(expressionToken(), m_name, std::move(clonedArgs));
         }
     };
 }

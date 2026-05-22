@@ -16,17 +16,17 @@ namespace ast {
     class LogicalExpression final : public ASTNode {
     private:
         LogicalOperator m_operator;
-        std::unique_ptr<ASTNode> m_lhs;
-        std::unique_ptr<ASTNode> m_rhs;
+        std::shared_ptr<ASTNode> m_lhs;
+        std::shared_ptr<ASTNode> m_rhs;
 
     public:
-        explicit LogicalExpression(Token name, LogicalOperator op, std::unique_ptr<ASTNode> lhs,
-                                   std::unique_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
+        explicit LogicalExpression(Token name, LogicalOperator op, std::shared_ptr<ASTNode> lhs,
+                                   std::shared_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
                                                                    m_lhs(std::move(lhs)), m_rhs(std::move(rhs)) {
         }
 
         explicit LogicalExpression(Token name, LogicalOperator op,
-                                   std::unique_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
+                                   std::shared_ptr<ASTNode> rhs) : ASTNode(std::move(name)), m_operator(op),
                                                                    m_lhs(nullptr), m_rhs(std::move(rhs)) {
         }
 
@@ -60,12 +60,12 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            std::unique_ptr<ASTNode> lhsClone = nullptr;
+        std::shared_ptr<ASTNode> clone() override {
+            std::shared_ptr<ASTNode> lhsClone = nullptr;
             if (m_lhs) {
                 lhsClone = m_lhs->clone();
             }
-            auto cloneNode = std::make_unique<LogicalExpression>(expressionToken(),
+            auto cloneNode = std::make_shared<LogicalExpression>(expressionToken(),
                                                                  m_operator,
                                                                  std::move(lhsClone),
                                                                  m_rhs->clone());

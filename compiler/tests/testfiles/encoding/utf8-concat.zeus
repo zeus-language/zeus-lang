@@ -1,0 +1,15 @@
+fn main() : i32 {
+    let mut result : string = string::from_slice("Hello");
+    let mut suffix : string = string::from_slice("世");
+    defer result.destroy();
+    defer suffix.destroy();
+
+    result.append(&suffix);
+    let codepoint_length = result.length() as i32;
+
+    println("String after concatenation: ${result}");
+    println("Codepoint count after concat: ${codepoint_length}"); // should output 6
+
+    return 0;
+}
+

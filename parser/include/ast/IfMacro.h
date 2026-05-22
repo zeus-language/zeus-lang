@@ -3,13 +3,13 @@
 
 namespace ast {
     class IfMacro : public ASTNode {
-        std::unique_ptr<ASTNode> m_condition;
-        std::vector<std::unique_ptr<ASTNode> > m_ifBlock;
-        std::vector<std::unique_ptr<ASTNode> > m_elseBlock;
+        std::shared_ptr<ASTNode> m_condition;
+        std::vector<std::shared_ptr<ASTNode> > m_ifBlock;
+        std::vector<std::shared_ptr<ASTNode> > m_elseBlock;
 
     public:
-        IfMacro(const Token &token, std::unique_ptr<ASTNode> condition, std::vector<std::unique_ptr<ASTNode> > ifBlock,
-                std::vector<std::unique_ptr<ASTNode> > elseBlock) : ASTNode(token, NodeType::IF_MACRO),
+        IfMacro(const Token &token, std::shared_ptr<ASTNode> condition, std::vector<std::shared_ptr<ASTNode> > ifBlock,
+                std::vector<std::shared_ptr<ASTNode> > elseBlock) : ASTNode(token, NodeType::IF_MACRO),
                                                                     m_condition(std::move(condition)),
                                                                     m_ifBlock(std::move(ifBlock)),
                                                                     m_elseBlock(std::move(elseBlock)) {
@@ -27,22 +27,22 @@ namespace ast {
 
         [[nodiscard]] ASTNode *condition() const { return m_condition.get(); }
 
-        [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &ifBlock() { return m_ifBlock; }
+        [[nodiscard]] std::vector<std::shared_ptr<ASTNode> > &ifBlock() { return m_ifBlock; }
 
-        [[nodiscard]] std::vector<std::unique_ptr<ASTNode> > &elseBlock() { return m_elseBlock; }
+        [[nodiscard]] std::vector<std::shared_ptr<ASTNode> > &elseBlock() { return m_elseBlock; }
 
-        std::unique_ptr<ASTNode> clone() override {
-            std::vector<std::unique_ptr<ASTNode> > ifBlockClone;
+        std::shared_ptr<ASTNode> clone() override {
+            std::vector<std::shared_ptr<ASTNode> > ifBlockClone;
             ifBlockClone.reserve(m_ifBlock.size());
             for (const auto &statement: m_ifBlock) {
                 ifBlockClone.push_back(statement->clone());
             }
-            std::vector<std::unique_ptr<ASTNode> > elseBlockClone;
+            std::vector<std::shared_ptr<ASTNode> > elseBlockClone;
             elseBlockClone.reserve(m_elseBlock.size());
             for (const auto &statement: m_elseBlock) {
                 elseBlockClone.push_back(statement->clone());
             }
-            auto cloneNode = std::make_unique<IfMacro>(expressionToken(), m_condition->clone(), std::move(ifBlockClone),
+            auto cloneNode = std::make_shared<IfMacro>(expressionToken(), m_condition->clone(), std::move(ifBlockClone),
                                                        std::move(elseBlockClone));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

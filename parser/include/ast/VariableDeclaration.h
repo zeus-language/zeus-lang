@@ -56,49 +56,49 @@ namespace ast {
             return m_fullTypeName;
         }
 
-        [[nodiscard]] virtual std::unique_ptr<RawType> clone() const {
+        [[nodiscard]] virtual std::shared_ptr<RawType> clone() const {
             return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam, m_fullTypeName);
         }
     };
 
     struct PointerRawType final : RawType {
-        std::unique_ptr<RawType> baseType;
+        std::shared_ptr<RawType> baseType;
 
         PointerRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
-                       std::unique_ptr<RawType> base_type)
+                       std::shared_ptr<RawType> base_type)
             : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
               baseType(std::move(base_type)) {
         }
 
         ~PointerRawType() override = default;
 
-        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
-            return std::make_unique<PointerRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
+        [[nodiscard]] std::shared_ptr<RawType> clone() const override {
+            return std::make_shared<PointerRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
         }
     };
 
     struct SliceRawType final : RawType {
-        std::unique_ptr<RawType> baseType;
+        std::shared_ptr<RawType> baseType;
 
         SliceRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
-                     std::unique_ptr<RawType> base_type)
+                     std::shared_ptr<RawType> base_type)
             : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
               baseType(std::move(base_type)) {
         }
 
         ~SliceRawType() override = default;
 
-        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
-            return std::make_unique<SliceRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
+        [[nodiscard]] std::shared_ptr<RawType> clone() const override {
+            return std::make_shared<SliceRawType>(typeToken, namespaceElements, typeModifier, baseType->clone());
         }
     };
 
     struct ArrayRawType final : RawType {
-        std::unique_ptr<RawType> baseType;
+        std::shared_ptr<RawType> baseType;
         size_t size;
 
         ArrayRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
-                     std::unique_ptr<RawType> base_type, size_t size)
+                     std::shared_ptr<RawType> base_type, size_t size)
             : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
               baseType(std::move(base_type)),
               size(size) {
@@ -106,17 +106,17 @@ namespace ast {
 
         ~ArrayRawType() override = default;
 
-        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
-            return std::make_unique<ArrayRawType>(typeToken, namespaceElements, typeModifier, baseType->clone(), size);
+        [[nodiscard]] std::shared_ptr<RawType> clone() const override {
+            return std::make_shared<ArrayRawType>(typeToken, namespaceElements, typeModifier, baseType->clone(), size);
         }
     };
 
     struct FunctionRawType final : RawType {
-        std::vector<std::unique_ptr<RawType> > argumentTypes;
-        std::unique_ptr<RawType> returnType;
+        std::vector<std::shared_ptr<RawType> > argumentTypes;
+        std::shared_ptr<RawType> returnType;
 
-        FunctionRawType(const Token &type_token, std::vector<std::unique_ptr<RawType> > argument_types,
-                        std::unique_ptr<RawType> return_type)
+        FunctionRawType(const Token &type_token, std::vector<std::shared_ptr<RawType> > argument_types,
+                        std::shared_ptr<RawType> return_type)
             : RawType(type_token, {}, TypeModifier::NONE, std::nullopt),
               argumentTypes(std::move(argument_types)),
               returnType(std::move(return_type)) {
@@ -124,25 +124,25 @@ namespace ast {
 
         ~FunctionRawType() override = default;
 
-        [[nodiscard]] std::unique_ptr<RawType> clone() const override {
-            std::vector<std::unique_ptr<RawType> > argTypesClones;
+        [[nodiscard]] std::shared_ptr<RawType> clone() const override {
+            std::vector<std::shared_ptr<RawType> > argTypesClones;
             for (const auto &argType: argumentTypes) {
                 argTypesClones.push_back(argType->clone());
             }
-            return std::make_unique<FunctionRawType>(typeToken, std::move(argTypesClones), returnType->clone());
+            return std::make_shared<FunctionRawType>(typeToken, std::move(argTypesClones), returnType->clone());
         }
     };
 
     class VariableDeclaration final : public ASTNode {
     private:
-        std::optional<std::unique_ptr<RawType> > m_type;
+        std::optional<std::shared_ptr<RawType> > m_type;
 
         bool m_constant;
-        std::optional<std::unique_ptr<ASTNode> > m_initialValue;
+        std::optional<std::shared_ptr<ASTNode> > m_initialValue;
 
     public:
-        explicit VariableDeclaration(Token name, std::optional<std::unique_ptr<RawType> > type, bool constant,
-                                     std::optional<std::unique_ptr<ASTNode> > initialValue);
+        explicit VariableDeclaration(Token name, std::optional<std::shared_ptr<RawType> > type, bool constant,
+                                     std::optional<std::shared_ptr<ASTNode> > initialValue);
 
         ~VariableDeclaration() override = default;
 
@@ -168,7 +168,7 @@ namespace ast {
             return std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
 
         VariableDeclaration copy() const;
 

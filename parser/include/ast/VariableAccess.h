@@ -12,10 +12,9 @@ namespace ast {
         bool m_constant = false;
 
     public:
-        explicit VariableAccess(Token name) : ASTNode(std::move(name), ast::NodeType::VARIABLE_ACCESS) {
-        }
+        explicit VariableAccess(Token name);
 
-        ~VariableAccess() override = default;
+        ~VariableAccess() override;
 
         VariableAccess(VariableAccess &&) = default;
 
@@ -33,8 +32,9 @@ namespace ast {
             return m_constant;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<VariableAccess>(expressionToken());
+        std::shared_ptr<ASTNode> clone() override {
+            auto name = expressionToken();
+            auto cloneNode = std::make_shared<VariableAccess>(name);
             cloneNode->setConstant(m_constant);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

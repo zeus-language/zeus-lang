@@ -61,7 +61,7 @@ namespace ast {
     public:
         virtual ~ASTNode() = default;
 
-        virtual std::unique_ptr<ASTNode> clone() {
+        virtual std::shared_ptr<ASTNode> clone() {
             assert(false && "clone not implemented for this ASTNode type");
             return nullptr;
         }
@@ -71,14 +71,15 @@ namespace ast {
                 return;
             }
             if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
-                m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
+                m_expressionType = genericParam;
             } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
                        m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
                 if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
                     if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
                         auto newBaseType = genericParam;
-                        auto newPtrType = std::make_shared<types::PointerType>("*" + newBaseType->name(), newBaseType);
-                        m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(newPtrType);
+                        const auto newPtrType = std::make_shared<types::PointerType>(
+                            "*" + newBaseType->name(), newBaseType);
+                        m_expressionType = newPtrType;
                     }
                 }
             }
@@ -93,12 +94,16 @@ namespace ast {
 
         ASTNode &operator=(const ASTNode &) = delete;
 
-        [[nodiscard]] const std::optional<std::shared_ptr<types::VariableType> > &expressionType() const {
-            return m_expressionType;
+        [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > expressionType() const {
+            return (m_expressionType.has_value())
+                       ? std::make_optional(m_expressionType.value())
+                       : std::nullopt;
         }
 
+
         void setExpressionType(const std::shared_ptr<types::VariableType> &type) {
-            m_expressionType = std::make_optional<std::shared_ptr<types::VariableType> >(type);
+            assert(type != nullptr);
+            m_expressionType = type;
         }
 
         [[nodiscard]] virtual bool constant() const {

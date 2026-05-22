@@ -3,7 +3,7 @@ use std::str;
 #if target_os == ostype::WINDOWS
     use std::os::windows;
 #else
-    use std::os::unix;
+    use std::os::unix::posix;
 #endif
 pub fn path_separator() : [u8] {
     return match target_os {

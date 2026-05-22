@@ -5,10 +5,10 @@
 namespace ast {
     class DeferStatement : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_deferredNode;
+        std::shared_ptr<ASTNode> m_deferredNode;
 
     public:
-        explicit DeferStatement(Token token, std::unique_ptr<ASTNode> deferredNode) : ASTNode(std::move(token)),
+        explicit DeferStatement(Token token, std::shared_ptr<ASTNode> deferredNode) : ASTNode(std::move(token)),
             m_deferredNode(std::move(deferredNode)) {
         }
 
@@ -16,8 +16,8 @@ namespace ast {
 
         [[nodiscard]] ASTNode *deferredNode() const { return m_deferredNode.get(); }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<DeferStatement>(expressionToken(), m_deferredNode->clone());
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<DeferStatement>(expressionToken(), m_deferredNode->clone());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

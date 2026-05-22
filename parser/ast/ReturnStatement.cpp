@@ -5,7 +5,7 @@
 #include "ast/ReturnStatement.h"
 
 namespace ast {
-    ReturnStatement::ReturnStatement(Token returnToken, std::optional<std::unique_ptr<ASTNode> > returnValue)
-        : ASTNode(std::move(returnToken),NodeType::RETURN), m_returnValue(std::move(returnValue)) {
+    ReturnStatement::ReturnStatement(Token returnToken, const std::shared_ptr<ASTNode> &returnValue)
+        : ASTNode(std::move(returnToken), NodeType::RETURN), m_returnValue(returnValue) {
     }
 } // ast

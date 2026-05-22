@@ -1,0 +1,12 @@
+
+fn main() : i32 {
+    let mut helloworld = string::from_slice("你好世界");
+    defer helloworld.destroy();
+    let slice = helloworld.as_slice();
+    let byte_length = slice.length;
+    let length = helloworld.length() as i32;
+    println("Message: ${helloworld}");
+    println("Length: ${length}"); // should output 4
+    println("Length in byes: ${byte_length}"); // should output 12
+    return 0;
+}

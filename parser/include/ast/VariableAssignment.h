@@ -13,10 +13,10 @@
 namespace ast {
     class VariableAssignment final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_expression;
+        std::shared_ptr<ASTNode> m_expression;
 
     public:
-        explicit VariableAssignment(Token name, std::unique_ptr<ASTNode> expression);
+        explicit VariableAssignment(Token name, std::shared_ptr<ASTNode> expression);
 
         [[nodiscard]] ASTNode *expression() const {
             return m_expression.get();
@@ -34,7 +34,7 @@ namespace ast {
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
 
-        std::unique_ptr<ASTNode> clone() override;
+        std::shared_ptr<ASTNode> clone() override;
     };
 } // ast
 

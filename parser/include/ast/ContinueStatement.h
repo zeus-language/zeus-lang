@@ -16,8 +16,9 @@ namespace ast {
         ContinueStatement &operator=(ContinueStatement &&) = delete;
 
         ContinueStatement &operator=(const ContinueStatement &) = delete;
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<ContinueStatement>(expressionToken());
+
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<ContinueStatement>(expressionToken());
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
             return std::move(cloneNode);

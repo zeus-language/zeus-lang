@@ -9,14 +9,14 @@
 namespace ast {
     class ArrayAccess final : public ASTNode {
     private:
-        std::unique_ptr<ASTNode> m_accessExpression;
-        std::unique_ptr<ASTNode> m_indexExpression;
+        std::shared_ptr<ASTNode> m_accessExpression;
+        std::shared_ptr<ASTNode> m_indexExpression;
 
         std::optional<std::shared_ptr<types::VariableType> > m_arrayType = std::nullopt;
 
     public:
-        explicit ArrayAccess(Token name, std::unique_ptr<ASTNode> accessExpression,
-                             std::unique_ptr<ASTNode> indexExpression) : ASTNode(std::move(name)),
+        explicit ArrayAccess(Token name, std::shared_ptr<ASTNode> accessExpression,
+                             std::shared_ptr<ASTNode> indexExpression) : ASTNode(std::move(name)),
                                                                          m_accessExpression(
                                                                              std::move(accessExpression)),
                                                                          m_indexExpression(std::move(indexExpression)) {
@@ -61,8 +61,8 @@ namespace ast {
             return ownToken == token ? std::make_optional(const_cast<ArrayAccess *>(this)) : std::nullopt;
         }
 
-        std::unique_ptr<ASTNode> clone() override {
-            auto cloneNode = std::make_unique<ArrayAccess>(expressionToken(),
+        std::shared_ptr<ASTNode> clone() override {
+            auto cloneNode = std::make_shared<ArrayAccess>(expressionToken(),
                                                            m_accessExpression->clone(),
                                                            m_indexExpression->clone());
             if (expressionType())

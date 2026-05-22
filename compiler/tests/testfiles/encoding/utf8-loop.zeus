@@ -1,0 +1,18 @@
+
+fn main() :i32 {
+    let mut cn_helloworld = string::from_slice("你好世界");
+    defer cn_helloworld.destroy();
+    print("hello world\n");
+    println(cn_helloworld.length());
+        for i in 0 as u32  ..cn_helloworld.length()  {
+            println(cn_helloworld.get_codepoint(i) as i32);
+        }
+        print("\n");
+    println("----------------------")
+    for i in 0 as u32  ..cn_helloworld.length()  {
+        print(cn_helloworld.get_codepoint(i) );
+    }
+    print("\n");
+
+    return 0;
+}

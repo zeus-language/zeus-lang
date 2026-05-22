@@ -1,0 +1,10 @@
+fn main() : i32 {
+    let mut ascii_str : string = string::from_slice("Hello");
+    defer ascii_str.destroy();
+
+    let codepoint_length = ascii_str.length() as i32;
+    println("Codepoint length: ${codepoint_length}"); // should output 5
+
+    return 0;
+}
+

@@ -68,9 +68,11 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
         // adjust to 0-based indexing
 
         diag.range.start.line = static_cast<int>(token.source_location.row) - 1;
-        diag.range.start.character = static_cast<int>(token.source_location.col) - 1;
+        diag.range.start.character = static_cast<int>(token.source_location.unicode_col()) - 1;
         diag.range.end.line = static_cast<int>(token.source_location.row) - 1;
-        diag.range.end.character = static_cast<int>(token.source_location.col + token.source_location.num_bytes) - 1;
+        diag.range.end.character = static_cast<int>(
+                                       token.source_location.unicode_col() + token.source_location.unicode_length()) -
+                                   1;
         diag.severity = mapOutputTypeToSeverity(outputType);
         diag.message = message;
         diag.source = std::string("zeus");
@@ -103,6 +105,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
 
     auto result = parser::parse_tokens(tokens);
     std::vector<std::filesystem::path> includeDirs;
+    includeDirs.reserve(rtlDirectories.size() + 1);
     for (auto &dir: rtlDirectories) {
         if (std::filesystem::exists(dir)) {
             includeDirs.push_back(dir);
@@ -201,16 +204,16 @@ void processMultiLineToken(const Token &token, const int tokenType,
         semanticTokens.push_back(
             static_cast<uint32_t>(token.source_location.row - lastRow - 1)); // line delta
         semanticTokens.push_back(
-            static_cast<uint32_t>(token.source_location.col - lastCol - 1)); // startChar delta
-        semanticTokens.push_back(static_cast<uint32_t>(token.source_location.num_bytes)); // length
+            static_cast<uint32_t>(token.source_location.unicode_col() - lastCol - 1)); // startChar delta
+        semanticTokens.push_back(static_cast<uint32_t>(token.source_location.unicode_length())); // length
         semanticTokens.push_back(tokenType); // tokenType
         semanticTokens.push_back(0); // tokenModifiers
 
         lastRow = token.source_location.row - 1;
-        lastCol = token.source_location.col - 1;
+        lastCol = token.source_location.unicode_col() - 1;
     } else {
         // Multi-line token
-        size_t startCol = token.source_location.col - 1;
+        size_t startCol = token.source_location.unicode_col() - 1;
         size_t currentRow = token.source_location.row - 1;
 
         size_t segmentStart = 0;
@@ -227,7 +230,9 @@ void processMultiLineToken(const Token &token, const int tokenType,
                         static_cast<uint32_t>(currentRow - lastRow)); // line delta
                     semanticTokens.push_back(
                         static_cast<uint32_t>(startCol - lastCol)); // startChar delta
-                    semanticTokens.push_back(static_cast<uint32_t>(segmentLength)); // length
+
+                    semanticTokens.push_back(
+                        static_cast<uint32_t>(count_unicode_characters(text, segmentStart, segmentLength))); // length
                     semanticTokens.push_back(tokenType); // tokenType
                     semanticTokens.push_back(0); // tokenModifiers
 
@@ -320,7 +325,7 @@ void LanguageServer::handleRequest() {
                         m_openDocuments[uriString] = LspDocument{.uri = uriString, .text = text};
 
                         // compute diagnostics asynchronously using a detached thread and send PublishDiagnostics
-                        std::ignore = std::async(std::launch::async,
+                        std::ignore = std::async(std::launch::deferred,
                                                  [ uri = std::move(uri), text = std::move(text), &messageHandler, rtl =
                                                      this->m_options.stdlibDirectories, &cache = m_moduleCache,
                                                      &env = this->m_env
@@ -354,7 +359,7 @@ void LanguageServer::handleRequest() {
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
                         auto *cache = &m_moduleCache;
                         // async diagnostics
-                        std::ignore = std::async(std::launch::async,
+                        std::ignore = std::async(std::launch::deferred,
                                                  [ uri = uri, text = std::move(text), &messageHandler, rtl = this->
                                                      m_options.stdlibDirectories, cache,
                                                      &env = this->m_env]() {
@@ -378,6 +383,7 @@ void LanguageServer::handleRequest() {
                 .add<lsp::notifications::TextDocument_DidClose>(
                     [&](lsp::notifications::TextDocument_DidClose::Params &&params) {
                         m_openDocuments.erase(params.textDocument.uri.toString());
+                        m_moduleCache.removeModule(params.textDocument.uri.toString());
                     })
                 .add<lsp::requests::TextDocument_Definition>(
                     [&](lsp::requests::TextDocument_Definition::Params &&params) {
@@ -463,14 +469,18 @@ void LanguageServer::handleRequest() {
 lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semanticTokensFull(const
     lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
     auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+    auto startTime = std::chrono::high_resolution_clock::now();
     const auto uri = params.textDocument.uri.toString();
     const auto [documentUri, text] = m_openDocuments.at(uri);
     const auto tokens = lexer::lex_file(uri, text, false);
+    std::cerr << "Lexing took " << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - startTime).count() << "ms\n";
     auto semanticTokens = lsp::SemanticTokens{
         .data = std::vector<uint32_t>{}
     };
     size_t lastRow = 0;
     size_t lastCol = 0;
+
     for (const auto &token: tokens) {
         if (auto tokenType = mapTokenType(token.type)) {
             // Use helper function to properly handle multi-line tokens
@@ -480,6 +490,8 @@ lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semantic
         }
     }
     result.emplace(semanticTokens);
+    std::cerr << "Semantic tokenization took " << std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - startTime).count() << "ms\n";
     return result;
 }
 

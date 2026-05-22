@@ -1,0 +1,3 @@
+Message: 你好世界
+Length: 4
+Length in byes: 12

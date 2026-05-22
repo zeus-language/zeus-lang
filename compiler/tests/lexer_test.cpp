@@ -28,15 +28,29 @@ void VerifyTokenPosition(const Token &token, const std::string &source, size_t e
     EXPECT_EQ(token.source_location.byte_offset, expectedStart)
         << "Token byte offset mismatch for: " << expectedText;
     EXPECT_EQ(token.source_location.num_bytes, expectedLength)
-        << "Token byte length mismatch for: " << expectedText;
+        << "Token string length mismatch for: " << expectedText;
     EXPECT_EQ(token.lexical(), expectedText) << "Token text mismatch";
     EXPECT_EQ(token.source_location.text(), source.substr(expectedStart, expectedLength))
         << "Token text does not match source at given position";
 }
 
+void verifyUnicodeTokenPosition(const Token &token, const std::string &source, size_t expectedStart, int row, int col,
+                                size_t expectedByteLength, size_t expectedUnicodeLength,
+                                const std::string &expectedText) {
+    EXPECT_EQ(token.source_location.byte_offset, expectedStart)
+        << "Token byte offset mismatch for: " << expectedText;
+    EXPECT_EQ(token.source_location.unicode_length(), expectedUnicodeLength)
+        << "Token unicode length mismatch for: " << expectedText;
+    EXPECT_EQ(token.lexical(), expectedText) << "Token text mismatch";
+    EXPECT_EQ(token.source_location.text(), source.substr(expectedStart, expectedByteLength))
+        << "Token text does not match source at given position";
+    EXPECT_EQ(token.source_location.row, row) << "Token row mismatch for: " << expectedText;
+    EXPECT_EQ(token.source_location.col, col) << "Token column mismatch for: " << expectedText;
+}
+
 TEST(LexerTest, LexIncomplete) {
-    std::string source = "ex";
-    auto tokens = lexer::lex_file("incomplete.zeus", source);
+    const std::string source = "ex";
+    const auto tokens = lexer::lex_file("incomplete.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 2);
@@ -48,8 +62,8 @@ TEST(LexerTest, LexIncomplete) {
 }
 
 TEST(LexerTest, LexIdentifiers) {
-    std::string source = "hello world test";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "hello world test";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 4); // 3 identifiers + EOF
@@ -67,8 +81,8 @@ TEST(LexerTest, LexIdentifiers) {
 }
 
 TEST(LexerTest, LexNumbers) {
-    std::string source = "42 3.14 -100 -5.5";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "42 3.14 -100 -5.5";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // 4 numbers + EOF
@@ -90,8 +104,8 @@ TEST(LexerTest, LexNumbers) {
 }
 
 TEST(LexerTest, LexStrings) {
-    std::string source = R"(hello "world" test)";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = R"(hello "world" test)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // identifier + string + identifier + EOF
@@ -110,8 +124,8 @@ TEST(LexerTest, LexStrings) {
 }
 
 TEST(LexerTest, LexKeywords) {
-    std::string source = "fn let return";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "fn let return";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // 3 keywords + EOF
@@ -130,8 +144,8 @@ TEST(LexerTest, LexKeywords) {
 }
 
 TEST(LexerTest, LexOperators) {
-    std::string source = "+ - * / % = < > , ; : . ! @ & | ^";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "+ - * / % = < > , ; : . ! @ & | ^";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // All operators + EOF
@@ -163,8 +177,8 @@ TEST(LexerTest, LexOperators) {
 }
 
 TEST(LexerTest, LexBraces) {
-    std::string source = "{ } ( ) [ ]";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "{ } ( ) [ ]";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // 6 brace tokens + EOF
@@ -189,8 +203,8 @@ TEST(LexerTest, LexBraces) {
 }
 
 TEST(LexerTest, LexComplexExpression) {
-    std::string source = "let x = 42 + y;";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let x = 42 + y;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // let, x, =, 42, +, y, ; + EOF
@@ -221,8 +235,8 @@ TEST(LexerTest, LexComplexExpression) {
 }
 
 TEST(LexerTest, LexRangeOperator) {
-    std::string source = "1..10";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "1..10";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // 1, .., 10 + EOF
@@ -241,8 +255,8 @@ TEST(LexerTest, LexRangeOperator) {
 }
 
 TEST(LexerTest, LexNamespaceSeparator) {
-    std::string source = "std::vector";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "std::vector";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // std, ::, vector + EOF
@@ -261,8 +275,8 @@ TEST(LexerTest, LexNamespaceSeparator) {
 }
 
 TEST(LexerTest, LexLineComment) {
-    std::string source = "let x = 5; // comment";
-    auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
+    const std::string source = "let x = 5; // comment";
+    const auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
 
     ASSERT_FALSE(tokens.empty());
     // let, x, =, 5, ;, comment + EOF
@@ -273,8 +287,8 @@ TEST(LexerTest, LexLineComment) {
 }
 
 TEST(LexerTest, LexBlockComment) {
-    std::string source = "let /* comment */ x = 5;";
-    auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
+    const std::string source = "let /* comment */ x = 5;";
+    const auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
 
     ASSERT_FALSE(tokens.empty());
     auto commentToken = std::find_if(tokens.begin(), tokens.end(),
@@ -284,8 +298,8 @@ TEST(LexerTest, LexBlockComment) {
 }
 
 TEST(LexerTest, LexAnnotation) {
-    std::string source = "@deprecated fn foo() {}";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "@deprecated fn foo() {}";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens[0].type, Token::Type::ANNOTATION);
@@ -293,8 +307,8 @@ TEST(LexerTest, LexAnnotation) {
 }
 
 TEST(LexerTest, LexMultilineWithRowCol) {
-    std::string source = "let x\nlet y";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let x\nlet y";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // let, x, let, y + EOF
@@ -318,8 +332,8 @@ TEST(LexerTest, LexMultilineWithRowCol) {
 }
 
 TEST(LexerTest, LexEmptyString) {
-    std::string source = "\"\"";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "\"\"";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 2); // string + EOF
@@ -329,8 +343,8 @@ TEST(LexerTest, LexEmptyString) {
 }
 
 TEST(LexerTest, LexMixedContent) {
-    std::string source = "fn add(a: i32, b: i32) -> i32 { a + b }";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "fn add(a: i32, b: i32) -> i32 { a + b }";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
 
@@ -360,8 +374,8 @@ TEST(LexerTest, LexMixedContent) {
 
 //DrawText(\"Hello World\" as *u8, 190, 200, 20, black);
 TEST(LexerTest, LexNumberOffsets) {
-    std::string source = "DrawText(\"Hello World\" as *u8, 190, 200, 20, black);";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "DrawText(\"Hello World\" as *u8, 190, 200, 20, black);";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     // verify string token
     auto stringToken = std::find_if(tokens.begin(), tokens.end(),
@@ -401,8 +415,8 @@ TEST(LexerTest, LexNumberOffsets) {
 
 
 TEST(LexerTest, LexFloat) {
-    std::string source = "let pi = 3.14159f;";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let pi = 3.14159f;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
 
     ASSERT_FALSE(tokens.empty());
     // let, pi, =, 3.14159, ; + EOF
@@ -427,8 +441,8 @@ TEST(LexerTest, LexFloat) {
 }
 
 TEST(LexerStringTest, InterpolateString) {
-    std::string source = R"(let greeting = "Hello, ${name}!";)";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = R"(let greeting = "Hello, ${name}!";)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     //let greeting = "Hello, ${name}!\";
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 10); // let, greeting, =, "Hello, ", ${, name, }, "!", ; + EOF
@@ -449,8 +463,8 @@ TEST(LexerStringTest, InterpolateString) {
 }
 
 TEST(LexerStringTest, TestUnclosedString) {
-    std::string source = R"(let str = "Hello, World;)";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = R"(let str = "Hello, World;)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 5); // let, str, =, "Hello, World; + EOF
     EXPECT_EQ(tokens[3].type, Token::Type::UNCLOSED_STRING);
@@ -458,23 +472,52 @@ TEST(LexerStringTest, TestUnclosedString) {
 }
 
 TEST(LexerStringTest, TestUnclosedRawString) {
-    std::string source = R"(let str = r"Hello, World;)";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = R"(let str = r"Hello, World;)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 5); // let, str, =, r#"Hello, World; + EOF
     EXPECT_EQ(tokens[3].type, Token::Type::UNCLOSED_RAW_STRING);
     VerifyTokenPosition(tokens[3], source, 10, 15, "r\"Hello, World;");
 }
 
+TEST(LexerStringTest, TestUtf8String) {
+    const std::string source = R"(let str = "Hello, 世界";)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 6); // let, str, =, "Hello, 世界"; + EOF
+    EXPECT_EQ(tokens[3].type, Token::Type::STRING);
+    verifyUnicodeTokenPosition(tokens[3], source, 10, 1, 11, 15, 11, "\"Hello, 世界\"");
+}
+
+TEST(LexerStringTest, MultiLineUtf8Mix) {
+    const std::string source = R"( println("café: ${l1} codepoints");
+    println("你好: ${l2} codepoints");
+    println("😀: ${l3} codepoints");
+    let total = l1 + l2 + l3;
+    println("Total: ${total} codepoints");)";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 46); // 5 lines with 5 tokens each + EOF
+    EXPECT_EQ(tokens[0].type, Token::Type::IDENTIFIER);
+    verifyUnicodeTokenPosition(tokens[0], source, 1, 1, 2, 7, 7, "println");
+    EXPECT_EQ(tokens[1].type, Token::Type::LEFT_CURLY);
+    verifyUnicodeTokenPosition(tokens[1], source, 8, 1, 9, 1, 1, "(");
+    EXPECT_EQ(tokens[2].type, Token::Type::INTERPOLATED_STRING);
+    verifyUnicodeTokenPosition(tokens[2], source, 9, 1, 10, 8, 7, "\"café: ");
+    EXPECT_EQ(tokens[3].type, Token::Type::INTERPOLATION_START);
+    verifyUnicodeTokenPosition(tokens[3], source, 17, 1, 18, 2, 2, "${");
+    EXPECT_EQ(tokens[4].type, Token::Type::IDENTIFIER);
+    verifyUnicodeTokenPosition(tokens[4], source, 19, 1, 20, 2, 2, "l1");
+}
 
 TEST(LexerLexCommentTest, TestMulipleSingleLineComments) {
-    std::string source = R"(let x = 5; // first comment
+    const std::string source = R"(let x = 5; // first comment
 // second comment
 // third comment
 let y = 10; // fourth comment
 }
 )";
-    auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
+    const auto tokens = lexer::lex_file("test.zeus", source, false); // skipComments = false
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 16); // let, x, =, 5, ;, comment1, comment2, comment3, let, y, EOF
     EXPECT_EQ(tokens[5].type, Token::Type::LINE_COMMENT);
@@ -491,13 +534,13 @@ let y = 10; // fourth comment
 }
 
 TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsSkipped) {
-    std::string source = R"(let x = 5; // first comment
+    const std::string source = R"(let x = 5; // first comment
 // second comment
 // third comment
 let y = 10; // fourth comment
 }
 )";
-    auto tokens = lexer::lex_file("test.zeus", source, true); // skipComments = false
+    const auto tokens = lexer::lex_file("test.zeus", source, true); // skipComments = false
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 12);
 
@@ -508,9 +551,9 @@ let y = 10; // fourth comment
 }
 
 TEST(LexerLexCommentTest, TestLineCommentAtFileEnd) {
-    std::string source = R"(let bla;
+    const std::string source = R"(let bla;
 // asdasd asd)";
-    auto tokens = lexer::lex_file("test.zeus", source, false);
+    const auto tokens = lexer::lex_file("test.zeus", source, false);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 5);
     EXPECT_EQ(tokens[3].type, Token::Type::LINE_COMMENT);
@@ -519,10 +562,10 @@ TEST(LexerLexCommentTest, TestLineCommentAtFileEnd) {
 }
 
 TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsAtEnd) {
-    std::string source = R"(let bla;
+    const std::string source = R"(let bla;
     // asdasd asd
 // asdasd asd)";
-    auto tokens = lexer::lex_file("test.zeus", source, false);
+    const auto tokens = lexer::lex_file("test.zeus", source, false);
     EXPECT_EQ(tokens.size(), 6);
     EXPECT_EQ(tokens[3].type, Token::Type::LINE_COMMENT);
     VerifyTokenPosition(tokens[3], source, 13, 13, "// asdasd asd");
@@ -532,8 +575,8 @@ TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsAtEnd) {
 }
 
 TEST(LexerLexNumbersTest, LexHexNumbers) {
-    std::string source = "let hex1 = 0x1A3F;";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let hex1 = 0x1A3F;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 6); // let, hex1, =, 0x1A3F, ; + EOF
     EXPECT_EQ(tokens[3].type, Token::Type::HEX_NUMBER);
@@ -551,8 +594,8 @@ TEST(LexerLexNumbersTest, LexHexNumbers) {
 }
 
 TEST(LexerLexNumbersTest, LexOctalNumbers) {
-    std::string source = "let hex1 = 0o06670;";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let hex1 = 0o06670;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 6); // let, hex1, =, 0x1A3F, ; + EOF
     EXPECT_EQ(tokens[3].type, Token::Type::OCT_NUMBER);
@@ -560,8 +603,8 @@ TEST(LexerLexNumbersTest, LexOctalNumbers) {
 }
 
 TEST(LexerLexNumbersTest, LexBinaryNumbers) {
-    std::string source = "let hex1 = 0b11000101;";
-    auto tokens = lexer::lex_file("test.zeus", source);
+    const std::string source = "let hex1 = 0b11000101;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
     ASSERT_FALSE(tokens.empty());
     EXPECT_EQ(tokens.size(), 6); // let, hex1, =, 0x1A3F, ; + EOF
     EXPECT_EQ(tokens[3].type, Token::Type::BIN_NUMBER);

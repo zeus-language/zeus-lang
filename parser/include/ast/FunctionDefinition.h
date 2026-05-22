@@ -4,20 +4,20 @@
 
 namespace ast {
     class FunctionDefinition final : public FunctionDefinitionBase {
-        std::unique_ptr<BlockNode> m_blockNode;
+        std::shared_ptr<BlockNode> m_blockNode;
         std::optional<Token> genericParam;
-        std::optional<types::VariableType *> m_parentStruct = std::nullopt;
+        types::VariableType *m_parentStruct = nullptr;
 
     public:
         explicit FunctionDefinition(const Token &functionName, std::vector<FunctionArgument> args,
-                                    std::optional<std::unique_ptr<RawType> > returnType,
-                                    std::unique_ptr<BlockNode> blockNode,
+                                    std::optional<std::shared_ptr<RawType> > returnType,
+                                    std::shared_ptr<BlockNode> blockNode,
                                     std::optional<Token> genericParam,
-                                    std::vector<std::unique_ptr<RawAnnotation> > annotations,
+                                    std::vector<std::shared_ptr<RawAnnotation> > annotations,
                                     const VisibilityModifier visibilityModifier
         );
 
-        ~FunctionDefinition() override = default;
+        ~FunctionDefinition() override;
 
 
         [[nodiscard]] BlockNode *block() const { return m_blockNode.get(); }
@@ -37,18 +37,18 @@ namespace ast {
             return genericParam;
         }
 
-        std::unique_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
+        std::shared_ptr<ast::FunctionDefinitionBase> cloneFunction() override;
 
-        std::unique_ptr<ast::FunctionDefinition> cloneFunction2();
+        std::shared_ptr<ast::FunctionDefinition> cloneFunction2();
 
         [[nodiscard]] bool isMethod() const override;
 
         [[nodiscard]] std::optional<types::VariableType *> parentStruct() const override {
-            return m_parentStruct;
+            return (m_parentStruct) ? std::make_optional(m_parentStruct) : std::nullopt;
         }
 
         void setParentStruct(types::VariableType *structType) {
-            m_parentStruct = std::make_optional(structType);
+            m_parentStruct = structType;
         }
 
         std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
