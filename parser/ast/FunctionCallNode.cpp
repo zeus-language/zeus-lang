@@ -32,6 +32,14 @@ namespace ast {
         return signature;
     }
 
+    void FunctionCallNode::setFunctionDefinition(FunctionDefinitionBase *func_def) {
+        m_functionDefinition = func_def;
+    }
+
+    std::optional<FunctionDefinitionBase *> FunctionCallNode::functionDefinition() const {
+        return (m_functionDefinition != nullptr) ? std::make_optional(m_functionDefinition) : std::nullopt;
+    }
+
     std::shared_ptr<ASTNode> FunctionCallNode::clone() {
         std::vector<std::shared_ptr<ASTNode> > argClones;
         argClones.reserve(m_args.size());

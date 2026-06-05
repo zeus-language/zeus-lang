@@ -26,6 +26,7 @@
 #include "ast/FunctionDefinition.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/InterfaceDeclaration.h"
 #include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
@@ -349,6 +350,8 @@ namespace types {
 
     void type_check(ast::InterpolatedString *node, Context &context);
 
+    void type_check_funcsig(ast::FunctionSignature *node, Context &context);
+
     void type_check(ast::BreakStatement *node, Context &context) {
     }
 
@@ -444,6 +447,9 @@ namespace types {
         if (const auto funcDef = dynamic_cast<ast::ExternFunctionDefinition *>(node)) {
             return type_check(funcDef, context);
         }
+        if (const auto funcDef = dynamic_cast<ast::FunctionSignature *>(node)) {
+            return type_check_funcsig(funcDef, context);
+        }
         if (const auto varAssign = dynamic_cast<ast::VariableAssignment *>(node)) {
             return type_check(varAssign, context);
         }
@@ -505,6 +511,9 @@ namespace types {
             return type_check(typeCast, context);
         }
         if (dynamic_cast<ast::StructDeclaration *>(node)) {
+            return;
+        }
+        if (dynamic_cast<ast::InterfaceDeclaration *>(node)) {
             return;
         }
         if (dynamic_cast<ast::EnumDeclaration *>(node)) {
@@ -596,6 +605,59 @@ namespace types {
             });
         }
     }
+
+    void type_check_funcsig(ast::FunctionSignature *node, Context &context) {
+        if (node->expressionType().has_value())
+            return;
+
+
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+        for (auto &arg: node->args()) {
+            if (!arg.rawType) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Missing type for argument '" + arg.name.lexical() + "'."
+                });
+                continue;
+            }
+            arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
+
+            if (!arg.type) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + arg.rawType.value()->fullTypeName() + "' for argument '" + arg.name.lexical()
+                    +
+                    "'."
+                });
+            }
+        }
+
+        for (auto &raw: node->rawAnnotations()) {
+            if (const auto annotationType = resolveAnnotation(raw.get(), context)) {
+                node->addAnnotation(annotationType);
+            }
+        }
+        if (node->returnType()) {
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope)) {
+                node->setExpressionType(returnType.value());
+                node->setResolvedReturnType(returnType.value());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Unknown type '" + node->returnType().value()->fullTypeName() + "' for the function return."
+                });
+            }
+        } else {
+            node->setExpressionType(context.currentScope->getTypeByName("void").value());
+            node->setResolvedReturnType(context.currentScope->getTypeByName("void").value());
+        }
+
+        context.currentScope = context.currentScope->parentScope();
+    }
+
 
     void type_check(ast::DeferStatement *node, Context &context) {
         type_check_base(node->deferredNode(), context);
@@ -713,6 +775,93 @@ namespace types {
                         and
                         (!context.currentFunction->isMethod() or
                          context.currentFunction->parentStruct().value()->name() != structType->name())
+                    ) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Method '" + methodName + "' is private and cannot be accessed from this module."
+                        });
+                        context.currentScope = context.currentScope->parentScope();
+                        return;
+                    }
+
+
+                    matchedMethod = method.get();
+                    break;
+                }
+            }
+        } else if (const auto interFaceType = std::dynamic_pointer_cast<types::InterfaceType>(instanceType)) {
+            const auto &methods = interFaceType->methods();
+            auto filteredMethods = methods | std::ranges::views::filter([methodName](auto &method) {
+                return method->functionName() == methodName;
+            });
+            if (filteredMethods.empty()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type '" + instanceType->name() + "' does not have a method named '" + methodName + "'."
+                });
+                context.currentScope = context.currentScope->parentScope();
+                return;
+            }
+
+
+            for (const auto &method: filteredMethods) {
+                if (method->args().size() - 1 != node->args().size()) {
+                    continue;
+                }
+                context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+
+                type_check_base(method.get(), context);
+                context.currentScope = context.currentScope->parentScope();
+
+                bool allParamsMatch = true;
+                for (size_t i = 1; i < method->args().size(); ++i) {
+                    if (!method->args()[i].type) {
+                        allParamsMatch = false;
+                        break;
+                    }
+                    if (node->args()[i - 1]->expressionType() == nullptr || !node->args()[i - 1]->expressionType()
+                        ||
+                        node->args()[i - 1]->expressionType().value()->name() !=
+                        method->args()[i].type.value()->name()) {
+                        allParamsMatch = false;
+                        break;
+                    }
+                }
+                auto selfArg = method->args()[0];
+                if (!selfArg.isConstant) {
+                    if (node->instanceNode()->constant()) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Mutability mismatch for 'self' argument in method '" + node->functionName() +
+                            "': expected 'mutable', but got 'immutable'."
+                        });
+                    }
+                }
+
+                if (allParamsMatch) {
+                    for (size_t i = 1; i < method->args().size(); ++i) {
+                        const auto &arg = method->args()[i];
+                        const auto &argNode = node->args()[i - 1];
+                        if (!arg.isConstant && argNode->constant()) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                argNode->expressionToken(),
+                                "Mutability mismatch for argument " + arg.name.lexical() + " in method '" +
+                                node->functionName() + "': expected '" +
+                                (arg.isConstant ? "immutable" : "mutable") + "', but got '" +
+                                (argNode->constant() ? "immutable" : "mutable") + "'."
+                            });
+                        }
+                    }
+
+
+                    if (method->visibilityModifier() == ast::VisibilityModifier::PRIVATE and context.currentFunction
+                        and
+                        (!context.currentFunction->isMethod() or
+                         context.currentFunction->parentStruct().value()->name() != interFaceType->name())
                     ) {
                         context.messages.insert({
                             parser::OutputType::ERROR,
@@ -1573,9 +1722,10 @@ namespace types {
             bool argsMatch = true;
 
             for (size_t i = 0; i < funcDef->args().size(); ++i) {
+                auto argType = funcDef->args()[i].type;
                 if (!node->args()[i]->expressionType() ||
-                    !funcDef->args()[i].type ||
-                    *funcDef->args()[i].type.value() != *node->args()[i]->expressionType().value()
+                    !argType ||
+                    *argType.value() != *node->args()[i]->expressionType().value()
                 ) {
                     messages.push_back({
                         parser::OutputType::ERROR,
@@ -1649,6 +1799,7 @@ namespace types {
             }
             const auto modulePath = funcDef->modulePath();
             node->setNamespacePrefix(modulePath);
+            node->setFunctionDefinition(funcDef);
             return;
         }
         // look for variable with function name
@@ -2439,6 +2590,21 @@ namespace types {
         for (auto &node: module->nodes) {
             if (const auto typeDef = dynamic_cast<ast::TypeDefinition *>(node.get())) {
                 type_check_base(typeDef, context);
+            } else if (const auto interfaceDecl = dynamic_cast<ast::InterfaceDeclaration *>(node.get())) {
+                std::vector<std::shared_ptr<ast::FunctionSignature> > methods;
+                methods.reserve(interfaceDecl->methods().size());
+                for (const auto &method: interfaceDecl->methods()) {
+                    methods.push_back(method);
+                }
+                auto type = std::make_shared<types::InterfaceType>(interfaceDecl->expressionToken().lexical(),
+                                                                   methods);
+                context.currentScope->registerType(type);
+                // for (const auto &method: type->methods()) {
+                //     method->setParentInterface(type.get());
+                // }
+                // for (const auto &method: type->methods()) {
+                //     type_check_base(method.get(), context);
+                // }
             } else if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
                 std::vector<types::StructField> structFields;
                 context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
@@ -2470,10 +2636,31 @@ namespace types {
                     methods.push_back(method);
                 }
                 //structDecl->methods().clear();
+                std::vector<std::shared_ptr<InterfaceType> > interfaces;
+                for (const auto &interfaceName: structDecl->interfaceNames()) {
+                    const auto interfaceType = context.currentScope->getTypeByName(interfaceName.lexical());
+                    if (!interfaceType) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            interfaceName,
+                            "Unknown interface '" + interfaceName.lexical() + "' implemented by struct '" +
+                            structDecl->expressionToken().lexical() + "'."
+                        });
+                    } else if (interfaceType.value()->typeKind() != types::TypeKind::INTERFACE) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            interfaceName,
+                            "Type '" + interfaceName.lexical() + "' implemented by struct '" +
+                            structDecl->expressionToken().lexical() + "' is not an interface."
+                        });
+                    } else {
+                        interfaces.push_back(std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
+                    }
+                }
 
 
                 auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                                structFields, methods, genericType);
+                                                                structFields, methods, interfaces, genericType);
 
                 const auto parentScope = context.currentScope->parentScope();
                 context.currentScope->registerType(type);

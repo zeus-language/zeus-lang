@@ -123,6 +123,7 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     compiler::CompilerOptions options;
     options.stdlibDirectories.emplace_back("stdlib");
     options.stdlibDirectories.emplace_back(base_path);
+    moduleCache.clear();
 
     options.runProgram = true;
     options.runArguments.push_back(output_path.string());
@@ -357,7 +358,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "functionpointer","externannotation","stringslice", "convert2string","convertfromstring",
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
-                             "lambda-infer-expression"));
+                             "lambda-infer-expression","interface-single"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
