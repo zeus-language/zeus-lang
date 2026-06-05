@@ -2656,6 +2656,24 @@ namespace types {
                     } else {
                         interfaces.push_back(std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
                     }
+                    for (const auto &method: interfaces.back()->methods()) {
+                        bool methodImplemented = false;
+                        for (const auto &structMethod: methods) {
+                            if (method->functionName() == structMethod.lock()->functionName()) {
+                                methodImplemented = true;
+                                break;
+                            }
+                        }
+                        if (!methodImplemented) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                structDecl->expressionToken(),
+                                "Struct '" + structDecl->expressionToken().lexical() +
+                                "' does not implement method '" + method->functionSignature() +
+                                "' required by interface '" + interfaceName.lexical() + "'."
+                            });
+                        }
+                    }
                 }
 
 
