@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : float = 3.14f;
+    let y : float = 2.5f;
+    let result : i32 = x % y;  // Error: modulo not supported for floats
+    return 0;
+}
+

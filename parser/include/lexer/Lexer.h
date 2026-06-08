@@ -78,6 +78,7 @@ public:
         MUL,
         PERCENT,
         AND,
+        BITNOT,
         LEFT_CURLY,
         RIGHT_CURLY,
         LEFT_SQUAR,

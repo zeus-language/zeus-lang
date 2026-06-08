@@ -1,0 +1,6 @@
+FILENAME:4:25: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = x >> y;  // Error: right shift not supported for float
+                        ^
+FILENAME:4:25: error: Operator '__rshift__' is not overloaded for struct type 'float'.
+    let result : i32 = x >> y;  // Error: right shift not supported for float
+                        ^

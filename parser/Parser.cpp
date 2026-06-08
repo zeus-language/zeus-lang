@@ -778,7 +778,14 @@ namespace parser {
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
                 if (tryConsume(Token::DIV)) {
-                    auto rhs = tryParseToken(allowInit);
+                    auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '/' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::DIV,
@@ -850,6 +857,23 @@ namespace parser {
                                                operatorToken, ast::BinaryOperator::RIGHT_SHIFT,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
+            } else {
+                // if (canConsume(Token::MINUS)) {
+                //     consume(Token::MINUS);
+                //     auto operatorToken = current();
+                //     auto rhs = parseBaseExpression(allowInit);
+                //     if (!rhs) {
+                //         m_messages.push_back(ParserMessasge{
+                //             .token = current(),
+                //             .message = "expected a right hand side after a '-'!"
+                //         });
+                //         return std::nullopt;
+                //     }
+                //     return parseExpression(false,
+                //                            std::make_shared<ast::BinaryExpression>(
+                //                                operatorToken, ast::BinaryOperator::MINUS,
+                //                                std::move(lhs.value()), std::move(rhs.value())));
+                // }
             }
 
             if (canConsume(Token::LEFT_CURLY)) {

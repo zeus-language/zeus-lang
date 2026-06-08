@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : i32 = 10;
+    let s : string = "5";
+    let result : i32 = x ^ s;  // Error: bitwise XOR not supported with string
+    return 0;
+}
+

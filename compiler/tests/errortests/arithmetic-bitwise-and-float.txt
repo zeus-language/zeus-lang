@@ -1,0 +1,6 @@
+FILENAME:4:26: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = x & y;  // Error: bitwise AND not supported for float
+                         ^
+FILENAME:4:26: error: Type mismatch in binary expression: left is of type 'float', right is of type 'i32'.
+    let result : i32 = x & y;  // Error: bitwise AND not supported for float
+                         ^

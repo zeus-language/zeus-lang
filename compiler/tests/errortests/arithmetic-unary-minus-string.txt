@@ -1,0 +1,6 @@
+FILENAME:3:25: error: Could not determine type of initial value for variable 'result'.
+    let result : string = -s;  // Error: unary minus not supported for string
+                        ^
+FILENAME:3:25: error: Unary operator '__neg__' is not overloaded for type 'string'.
+    let result : string = -s;  // Error: unary minus not supported for string
+                        ^

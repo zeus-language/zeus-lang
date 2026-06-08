@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : i32 = 10;
+    let s : string = string::from_slice("2");
+    let result : i32 = x / s;  // Error: cannot divide i32 by string
+    return 0;
+}
+

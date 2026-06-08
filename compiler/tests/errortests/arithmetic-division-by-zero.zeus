@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : i32 = 10;
+    let y : i32 = 0;
+    let result : i32 = x / y;  // Error: division by zero literal
+    return 0;
+}
+

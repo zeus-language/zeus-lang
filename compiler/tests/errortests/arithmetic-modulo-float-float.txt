@@ -1,0 +1,6 @@
+FILENAME:4:26: error: Modulo operator requires integer operands, but got 'float'.
+    let result : i32 = x % y;  // Error: modulo not supported for floats
+                         ^
+FILENAME:4:26: error: Type mismatch in variable initialization: variable 'result' is of type 'i32', but got initial value of type 'float'.
+    let result : i32 = x % y;  // Error: modulo not supported for floats
+                         ^

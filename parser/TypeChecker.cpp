@@ -1667,6 +1667,89 @@ namespace types {
             });
         }
         // Further type checking logic would go here...
+        switch (node->binoperator()) {
+            case ast::BinaryOperator::ADD:
+                break;
+            case ast::BinaryOperator::SUB:
+                break;
+            case ast::BinaryOperator::MUL:
+                break;
+            case ast::BinaryOperator::DIV: {
+                const auto rhsValue = types::evalConstantExpression(node->rhs(), context);
+                if (rhsValue.has_value() && std::holds_alternative<ast::NumberValue>(rhsValue.value())) {
+                    const auto numberValue = std::get<ast::NumberValue>(rhsValue.value());
+                    if (std::holds_alternative<int64_t>(numberValue) && std::get<int64_t>(numberValue) == 0) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Division by zero is not allowed."
+                        });
+                    } else if (std::holds_alternative<double>(numberValue)) {
+                        if (std::get<double>(numberValue) == 0.0) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                node->expressionToken(),
+                                "Division by zero is not allowed."
+                            });
+                        }
+                    }
+                }
+            }
+
+            break;
+            case ast::BinaryOperator::MOD:
+                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Modulo operator requires integer operands, but got '" +
+                        node->lhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::POW:
+                break;
+            case ast::BinaryOperator::AND:
+                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Binary And operator requires integer operands, but got '" +
+                        node->lhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::OR:
+                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Binary Or operator requires integer operands, but got '" +
+                        node->lhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::LEFT_SHIFT:
+                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Left shift operator requires integer operands, but got '" +
+                        node->lhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::RIGHT_SHIFT:
+                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Right shift operator requires integer operands, but got '" +
+                        node->lhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+        }
     }
 
     void type_check_funcall(ast::FunctionCallNode *node, Context &context) {
@@ -2671,7 +2754,8 @@ namespace types {
                             structDecl->expressionToken().lexical() + "' is not an interface."
                         });
                     } else {
-                        interfaces.push_back(std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
+                        interfaces.push_back(
+                            std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
                     }
                     for (const auto &method: interfaces.back()->methods()) {
                         bool methodImplemented = false;

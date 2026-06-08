@@ -1,0 +1,6 @@
+fn main() : i32 {
+    let s : string = "hello";
+    let result : string = -s;  // Error: unary minus not supported for string
+    return 0;
+}
+

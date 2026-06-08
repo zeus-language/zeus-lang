@@ -582,6 +582,9 @@ namespace lexer {
                         case '|':
                             tokens.emplace_back(Token::PIPE, std::move(source_location));
                             break;
+                        case '~':
+                            tokens.emplace_back(Token::BITNOT, std::move(source_location));
+                            break;
                         default:
                             break;
                     }

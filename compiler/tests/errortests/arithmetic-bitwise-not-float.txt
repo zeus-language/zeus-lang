@@ -1,0 +1,6 @@
+FILENAME:3:25: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = ~x;  // Error: bitwise NOT not supported for float
+                        ^
+FILENAME:3:25: error: Unary operator '__bnot__' is not overloaded for type 'float'.
+    let result : i32 = ~x;  // Error: bitwise NOT not supported for float
+                        ^

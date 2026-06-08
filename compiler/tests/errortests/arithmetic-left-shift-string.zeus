@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : i32 = 10;
+    let s : string = "2";
+    let result : i32 = x << s;  // Error: left shift requires integer types
+    return 0;
+}
+

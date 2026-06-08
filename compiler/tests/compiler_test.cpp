@@ -370,7 +370,15 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
-                             "interpolation-utf8-error","unimplemented-interface","interface-by-value"
+                             "interpolation-utf8-error","unimplemented-interface","interface-by-value",
+                             "arithmetic-division-by-zero","arithmetic-string-plus-number","arithmetic-modulo-float",
+                             "arithmetic-unary-minus-string","arithmetic-undefined-variable",
+                             "arithmetic-multiply-incompatible-types","arithmetic-bitwise-not-float",
+                             "arithmetic-subtract-string","arithmetic-divide-string","arithmetic-bitwise-and-float",
+                             "arithmetic-left-shift-string","arithmetic-right-shift-float",
+                             "arithmetic-bitwise-or-string",
+                             "arithmetic-compound-expression-mismatch","arithmetic-bitwise-xor-string",
+                             "arithmetic-modulo-float-float","arithmetic-divide-string-compound"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,

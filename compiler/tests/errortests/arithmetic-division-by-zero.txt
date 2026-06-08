@@ -1,0 +1,3 @@
+FILENAME:4:26: error: Division by zero is not allowed.
+    let result : i32 = x / y;  // Error: division by zero literal
+                         ^
