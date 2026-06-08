@@ -175,6 +175,15 @@ void types::StructType::setMethods(const std::vector<std::shared_ptr<ast::Functi
     }
 }
 
+size_t types::StructType::getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const {
+    for (size_t i = 0; i < m_interfaces.size(); ++i) {
+        if (*m_interfaces[i] == *interface) {
+            return i;
+        }
+    }
+    throw std::runtime_error("Interface not implemented by struct");
+}
+
 types::SliceType::SliceType(std::string name, const std::shared_ptr<VariableType> &baseType) : StructType(
     std::move(name),
     {

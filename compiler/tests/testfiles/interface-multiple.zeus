@@ -1,0 +1,29 @@
+interface A {
+    fn a(self : &A) : void;
+}
+interface B {
+    fn b(self : &B) : void;
+}
+
+struct C implements A,B {
+    fn a(self : &C) : void {
+        println("a");
+    }
+    fn b(self : &C) : void {
+        println("b");
+    }
+}
+
+fn test_a(a : &A) : void {
+    a.a();
+}
+
+fn test_b(b : &B) : void{
+    b.b();
+}
+fn main() :i32{
+    let x  = C{};
+    test_a(&x);
+    test_b(&x);
+    return 0;
+}

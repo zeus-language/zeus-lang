@@ -1,0 +1,19 @@
+interface A {
+    fn a(self : &A) : void;
+}
+
+struct C implements A {
+    fn a(self : &C) : void {
+        println("a");
+    }
+}
+
+// this is illegal as A is an interface and cannot be passed by value, it must be passed by reference
+fn test_a(a : A) : void {
+    a.a();
+}
+fn main() :i32{
+    let x  = C{};
+    test_a(x);
+    return 0;
+}

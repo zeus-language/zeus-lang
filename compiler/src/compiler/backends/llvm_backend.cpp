@@ -2207,6 +2207,8 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
             auto [method, methodIndex] = methodOption.value();
+            std::cerr << "Found method " << methodName << " in interface " << typeName << " with index " << methodIndex
+                    << "\n";
             // first member of the struct is the vtable pointer, second member is the data pointer
             //const auto vTableType = checkAndGenerateVTableForInterface(interfaceType, llvmState);
             auto ptrType = llvmState.Builder->getPtrTy();
@@ -2344,6 +2346,30 @@ namespace llvm_backend {
         }
         for (const auto &arg: node->args()) {
             if (auto value = codegen_base(arg.get(), llvmState)) {
+                if (arg->expressionType().value()->typeKind() == types::TypeKind::POINTER) {
+                    auto ptrType = std::dynamic_pointer_cast<types::TypeWithBaseType>(arg->expressionType().value());
+                    if (ptrType->baseType()->typeKind() == types::TypeKind::STRUCT) {
+                        auto structType = std::dynamic_pointer_cast<types::StructType>(ptrType->baseType());
+                        assert(structType && "Argument type is not a struct");
+                        assert(node->functionDefinition() && "Function definition must be available for struct type");
+                        const auto funcDef = node->functionDefinition().value();
+                        const auto param = funcDef->getParam(args.size() - (isStructReturn ? 1 : 0));
+                        assert(param && "Parameter not found in function definition");
+
+                        if (auto paramPtrType = std::dynamic_pointer_cast<
+                            types::TypeWithBaseType>(param->type.value())) {
+                            if (auto paramType = std::dynamic_pointer_cast<types::InterfaceType>(
+                                paramPtrType->baseType())) {
+                                // Handle struct parameter
+                                const auto type = llvmState.Builder->getPtrTy();
+                                const auto index = structType->getInterfaceIndex(paramType);
+                                auto gep = llvmState.Builder->CreateConstGEP1_32(type, value, index, "arg_vtable");
+                                args.push_back(gep);
+                                continue;
+                            }
+                        }
+                    }
+                }
                 args.push_back(value);
             } else {
                 assert(false && "Failed to generate argument for function call");

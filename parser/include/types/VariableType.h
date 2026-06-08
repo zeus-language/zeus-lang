@@ -1,9 +1,7 @@
 #pragma once
 #include <cassert>
-#include <iostream>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -91,21 +89,30 @@ namespace types {
         [[nodiscard]] bool isSigned() const { return m_signed; }
     };
 
-    class PointerType final : public VariableType {
-    private:
-        std::weak_ptr<VariableType> m_baseType;
+    class TypeWithBaseType : public VariableType {
+    protected:
+        std::shared_ptr<VariableType> m_baseType;
 
     public:
-        PointerType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
-                                                                                  std::move(name), TypeKind::POINTER),
-                                                                              m_baseType(std::move(baseType)) {
+        TypeWithBaseType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
+                std::move(name), TypeKind::POINTER),
+            m_baseType(std::move(baseType)) {
+        }
+
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+    };
+
+    class PointerType final : public TypeWithBaseType {
+    public:
+        PointerType(std::string name, std::shared_ptr<VariableType> baseType) : TypeWithBaseType(
+            std::move(name), std::move(baseType)) {
         }
 
         ~PointerType() override = default;
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
 
-        std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
+        std::shared_ptr<VariableType>
+        makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -116,19 +123,13 @@ namespace types {
         }
     };
 
-    class ReferenceType final : public VariableType {
-    private:
-        std::weak_ptr<VariableType> m_baseType;
-
+    class ReferenceType final : public TypeWithBaseType {
     public:
-        ReferenceType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
-                std::move(name), TypeKind::POINTER),
-            m_baseType(std::move(baseType)) {
+        ReferenceType(std::string name, std::shared_ptr<VariableType> baseType) : TypeWithBaseType(
+            std::move(name), std::move(baseType)) {
         }
 
         ~ReferenceType() override = default;
-
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -200,7 +201,8 @@ namespace types {
         [[nodiscard]] std::optional<std::shared_ptr<ast::FunctionSignature> > findMethod(
             const std::string &method_name) const;
 
-        [[nodiscard]] std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> > findMethodWithIndex(
+        [[nodiscard]] std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> >
+        findMethodWithIndex(
             const std::string &method_name) const;
 
     protected:
@@ -280,6 +282,8 @@ namespace types {
         void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods);
 
         [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
+
+        size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {

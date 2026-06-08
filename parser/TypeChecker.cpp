@@ -571,7 +571,7 @@ namespace types {
         context.messages.insert({
             parser::OutputType::ERROR,
             node->expressionToken(),
-            "Unknown AST node that can not be type checked yet."
+            "Unknown AST node that cannot be type checked yet."
         });
     }
 
@@ -2275,6 +2275,14 @@ namespace types {
         }
         if (node->returnType()) {
             if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope)) {
+                if (returnType.value()->typeKind() == TypeKind::INTERFACE) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Return type '" + returnType.value()->name() +
+                        "' cannot be of interface type. Interfaces cannot be returned by value."
+                    });
+                }
                 node->setExpressionType(returnType.value());
                 node->setResolvedReturnType(returnType.value());
             } else {
@@ -2300,6 +2308,15 @@ namespace types {
                     "'."
                 });
             }
+            if (arg.type.value()->typeKind() == TypeKind::INTERFACE) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Argument '" + arg.name.lexical() +
+                    "' cannot be of interface type. Interfaces cannot be passed by value."
+                });
+            }
+
             context.currentScope->addVariable(arg.name.lexical(), Variable{
                                                   arg.name.lexical(), arg.type.value_or(nullptr), arg.isConstant
                                               });

@@ -358,7 +358,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "functionpointer","externannotation","stringslice", "convert2string","convertfromstring",
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
-                             "lambda-infer-expression","interface-single"));
+                             "lambda-infer-expression","interface-single","interface-multiple"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
@@ -370,7 +370,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
-                             "interpolation-utf8-error","unimplemented-interface"
+                             "interpolation-utf8-error","unimplemented-interface","interface-by-value"
                          ));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
