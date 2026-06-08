@@ -6,6 +6,7 @@
 #include "ast/RawAnnotation.h"
 #include "ast/FieldAccess.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/FunctionSignature.h"
 
 
 std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
@@ -16,12 +17,58 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
     return std::make_shared<types::PointerType>("*" + genericParam->name(), genericParam);
 }
 
+std::optional<std::shared_ptr<ast::FunctionSignature> >
+types::InterfaceType::findMethod(const std::string &method_name) const {
+    for (const auto &method: m_methods) {
+        if (method->functionName() == method_name) {
+            return std::make_optional(method);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> > types::InterfaceType::findMethodWithIndex(
+    const std::string &method_name) const {
+    for (size_t i = 0; i < m_methods.size(); ++i) {
+        const auto &method = m_methods[i];
+        if (method->functionName() == method_name) {
+            return std::make_optional(std::make_pair(method, i));
+        }
+    }
+    return std::nullopt;
+}
+
+bool types::InterfaceType::compare(const VariableType &other) const {
+    if (auto otherInterface = dynamic_cast<const InterfaceType *>(&other)) {
+        if (this->name() != otherInterface->name()) {
+            return false;
+        }
+        if (this->genericParam().has_value() != otherInterface->genericParam().has_value()) {
+            return false;
+        }
+        if (this->genericParam().has_value() && otherInterface->genericParam().has_value()) {
+            if (this->genericParam().value()->name() != otherInterface->genericParam().value()->name()) {
+                return false;
+            }
+        }
+        return true;
+    } else if (auto otherStruct = dynamic_cast<const StructType *>(&other)) {
+        for (const auto &interface: otherStruct->interfaces()) {
+            if (*interface == *this) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
                               const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
+                              const std::vector<std::shared_ptr<InterfaceType> > &interfaces,
                               std::optional<std::shared_ptr<VariableType> > genericParam) : VariableType(
         std::move(name),
         TypeKind::STRUCT), m_fields(fields),
-    m_methods(methods), m_genericParam(std::move(genericParam)) {
+    m_methods(methods), m_genericParam(std::move(genericParam)), m_interfaces(interfaces) {
     m_typename = VariableType::name() + (
                      m_genericParam.has_value() ? "<" + m_genericParam.value()->name() + ">" : "");
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
@@ -128,7 +175,16 @@ void types::StructType::setMethods(const std::vector<std::shared_ptr<ast::Functi
     }
 }
 
-types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> baseType) : StructType(
+size_t types::StructType::getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const {
+    for (size_t i = 0; i < m_interfaces.size(); ++i) {
+        if (*m_interfaces[i] == *interface) {
+            return i;
+        }
+    }
+    throw std::runtime_error("Interface not implemented by struct");
+}
+
+types::SliceType::SliceType(std::string name, const std::shared_ptr<VariableType> &baseType) : StructType(
     std::move(name),
     {
         {
@@ -140,6 +196,7 @@ types::SliceType::SliceType(std::string name, std::shared_ptr<VariableType> base
             .name = "data"
         }
     },
-    std::vector<std::weak_ptr<ast::FunctionDefinition> >{}, std::nullopt) {
+    std::vector<std::weak_ptr<ast::FunctionDefinition> >{}, std::vector<std::shared_ptr<InterfaceType> >{},
+    std::nullopt) {
     setTypeKind(TypeKind::SLICE);
 }

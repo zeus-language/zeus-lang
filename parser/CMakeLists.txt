@@ -47,6 +47,8 @@ add_library(${PROJECT_NAME} STATIC
         ast/FunctionDefinitionBase.cpp
         TypeResolver.cpp
         ast/VariableAccess.cpp
+        ast/FunctionSignature.cpp
+        ast/InterfaceDeclaration.cpp
 )
 target_sources(${PROJECT_NAME} PRIVATE
 )

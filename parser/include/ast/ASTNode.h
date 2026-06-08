@@ -42,7 +42,8 @@ namespace ast {
         GENERIC_PARAM,
         OTHER,
         DEREFERENCE,
-        BINARY_EXPRESSION
+        BINARY_EXPRESSION,
+        INTERFACE_DECLARATION
     };
 
     class ASTNode {

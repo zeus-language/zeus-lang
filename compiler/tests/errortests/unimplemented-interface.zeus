@@ -1,0 +1,13 @@
+
+interface I {
+    fn foo() : void;
+}
+
+struct S implements I {
+
+}
+
+fn main() : i32{
+    let s = S{};
+    return 0;
+}

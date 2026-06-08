@@ -1,0 +1,50 @@
+
+interface Connection {
+     fn open(self : &Connection) : void;
+
+     fn close(self : &Connection) : void;
+}
+
+struct SqliteConnection implements Connection{
+
+     pub fn open(self : &SqliteConnection) : void {
+        println("opening sqlite connection");
+     }
+
+     pub fn close(self : &SqliteConnection) : void {
+        println("closing sqlite connection");
+     }
+     pub fn new() : SqliteConnection {
+        return SqliteConnection{};
+     }
+}
+
+struct PgSqlConnection implements Connection{
+
+     pub fn open(self : &PgSqlConnection) : void {
+        println("opening postgres connection");
+     }
+
+     pub fn close(self : &PgSqlConnection) : void {
+        println("closing postgres connection");
+     }
+
+     fn new() : PgSqlConnection {
+        return PgSqlConnection{};
+     }
+
+}
+
+fn test(conn: &Connection) : void {
+     conn.open();
+     conn.close();
+}
+fn main() : i32 {
+        let sqlite = SqliteConnection{};
+        let pgsql = PgSqlConnection{};
+        test(&sqlite);
+        test(&pgsql);
+
+
+        return 0;
+}

@@ -13,21 +13,26 @@ namespace ast {
 
     class StructDeclaration final : public ASTNode {
     private:
+        std::vector<Token> m_interfaceNames;
         std::vector<StructField> m_fields;
         std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<Token> m_genericParam;
 
     public:
         StructDeclaration(Token name, std::vector<StructField> fields,
-                          std::vector<std::shared_ptr<ast::FunctionDefinition> >
-                          methods, std::optional<Token> genericParam) : ASTNode(std::move(name),
-                                                                            NodeType::STRUCT_DECLARATION),
-                                                                        m_fields(std::move(fields)),
-                                                                        m_methods(std::move(methods)),
-                                                                        m_genericParam(std::move(genericParam)) {
+                          std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
+                          std::vector<Token> interfaceNames,
+                          std::optional<Token> genericParam) : ASTNode(std::move(name),
+                                                                       NodeType::STRUCT_DECLARATION),
+                                                               m_interfaceNames(std::move(interfaceNames)),
+                                                               m_fields(std::move(fields)),
+                                                               m_methods(std::move(methods)),
+                                                               m_genericParam(std::move(genericParam)) {
         }
 
         ~StructDeclaration() override = default;
+
+        std::vector<Token> &interfaceNames();
 
         StructDeclaration(StructDeclaration &&) = default;
 
@@ -62,6 +67,10 @@ namespace ast {
         }
     };
 
+    inline std::vector<Token> &StructDeclaration::interfaceNames() {
+        return m_interfaceNames;
+    }
+
     inline std::shared_ptr<ASTNode> StructDeclaration::clone() {
         std::vector<StructField> fieldsClone;
         fieldsClone.reserve(m_fields.size());
@@ -79,6 +88,7 @@ namespace ast {
         auto cloneNode = std::make_shared<StructDeclaration>(expressionToken(),
                                                              std::move(fieldsClone),
                                                              std::move(methodsClone),
+                                                             m_interfaceNames,
                                                              m_genericParam);
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());

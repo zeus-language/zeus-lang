@@ -10,6 +10,7 @@
 
 
 namespace ast {
+    class FunctionSignature;
     class FunctionDefinition;
     class IntrinsicFunctionDefinition;
 }
@@ -28,7 +29,8 @@ namespace types {
         ARRAY,
         ENUM,
         GENERIC,
-        FUNCTION
+        FUNCTION,
+        INTERFACE
     };
 
     class VariableType {
@@ -38,6 +40,10 @@ namespace types {
 
     protected:
         void setTypeKind(const TypeKind typeKind) { m_typeKind = typeKind; }
+
+        virtual bool compare(const VariableType &other) const {
+            return this->name() == other.name();
+        }
 
     public:
         explicit VariableType(std::string name, const TypeKind typeKind) : m_typename(std::move(name)),
@@ -57,7 +63,7 @@ namespace types {
         [[nodiscard]] TypeKind typeKind() const { return m_typeKind; }
 
         bool operator==(const VariableType &other) const {
-            return this->name() == other.name();
+            return compare(other);
         }
 
         virtual std::shared_ptr<VariableType> makeNonGenericType(
@@ -83,32 +89,55 @@ namespace types {
         [[nodiscard]] bool isSigned() const { return m_signed; }
     };
 
-    class PointerType final : public VariableType {
-    private:
-        std::weak_ptr<VariableType> m_baseType;
+    class TypeWithBaseType : public VariableType {
+    protected:
+        std::shared_ptr<VariableType> m_baseType;
 
     public:
-        PointerType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
-                                                                                  std::move(name), TypeKind::POINTER),
-                                                                              m_baseType(std::move(baseType)) {
-        }
-
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
-
-        std::shared_ptr<VariableType> makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
-    };
-
-    class ReferenceType final : public VariableType {
-    private:
-        std::weak_ptr<VariableType> m_baseType;
-
-    public:
-        ReferenceType(std::string name, std::weak_ptr<VariableType> baseType) : VariableType(
+        TypeWithBaseType(std::string name, std::shared_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::POINTER),
             m_baseType(std::move(baseType)) {
         }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
+    };
+
+    class PointerType final : public TypeWithBaseType {
+    public:
+        PointerType(std::string name, std::shared_ptr<VariableType> baseType) : TypeWithBaseType(
+            std::move(name), std::move(baseType)) {
+        }
+
+        ~PointerType() override = default;
+
+
+        std::shared_ptr<VariableType>
+        makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
+
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            if (auto otherPtrType = dynamic_cast<const PointerType *>(&other)) {
+                return *this->baseType() == *otherPtrType->baseType();
+            }
+            return false;
+        }
+    };
+
+    class ReferenceType final : public TypeWithBaseType {
+    public:
+        ReferenceType(std::string name, std::shared_ptr<VariableType> baseType) : TypeWithBaseType(
+            std::move(name), std::move(baseType)) {
+        }
+
+        ~ReferenceType() override = default;
+
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            if (auto otherPtrType = dynamic_cast<const ReferenceType *>(&other)) {
+                return *this->baseType() == *otherPtrType->baseType();
+            }
+            return false;
+        }
     };
 
 
@@ -134,8 +163,55 @@ namespace types {
         std::string name;
     };
 
+    class InterfaceType final : public VariableType {
+    private:
+        std::vector<std::shared_ptr<ast::FunctionSignature> > m_methods;
+        std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
+        std::string m_typename;
+        std::string m_linkageName;
+
+    public:
+        InterfaceType(const std::string &name,
+                      const std::vector<std::shared_ptr<ast::FunctionSignature> > &methods,
+                      const std::optional<std::shared_ptr<VariableType> > &generic_param = std::nullopt)
+            : VariableType(name, TypeKind::INTERFACE),
+              m_methods(methods),
+              m_genericParam(generic_param) {
+            m_typename = VariableType::name() + (
+                             m_genericParam.has_value() ? "<" + m_genericParam.value()->name() + ">" : "");
+            m_linkageName = VariableType::name() + (m_genericParam.has_value()
+                                                        ? "_" + m_genericParam.value()->name()
+                                                        : "");
+        }
+
+        [[nodiscard]] const std::vector<std::shared_ptr<ast::FunctionSignature> > &methods() const {
+            return m_methods;
+        }
+
+        [[nodiscard]] const std::optional<std::shared_ptr<VariableType> > &genericParam() const {
+            return m_genericParam;
+        }
+
+        [[nodiscard]] const std::string &name() const override {
+            return m_typename;
+        }
+
+        [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
+
+        [[nodiscard]] std::optional<std::shared_ptr<ast::FunctionSignature> > findMethod(
+            const std::string &method_name) const;
+
+        [[nodiscard]] std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> >
+        findMethodWithIndex(
+            const std::string &method_name) const;
+
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override;
+    };
+
     class StructType : public VariableType {
     private:
+        std::vector<std::shared_ptr<InterfaceType> > m_interfaces;
         std::vector<StructField> m_fields;
         std::vector<std::weak_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
@@ -145,6 +221,7 @@ namespace types {
     public:
         StructType(std::string name, const std::vector<StructField> &fields,
                    const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
+                   const std::vector<std::shared_ptr<InterfaceType> > &interfaces,
                    std::optional<std::shared_ptr<VariableType> > genericParam);
 
         ~StructType() override {
@@ -179,9 +256,10 @@ namespace types {
         }
 
         [[nodiscard]] size_t getFieldIndexByName(const std::string &fieldName) const {
+            const size_t offset = m_interfaces.size();
             for (size_t i = 0; i < m_fields.size(); ++i) {
                 if (m_fields[i].name == fieldName) {
-                    return i;
+                    return i + offset;
                 }
             }
             assert(false && "invalid index for struct definition");
@@ -202,11 +280,27 @@ namespace types {
             const std::shared_ptr<VariableType> &genericParam) override;
 
         void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods);
+
+        [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
+
+        size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
+
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            if (auto otherPtrType = dynamic_cast<const InterfaceType *>(&other)) {
+                for (const auto &interface: m_interfaces) {
+                    if (*interface == *otherPtrType) {
+                        return true;
+                    }
+                }
+            }
+            return this->name() == other.name();
+        }
     };
 
     class SliceType final : public StructType {
     public:
-        explicit SliceType(std::string name, std::shared_ptr<VariableType> baseType);
+        explicit SliceType(std::string name, const std::shared_ptr<VariableType> &baseType);
     };
 
 
@@ -222,7 +316,7 @@ namespace types {
     public:
         NonGenericStructType(std::string name, const std::vector<StructField> &fields,
                              const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) : StructType(
-                std::move(name), fields, {}, std::nullopt),
+                std::move(name), fields, {}, {}, std::nullopt),
             m_methods(methods) {
         }
 

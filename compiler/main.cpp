@@ -23,7 +23,7 @@ std::optional<std::string> read_file(const std::filesystem::path &inputPath) {
 
 using namespace std::literals;
 
-void printHelp(const std::string &program) {
+static void printHelp(const std::string &program) {
     std::cout << "Usage: " + program + " [options] file...\n";
     std::cout << "Options:\n";
     std::cout << "  --run\t\t\tRuns the compiled program\n";

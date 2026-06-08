@@ -50,6 +50,7 @@
 #include "ast/FieldAssignment.h"
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
+#include "ast/FunctionSignature.h"
 #include "ast/IfCondition.h"
 #include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
@@ -338,12 +339,77 @@ namespace llvm_backend {
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
                                 bool functionTypeAsPointer = true, bool unnamedType = false);
 
-    llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType, LLVMBackendState &context,
-                                  bool unnamedType) {
+
+    static llvm::StructType *checkAndGenerateVTableForInterface(
+        const std::shared_ptr<types::VariableType> &interfaceTypeinterfaceType,
+        LLVMBackendState &context) {
+        if (const auto &interfaceType = std::dynamic_pointer_cast<types::InterfaceType>(interfaceTypeinterfaceType)) {
+            const auto vtableName = interfaceType->linkageName() + "_vtable";
+            const auto cached_type = llvm::StructType::getTypeByName(*context.TheContext, vtableName);
+
+            if (cached_type == nullptr) {
+                std::vector<llvm::Type *> vtableTypes;
+                for (const auto &method: interfaceType->methods()) {
+                    vtableTypes.emplace_back(resolveLlvmType(method->asFunctionType(), context, true));
+                }
+                return llvm::StructType::create(*context.TheContext, vtableTypes, vtableName);
+            }
+            return cached_type;
+        }
+        return nullptr;
+    }
+
+    void generateVTableForInterfaceAndStruct(const std::shared_ptr<types::StructType> &structType,
+                                             const std::shared_ptr<types::InterfaceType> &interfaceType,
+                                             LLVMBackendState &context) {
+        const auto vtableName = structType->linkageName() + "_" + interfaceType->linkageName() + "_vtable";
+        if (context.TheModule->getGlobalVariable(vtableName, true) == nullptr) {
+            const auto type = checkAndGenerateVTableForInterface(interfaceType, context);
+            auto methodPointers = std::vector<llvm::Constant *>();
+            for (const auto &methodSignature: interfaceType->methods()) {
+                const auto methodDef = structType->getMethodByName(methodSignature->functionName());
+                if (methodDef == nullptr) {
+                    std::cerr << "Struct " << structType->name() << " does not implement method " << methodSignature->
+                            functionName() << " of interface " << interfaceType->name() << std::endl;
+                    exit(1);
+                }
+                const auto methodDefFuncType = methodDef->asFunctionType();
+                const auto methodFuncType = methodSignature->asFunctionType();
+
+                std::string mangleName(structType->name());
+                mangleName += "::" + methodDef->functionSignature();
+                auto method = context.TheModule->getFunction(mangleName);
+                if (method == nullptr) {
+                    std::cerr << "Method " << mangleName << " not found for struct "
+                            << structType->name() << std::endl;
+                    for (const auto &f: context.TheModule->functions()) {
+                        std::cerr << "Available function: " << f.getName().str() << std::endl;
+                    }
+                    exit(1);
+                }
+
+                methodPointers.push_back(method);
+            }
+            const auto initializer = llvm::ConstantStruct::get(
+                type, methodPointers);
+
+            llvm::GlobalVariable *vtable = new llvm::GlobalVariable(*context.TheModule, type, true,
+                                                                    llvm::GlobalValue::PrivateLinkage,
+                                                                    initializer, vtableName);
+        }
+    }
+
+    static llvm::Type *resolveStructType(const std::shared_ptr<types::StructType> &structType,
+                                         LLVMBackendState &context,
+                                         bool unnamedType) {
         const auto typeName = structType->linkageName();
         const auto cached_type = llvm::StructType::getTypeByName(*context.TheContext, typeName);
         if (cached_type == nullptr or unnamedType) {
             std::vector<llvm::Type *> types;
+            for (const auto &interfaceType: structType->interfaces()) {
+                types.emplace_back(llvm::PointerType::getUnqual(*context.TheContext));
+                generateVTableForInterfaceAndStruct(structType, interfaceType, context);
+            }
             for (const auto &[visibility,type, _]: structType->fields()) {
                 types.emplace_back(resolveLlvmType(type, context));
             }
@@ -357,6 +423,7 @@ namespace llvm_backend {
         }
         return cached_type;
     }
+
 
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
                                 const bool functionTypeAsPointer, const bool unnamedType) {
@@ -419,6 +486,9 @@ namespace llvm_backend {
                 return llvm::PointerType::getUnqual(*context.TheContext);
             case types::TypeKind::SLICE:
                 break;
+            case types::TypeKind::INTERFACE:
+                checkAndGenerateVTableForInterface(value, context);
+                return llvm::PointerType::getUnqual(*context.TheContext);
         }
         assert(false && "Unknown type");
         return nullptr;
@@ -854,6 +924,17 @@ namespace llvm_backend {
         const auto type = std::dynamic_pointer_cast<types::StructType>(node->expressionType().value());
         std::vector<llvm::Constant *> fields;
         std::vector<llvm::Value *> values;
+        for (const auto &interface: type->interfaces()) {
+            const auto llvmInterfaceType = resolveLlvmType(interface, llvmState);
+            const auto vtableName = node->expressionType().value()->linkageName() + "_" + interface->linkageName() +
+                                    "_vtable";
+
+            const auto interfaceVTable = llvmState.TheModule->getGlobalVariable(vtableName, true);
+            assert(
+                llvmInterfaceType != nullptr && "Failed to resolve LLVM type for interface in struct initialization");
+            assert(interfaceVTable != nullptr && "Interface vtable not found in module for struct initialization");
+            fields.push_back(interfaceVTable);
+        }
         for (const auto &[name, value]: node->fields()) {
             auto llvmValue = codegen_base(value.get(), llvmState);
             values.push_back(llvmValue);
@@ -879,8 +960,9 @@ namespace llvm_backend {
         }
         const auto val = llvmState.Builder->CreateAlloca(structType);
         const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+        const size_t offset = type->interfaces().size();
         for (size_t i = 0; i < values.size(); i++) {
-            const auto [visibility,fieldType, fieldName] = type->fields()[i];
+            const auto [visibility,fieldType, fieldName] = type->fields()[offset + i];
             const auto elementPointer =
                     llvmState.Builder->CreateStructGEP(structType, val, i, fieldName);
             const auto llvmFieldType = resolveLlvmType(fieldType, llvmState);
@@ -2057,6 +2139,18 @@ namespace llvm_backend {
         return alloca;
     }
 
+    static llvm::FunctionType *generateFunctionTypeForSignature(
+        const std::shared_ptr<ast::FunctionSignature> &functionType,
+        LLVMBackendState &llvm_state) {
+        std::vector<llvm::Type *> arg_types;
+        for (const auto &arg: functionType->args()) {
+            assert(arg.type.has_value() && "Argument type must be resolved before code generation");
+            arg_types.push_back(resolveLlvmType(arg.type.value(), llvm_state));
+        }
+        return llvm::FunctionType::get(resolveLlvmType(functionType->expressionType().value(), llvm_state), arg_types,
+                                       false);
+    }
+
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState) {
         const auto methodName = node->functionName();
         const auto objectValue = codegen_base(node->instanceNode(), llvmState);
@@ -2104,6 +2198,47 @@ namespace llvm_backend {
             instanceType = refTye->baseType();
         }
         auto typeName = instanceType.has_value() ? instanceType.value()->rawTypeName() : "";
+        auto interfaceType = std::dynamic_pointer_cast<types::InterfaceType>(instanceType.value());
+        if (interfaceType) {
+            const auto methodOption = interfaceType->findMethodWithIndex(methodName);
+            if (!methodOption) {
+                std::cerr << "Method " << methodName << " not found in interface " << typeName << "\n";
+                assert(false && "Method not declared before call");
+                return nullptr; // Error handling
+            }
+            auto [method, methodIndex] = methodOption.value();
+            std::cerr << "Found method " << methodName << " in interface " << typeName << " with index " << methodIndex
+                    << "\n";
+            // first member of the struct is the vtable pointer, second member is the data pointer
+            //const auto vTableType = checkAndGenerateVTableForInterface(interfaceType, llvmState);
+            auto ptrType = llvmState.Builder->getPtrTy();
+            // const auto vtablePtr = llvmState.Builder->CreateConstInBoundsGEP1_32(ptrType, objectValue, 0,
+            //     "vtable_ptr");
+            const auto vtable = llvmState.Builder->CreateLoad(ptrType, objectValue, "vtable");
+            const auto methodType = generateFunctionTypeForSignature(method, llvmState);
+
+            const auto methodPtrPtr = llvmState.Builder->CreateConstInBoundsGEP1_32(
+                ptrType, vtable, methodIndex, "method_ptr_ptr");
+
+            const auto methodPtr = llvmState.Builder->CreateLoad(ptrType,
+                                                                 methodPtrPtr, "method_ptr");
+
+            const auto call = llvmState.Builder->CreateCall(methodType, methodPtr, args);
+            if (method->expressionType().value()->typeKind() == types::TypeKind::STRUCT) {
+                call->addRetAttr(llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
+                                                                       resolveLlvmType(
+                                                                           method->expressionType().value(),
+                                                                           llvmState)));
+                call->addRetAttr(llvm::Attribute::Writable);
+                call->addRetAttr(llvm::Attribute::DeadOnUnwind);
+                call->addRetAttr(llvm::Attribute::NoAlias);
+            }
+            if (method->expressionType().value()->typeKind() != types::TypeKind::VOID) {
+                return call;
+            }
+
+            return nullptr;
+        }
         std::string mangleName(typeName);
         mangleName += "::" + methodName;
         auto functionCall = llvmState.TheModule->getFunction(mangleName);
@@ -2162,6 +2297,9 @@ namespace llvm_backend {
         if (!functionCall) {
             functionCall = llvmState.TheModule->getFunction(node->functionSignature());
         }
+        if (!functionCall && node->functionDefinition()) {
+            functionCall = llvmState.TheModule->getFunction(node->functionDefinition().value()->functionSignature());
+        }
 
         const auto functionVar = llvmState.findVariable(node->functionName());
         // call the function through function pointer
@@ -2208,6 +2346,30 @@ namespace llvm_backend {
         }
         for (const auto &arg: node->args()) {
             if (auto value = codegen_base(arg.get(), llvmState)) {
+                if (arg->expressionType().value()->typeKind() == types::TypeKind::POINTER) {
+                    auto ptrType = std::dynamic_pointer_cast<types::TypeWithBaseType>(arg->expressionType().value());
+                    if (ptrType->baseType()->typeKind() == types::TypeKind::STRUCT) {
+                        auto structType = std::dynamic_pointer_cast<types::StructType>(ptrType->baseType());
+                        assert(structType && "Argument type is not a struct");
+                        assert(node->functionDefinition() && "Function definition must be available for struct type");
+                        const auto funcDef = node->functionDefinition().value();
+                        const auto param = funcDef->getParam(args.size() - (isStructReturn ? 1 : 0));
+                        assert(param && "Parameter not found in function definition");
+
+                        if (auto paramPtrType = std::dynamic_pointer_cast<
+                            types::TypeWithBaseType>(param->type.value())) {
+                            if (auto paramType = std::dynamic_pointer_cast<types::InterfaceType>(
+                                paramPtrType->baseType())) {
+                                // Handle struct parameter
+                                const auto type = llvmState.Builder->getPtrTy();
+                                const auto index = structType->getInterfaceIndex(paramType);
+                                auto gep = llvmState.Builder->CreateConstGEP1_32(type, value, index, "arg_vtable");
+                                args.push_back(gep);
+                                continue;
+                            }
+                        }
+                    }
+                }
                 args.push_back(value);
             } else {
                 assert(false && "Failed to generate argument for function call");

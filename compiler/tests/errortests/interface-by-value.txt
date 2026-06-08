@@ -1,0 +1,3 @@
+FILENAME:12:4: error: Argument 'a' cannot be of interface type. Interfaces cannot be passed by value.
+fn test_a(a : A) : void {
+   ^-----

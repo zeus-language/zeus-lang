@@ -23,8 +23,10 @@
 #include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
+#include "ast/FunctionSignature.h"
 #include "ast/IfCondition.h"
 #include "ast/IfMacro.h"
+#include "ast/InterfaceDeclaration.h"
 #include "ast/InterpolatedString.h"
 #include "ast/LambdaExpression.h"
 #include "ast/LogicalExpression.h"
@@ -1595,6 +1597,8 @@ namespace parser {
                     result = std::move(useModule.value());
                 } else if (auto structDef = parseStructDeclaration()) {
                     result = std::move(structDef.value());
+                } else if (auto interfaceDef = parseInterfaceDeclaration()) {
+                    result = std::move(interfaceDef.value());
                 } else if (auto enumDef = parseEnumDeclaration()) {
                     result = std::move(enumDef.value());
                 } else if (auto functionDef = parseFunctionDefinition()) {
@@ -2113,6 +2117,88 @@ namespace parser {
             return std::make_shared<ast::UseModule>(modulePath, aliasName);
         }
 
+        std::optional<std::shared_ptr<ast::FunctionSignature> > parseFunctionSignature() {
+            if (!canConsumeKeyWord("fn")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("fn");
+            Token nameToken = current();
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = nameToken,
+                    .message = "expected a function name but found a '" + nameToken.lexical() + "'"
+                });
+                return std::nullopt;
+            }
+            consume(Token::Type::IDENTIFIER);
+
+            consume(Token::Type::LEFT_CURLY);
+            std::vector<ast::FunctionArgument> functionArgs;
+            while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                if (auto arg = tryParseFunctionArgument()) {
+                    functionArgs.push_back(std::move(arg.value()));
+                    tryConsume(Token::COMMA);
+                } else {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "a function argument but found '" + current().lexical() + "'"
+                    });
+                    break;
+                }
+                if (canConsume(Token::Type::RIGHT_CURLY))
+                    break;
+            }
+            consume(Token::Type::RIGHT_CURLY);
+            consume(Token::COLON);
+            auto returnType = parseRawType();
+            consume(Token::SEMICOLON);
+            auto annotations = std::vector<std::shared_ptr<ast::RawAnnotation> >{};
+            // Collect annotations
+            for (auto &m_pendingAnnotation: m_pendingAnnotations) {
+                annotations.push_back(m_pendingAnnotation);
+            }
+            m_pendingAnnotations.clear();
+            return std::make_shared<ast::FunctionSignature>(nameToken, functionArgs, returnType, annotations);
+        }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > parseInterfaceDeclaration() {
+            if (!canConsumeKeyWord("interface")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("interface");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected interface name after 'interface'!"
+                });
+                return std::nullopt;
+            }
+            Token interfaceName = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::OPEN_BRACE);
+            std::vector<std::shared_ptr<ast::FunctionSignature> > methodSignatures;
+
+            while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                if (auto annotation = parseAnnotation()) {
+                    m_pendingAnnotations.push_back(std::move(annotation.value()));
+                    continue;
+                }
+                auto methodSignature = parseFunctionSignature();
+                if (!methodSignature) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected method signature in interface declaration!"
+                    });
+                    break;
+                }
+                methodSignatures.push_back(std::move(methodSignature.value()));
+                tryConsume(Token::SEMICOLON);
+            }
+
+            consume(Token::CLOSE_BRACE);
+            return std::make_shared<ast::InterfaceDeclaration>(interfaceName, methodSignatures);
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseStructDeclaration() {
             if (!canConsumeKeyWord("struct")) {
                 return std::nullopt;
@@ -2142,6 +2228,16 @@ namespace parser {
                 }
                 consume(Token::GREATER);
             }
+            std::vector<Token> interfaceNames;
+            if (tryConsumeKeyWord("implements")) {
+                while (canConsume(Token::IDENTIFIER)) {
+                    // We currently do not store the implemented interfaces, but we can extend this later
+                    interfaceNames.push_back(current());
+                    consume(Token::IDENTIFIER);
+                    tryConsume(Token::COMMA);
+                }
+            }
+
             consume(Token::OPEN_BRACE);
             std::vector<ast::StructField> fields;
             std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
@@ -2187,7 +2283,7 @@ namespace parser {
 
             consume(Token::CLOSE_BRACE);
             return std::make_shared<ast::StructDeclaration>(structName, fields,
-                                                            methods, genericParam);
+                                                            methods, interfaceNames, genericParam);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseEnumDeclaration() {
@@ -2258,6 +2354,8 @@ namespace parser {
                     module->useModuleNodes.push_back(std::move(useModule.value()));
                 } else if (auto structDecl = parseStructDeclaration()) {
                     module->nodes.push_back(std::move(structDecl.value()));
+                } else if (auto interfaceDef = parseInterfaceDeclaration()) {
+                    module->nodes.push_back(std::move(std::move(interfaceDef.value())));
                 } else if (auto enumDecl = parseEnumDeclaration()) {
                     module->nodes.push_back(std::move(enumDecl.value()));
                 } else {

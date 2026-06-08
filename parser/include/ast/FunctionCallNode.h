@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "ASTNode.h"
+#include "FunctionDefinitionBase.h"
 #include "lexer/Lexer.h"
 
 namespace ast {
@@ -17,6 +18,7 @@ namespace ast {
         std::vector<std::shared_ptr<ASTNode> > m_args;
         std::optional<Token> m_genericParam;
         std::optional<std::shared_ptr<types::VariableType> > m_genericType = std::nullopt;
+        FunctionDefinitionBase *m_functionDefinition = nullptr;
 
     public:
         explicit FunctionCallNode(Token functionName, std::vector<Token> namespacePrefix,
@@ -53,6 +55,10 @@ namespace ast {
         [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > genericType() const {
             return m_genericType;
         }
+
+        void setFunctionDefinition(FunctionDefinitionBase *func_def);
+
+        [[nodiscard]] std::optional<FunctionDefinitionBase *> functionDefinition() const;
 
 
         FunctionCallNode(FunctionCallNode &&) = default;

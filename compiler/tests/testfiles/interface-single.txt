@@ -1,0 +1,4 @@
+opening sqlite connection
+closing sqlite connection
+opening postgres connection
+closing postgres connection
