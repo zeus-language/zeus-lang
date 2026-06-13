@@ -21,14 +21,26 @@ struct SourceLocation {
     size_t col{};
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
-    [[nodiscard]] size_t lineStart() const { return source->rfind('\n', byte_offset) + 1; }
+
+    [[nodiscard]] size_t lineStart() const {
+        if (source == nullptr) {
+            return 0;
+        }
+        return source->rfind('\n', byte_offset) + 1;
+    }
 
     [[nodiscard]] size_t unicode_col() const {
+        if (source == nullptr) {
+            return 0;
+        }
         return count_unicode_characters(*source, lineStart(), byte_offset - lineStart()) + 1;
     }
 
 
     [[nodiscard]] size_t unicode_length() const {
+        if (source == nullptr) {
+            return 0;
+        }
         return count_unicode_characters(*source, byte_offset, num_bytes);
     }
 
@@ -78,6 +90,7 @@ public:
         MUL,
         PERCENT,
         AND,
+        BITNOT,
         LEFT_CURLY,
         RIGHT_CURLY,
         LEFT_SQUAR,

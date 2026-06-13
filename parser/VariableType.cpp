@@ -17,15 +17,6 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
     return std::make_shared<types::PointerType>("*" + genericParam->name(), genericParam);
 }
 
-std::optional<std::shared_ptr<ast::FunctionSignature> >
-types::InterfaceType::findMethod(const std::string &method_name) const {
-    for (const auto &method: m_methods) {
-        if (method->functionName() == method_name) {
-            return std::make_optional(method);
-        }
-    }
-    return std::nullopt;
-}
 
 std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> > types::InterfaceType::findMethodWithIndex(
     const std::string &method_name) const {

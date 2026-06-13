@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let x : float = 8.5f;
+    let y : i32 = 2;
+    let result : i32 = x >> y;  // Error: right shift not supported for float
+    return 0;
+}
+

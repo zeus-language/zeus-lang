@@ -1,0 +1,3 @@
+FILENAME:3:23: error: missing right hand side expression after 'or' operator
+    let y : i32 = x | ;
+                      ^

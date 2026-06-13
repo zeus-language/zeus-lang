@@ -1,0 +1,6 @@
+fn main() : i32 {
+    let x : i32 = 10;
+    let result : i32 = x + undefined_var;  // Error: undefined variable
+    return 0;
+}
+

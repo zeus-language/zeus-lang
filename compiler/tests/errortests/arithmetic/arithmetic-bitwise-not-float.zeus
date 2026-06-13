@@ -1,0 +1,5 @@
+fn main() : i32 {
+    let x : float = 3.14f;
+    let result : i32 = ~x;  // Error: bitwise NOT not supported for float
+    return 0;
+}

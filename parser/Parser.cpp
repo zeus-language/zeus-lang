@@ -778,7 +778,14 @@ namespace parser {
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
                 if (tryConsume(Token::DIV)) {
-                    auto rhs = tryParseToken(allowInit);
+                    auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '/' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::DIV,
@@ -786,6 +793,13 @@ namespace parser {
                 }
                 if (tryConsume(Token::PERCENT)) {
                     auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '%' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::MOD,
@@ -849,6 +863,57 @@ namespace parser {
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::RIGHT_SHIFT,
                                                std::move(lhs.value()), std::move(rhs.value())));
+                }
+
+                if (tryConsume(Token::CARET)) {
+                    auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after 'xor' operator",
+                        });
+
+                        return lhs;
+                    }
+                    return parseExpression(false,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::XOR,
+                                               std::move(lhs.value()), std::move(rhs.value())));
+                }
+            } else {
+                auto operatorToken = current();
+                if (canConsume(Token::MINUS)) {
+                    consume(Token::MINUS);
+
+                    auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected a right hand side after a '-'!"
+                        });
+                        return std::nullopt;
+                    }
+                    return parseExpression(allowInit,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::UNARY_MINUS,
+                                               std::move(rhs.value())));
+                }
+
+
+                if (canConsume(Token::BITNOT)) {
+                    consume(Token::BITNOT);
+                    auto rhs = parseBaseExpression(allowInit);
+                    if (!rhs) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "expected a right hand side after a '~'!"
+                        });
+                        return std::nullopt;
+                    }
+                    return parseExpression(allowInit,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::NOT,
+                                               std::move(rhs.value())));
                 }
             }
 
@@ -1118,12 +1183,13 @@ namespace parser {
             consume(Token::SEMICOLON);
 
 
-            return std::make_shared<ast::FieldAssignment>(std::move(varAccess.value()->expressionToken()),
+            return std::make_shared<ast::FieldAssignment>(varAccess.value()->expressionToken(),
                                                           std::move(varAccess.value()),
                                                           std::move(value.value()));
         }
 
-        std::optional<std::shared_ptr<ast::RawType> > parseRawType(std::optional<Token> expectedName = std::nullopt) {
+        std::optional<std::shared_ptr<ast::RawType> > parseRawType(
+            const std::optional<Token> &expectedName = std::nullopt) {
             const Token nameToken = expectedName.value_or(current());
 
             if (tryConsumeKeyWord("fn")) {

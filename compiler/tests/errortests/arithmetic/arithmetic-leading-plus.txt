@@ -1,0 +1,12 @@
+FILENAME:2:19: error: expected token 'SEMICOLON' but found PLUS!
+    let a : i32 = + 5;
+                  ^
+FILENAME:2:19: error: unexpected token found PLUS!
+    let a : i32 = + 5;
+                  ^
+FILENAME:2:21: error: unexpected token found NUMBER!
+    let a : i32 = + 5;
+                    ^
+FILENAME:2:22: error: unexpected token found SEMICOLON!
+    let a : i32 = + 5;
+                     ^

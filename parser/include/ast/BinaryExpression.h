@@ -12,13 +12,20 @@
 #include "lexer/Lexer.h"
 
 namespace ast {
-    enum class BinaryOperator { ADD, SUB, MUL, DIV, MOD, POW, AND, OR, LEFT_SHIFT, RIGHT_SHIFT };
+    enum class BinaryOperator { ADD, SUB, MUL, DIV, MOD, POW, AND, OR, LEFT_SHIFT, RIGHT_SHIFT, NOT, UNARY_MINUS, XOR };
 
     class BinaryExpression final : public OperatorNode {
     private:
         BinaryOperator m_operator;
 
     public:
+        explicit BinaryExpression(Token name, BinaryOperator op,
+                                  std::shared_ptr<ASTNode> rhs) : OperatorNode(std::move(name),
+                                                                               NodeType::BINARY_EXPRESSION,
+                                                                               nullptr, std::move(rhs)),
+                                                                  m_operator(op) {
+        }
+
         explicit BinaryExpression(Token name, BinaryOperator op, std::shared_ptr<ASTNode> lhs,
                                   std::shared_ptr<ASTNode> rhs) : OperatorNode(std::move(name),
                                                                                NodeType::BINARY_EXPRESSION,
@@ -50,6 +57,12 @@ namespace ast {
                 case BinaryOperator::OR:
                     break;
                 case BinaryOperator::LEFT_SHIFT:
+                    break;
+                case BinaryOperator::RIGHT_SHIFT:
+                    break;
+                case BinaryOperator::NOT:
+                    break;
+                case BinaryOperator::UNARY_MINUS:
                     break;
             }
             return "";

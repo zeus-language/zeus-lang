@@ -1537,7 +1537,7 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegenStructOperatorNodeCall(const ast::OperatorNode *node, LLVMBackendState &llvmState) {
-        const auto lhs = codegen_base(node->lhs(), llvmState);
+        const auto lhs = codegen_base(node->lhs().value(), llvmState);
         const auto rhs = codegen_base(node->rhs(), llvmState);
         const auto returnTypeKind = node->expressionType().has_value()
                                         ? node->expressionType().value()->typeKind()
@@ -1584,10 +1584,10 @@ namespace llvm_backend {
             call->addParamAttr(0, llvm::Attribute::DeadOnUnwind);
             call->addParamAttr(0, llvm::Attribute::NoAlias);
 
-            setCallArgInfo(node->lhs(), call, 1, llvmState);
+            setCallArgInfo(node->lhs().value(), call, 1, llvmState);
             setCallArgInfo(node->rhs(), call, 2, llvmState);
         } else {
-            setCallArgInfo(node->lhs(), call, 0, llvmState);
+            setCallArgInfo(node->lhs().value(), call, 0, llvmState);
             setCallArgInfo(node->rhs(), call, 1, llvmState);
         }
         if (!function->getReturnType()->isVoidTy())
@@ -1596,14 +1596,14 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(const ast::Comparisson *node, LLVMBackendState &llvmState) {
-        auto lhs = codegen_base(node->lhs(), llvmState);
+        auto lhs = codegen_base(node->lhs().value(), llvmState);
         assert(lhs && "lhs of the comparison is null");
         auto rhs = codegen_base(node->rhs(), llvmState);
         assert(rhs && "rhs of the comparison is null");
         if (node->operatorFunction()) {
             return codegenStructOperatorNodeCall(node, llvmState);
         }
-        const auto lhsType = node->lhs()->expressionType().value();
+        const auto lhsType = node->lhs().value()->expressionType().value();
         const auto rhsType = node->rhs()->expressionType().value();
         bool isSigned = true;
         if (lhsType->typeKind() == types::TypeKind::INT) {
@@ -1802,7 +1802,7 @@ namespace llvm_backend {
         if (node->operatorFunction()) {
             return codegenStructOperatorNodeCall(node, llvmState);
         }
-        const auto lhs = codegen_base(node->lhs(), llvmState);
+        const auto lhs = (node->lhs().has_value()) ? codegen_base(node->lhs().value(), llvmState) : nullptr;
         const auto rhs = codegen_base(node->rhs(), llvmState);
 
         switch (node->binoperator()) {
@@ -1858,6 +1858,11 @@ namespace llvm_backend {
                     return llvmState.Builder->CreateOr(lhs, rhs, "ortmp");
                 }
                 break;
+            case ast::BinaryOperator::XOR:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateXor(lhs, rhs, "xortmp");
+                }
+                break;
             case ast::BinaryOperator::LEFT_SHIFT:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
                     return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
@@ -1866,6 +1871,18 @@ namespace llvm_backend {
             case ast::BinaryOperator::RIGHT_SHIFT:
                 if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
                     return llvmState.Builder->CreateAShr(lhs, rhs, "shrtmp");
+                }
+                break;
+            case ast::BinaryOperator::NOT:
+                if (rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateNot(rhs, "nottmp");
+                }
+                break;
+            case ast::BinaryOperator::UNARY_MINUS:
+                if (rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateNeg(rhs, "negtmp");
+                } else if (rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFNeg(rhs, "fnegtmp");
                 }
                 break;
             default:

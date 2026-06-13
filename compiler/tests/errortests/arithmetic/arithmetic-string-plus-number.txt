@@ -1,0 +1,6 @@
+FILENAME:4:26: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = s + n;  // Error: cannot add string and i32
+                         ^
+FILENAME:4:26: error: Operator '__add__' is not overloaded for struct type 'string'.
+    let result : i32 = s + n;  // Error: cannot add string and i32
+                         ^

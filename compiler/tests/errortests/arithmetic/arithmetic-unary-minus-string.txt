@@ -1,0 +1,3 @@
+FILENAME:3:27: error: The unary minus operator requires an integer or float operand, but got 'string'.
+    let result : string = -s;  // Error: unary minus not supported for string
+                          ^

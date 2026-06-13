@@ -1,0 +1,6 @@
+FILENAME:5:32: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = (x + y) * s;  // Error: cannot multiply i32 and string
+                               ^
+FILENAME:5:32: error: Type mismatch in binary expression: left is of type 'i32', right is of type 'string'.
+    let result : i32 = (x + y) * s;  // Error: cannot multiply i32 and string
+                               ^

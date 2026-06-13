@@ -1,0 +1,9 @@
+FILENAME:3:26: error: Could not determine type of initial value for variable 'result'.
+    let result : i32 = x + undefined_var;  // Error: undefined variable
+                         ^
+FILENAME:3:26: error: Could not determine types of operands in binary expression.
+    let result : i32 = x + undefined_var;  // Error: undefined variable
+                         ^
+FILENAME:3:28: error: Variable 'undefined_var' is not declared in this scope.
+    let result : i32 = x + undefined_var;  // Error: undefined variable
+                           ^------------

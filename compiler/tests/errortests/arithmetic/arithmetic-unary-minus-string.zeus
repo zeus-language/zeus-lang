@@ -1,0 +1,6 @@
+fn main() : i32 {
+    let s : string = string::from_slice("hello");
+    let result : string = -s;  // Error: unary minus not supported for string
+    return 0;
+}
+

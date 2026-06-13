@@ -1,0 +1,7 @@
+fn main() : i32 {
+    let s : string = string::from_slice("hello");
+    let n : i32 = 5;
+    let result : i32 = s + n;  // Error: cannot add string and i32
+    return 0;
+}
+
