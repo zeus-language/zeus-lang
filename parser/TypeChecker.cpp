@@ -160,7 +160,7 @@ namespace types {
         } else if (auto rawStringConst = dynamic_cast<ast::RawStringConstant *>(node)) {
             return rawStringConst->value();
         } else if (auto binExpr = dynamic_cast<ast::BinaryExpression *>(node)) {
-            auto lhs = evalConstantExpression(binExpr->lhs(), context);
+            auto lhs = (binExpr->lhs()) ? evalConstantExpression(binExpr->lhs().value(), context) : std::nullopt;
             auto rhs = evalConstantExpression(binExpr->rhs(), context);
             if (!lhs or !rhs)
                 return std::nullopt;
@@ -212,7 +212,7 @@ namespace types {
                 case ast::CMPOperator::LESS_EQUAL:
                     break;
                 case ast::CMPOperator::EQUALS: {
-                    auto lhs = evalConstantExpression(condition->lhs(), context);
+                    auto lhs = evalConstantExpression(condition->lhs().value(), context);
                     auto rhs = evalConstantExpression(condition->rhs(), context);
                     if (lhs and rhs)
                         return lhs.value() == rhs.value();
@@ -1300,17 +1300,19 @@ namespace types {
 
     bool typecheckOperatorMethod(ast::OperatorNode *node, Context &context) {
         std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
-
-        if (node->lhs()->expressionType()) {
-            if (auto structType = std::dynamic_pointer_cast<types::StructType>(
-                node->lhs()->expressionType().value())) {
-                lhsStructType = structType;
-                auto lhsToken = node->lhs()->expressionToken();
-                node->setLhs(std::make_unique<ast::ReferenceAccess>(
-                    lhsToken,
-                    std::move(node->movelhs())
-                ));
-                type_check_base(node->lhs(), context);
+        if (node->lhs()) {
+            auto lhsType = node->lhs().value()->expressionType();
+            if (lhsType) {
+                if (auto structType = std::dynamic_pointer_cast<types::StructType>(
+                    lhsType.value())) {
+                    lhsStructType = structType;
+                    auto lhsToken = node->lhs().value()->expressionToken();
+                    node->setLhs(std::make_unique<ast::ReferenceAccess>(
+                        lhsToken,
+                        std::move(node->movelhs())
+                    ));
+                    type_check_base(node->lhs().value(), context);
+                }
             }
         }
 
@@ -1322,7 +1324,7 @@ namespace types {
                        method->args().size() == 2 &&
                        method->args()[0].type &&
                        method->args()[0].type.value()->name() ==
-                       node->lhs()->expressionType().value()->name() &&
+                       node->lhs().value()->expressionType().value()->name() &&
                        method->args()[1].type &&
                        method->args()[1].type.value()->name() ==
                        node->rhs()->expressionType().value()->name();
@@ -1342,7 +1344,7 @@ namespace types {
                     return method->args().size() == 2 &&
                            method->args()[0].type &&
                            method->args()[0].type.value()->name() ==
-                           node->lhs()->expressionType().value()->name() &&
+                           node->lhs().value()->expressionType().value()->name() &&
                            method->args()[1].type &&
                            method->args()[1].type.value()->name() ==
                            node->rhs()->expressionType().value()->name();
@@ -1370,11 +1372,11 @@ namespace types {
     }
 
     void type_check(ast::Comparisson *node, Context &context) {
-        type_check_base(node->lhs(), context);
+        type_check_base(node->lhs().value(), context);
         type_check_base(node->rhs(), context);
         if (typecheckOperatorMethod(node, context)) return;
 
-        const auto lhs = node->lhs();
+        const auto lhs = node->lhs().value();
         const auto rhs = node->rhs();
         if (lhs->expressionType() && rhs->expressionType()) {
             if (lhs->expressionType().value()->name() != rhs->expressionType().value()->name()) {
@@ -1640,25 +1642,31 @@ namespace types {
 
 
     void type_check(ast::BinaryExpression *node, Context &context) {
-        type_check_base(node->lhs(), context);
+        if (node->lhs()) {
+            type_check_base(node->lhs().value(), context);
+        }
         type_check_base(node->rhs(), context);
         if (typecheckOperatorMethod(node, context)) return;
 
 
-        if (node->lhs()->expressionType() && node->rhs()->expressionType()) {
-            if (node->lhs()->expressionType().value()->name() != node->rhs()->expressionType().value()->name()) {
+        if (node->lhs() && node->lhs().value()->expressionType() && node->rhs()->expressionType()) {
+            if (node->lhs().value()->expressionType().value()->name() != node->rhs()->expressionType().value()->
+                name()) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
                     "Type mismatch in binary expression: left is of type '" +
-                    node->lhs()->expressionType().value()->name() + "', right is of type '" +
+                    node->lhs().value()->expressionType().value()->name() + "', right is of type '" +
                     node->rhs()->expressionType().value()->name() + "'."
                 });
                 return;
             }
             // For simplicity, we assume the result type is the same as the operand types
-            if (node->lhs()->expressionType())
-                node->setExpressionType(node->lhs()->expressionType().value());
+            if (node->lhs().value()->expressionType())
+                node->setExpressionType(node->lhs().value()->expressionType().value());
+        } else if (!node->lhs() && node->rhs()->expressionType()) {
+            // Unary operator, type is the same as the operand
+            node->setExpressionType(node->rhs()->expressionType().value());
         } else {
             context.messages.insert({
                 parser::OutputType::ERROR,
@@ -1698,54 +1706,75 @@ namespace types {
 
             break;
             case ast::BinaryOperator::MOD:
-                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (node->lhs().value()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Modulo operator requires integer operands, but got '" +
-                        node->lhs()->expressionType().value()->name() + "'."
+                        node->lhs().value()->expressionType().value()->name() + "'."
                     });
                 }
                 break;
             case ast::BinaryOperator::POW:
                 break;
             case ast::BinaryOperator::AND:
-                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (node->lhs().value()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Binary And operator requires integer operands, but got '" +
-                        node->lhs()->expressionType().value()->name() + "'."
+                        node->lhs().value()->expressionType().value()->name() + "'."
                     });
                 }
                 break;
             case ast::BinaryOperator::OR:
-                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (node->lhs().value()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Binary Or operator requires integer operands, but got '" +
-                        node->lhs()->expressionType().value()->name() + "'."
+                        node->lhs().value()->expressionType().value()->name() + "'."
                     });
                 }
                 break;
             case ast::BinaryOperator::LEFT_SHIFT:
-                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (node->lhs().value()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Left shift operator requires integer operands, but got '" +
-                        node->lhs()->expressionType().value()->name() + "'."
+                        node->lhs().value()->expressionType().value()->name() + "'."
                     });
                 }
                 break;
             case ast::BinaryOperator::RIGHT_SHIFT:
-                if (node->lhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (node->lhs().value()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Right shift operator requires integer operands, but got '" +
-                        node->lhs()->expressionType().value()->name() + "'."
+                        node->lhs().value()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::NOT:
+                if (node->rhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "The bitwise NOT operator requires an integer operand, but got '" +
+                        node->rhs()->expressionType().value()->name() + "'."
+                    });
+                }
+                break;
+            case ast::BinaryOperator::UNARY_MINUS:
+                if (node->rhs()->expressionType().value()->typeKind() != types::TypeKind::INT
+                    and node->rhs()->expressionType().value()->typeKind() != types::TypeKind::FLOAT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "The unary minus operator requires an integer or float operand, but got '" +
+                        node->rhs()->expressionType().value()->name() + "'."
                     });
                 }
                 break;

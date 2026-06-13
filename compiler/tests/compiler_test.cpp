@@ -39,6 +39,9 @@ public:
     }
 };
 
+class ArithmethicTestError : public testing::TestWithParam<std::string> {
+};
+
 class PanicTest : public testing::TestWithParam<std::string> {
 protected:
 public:
@@ -246,6 +249,49 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     ASSERT_EQ(ostream.str(), "");
 }
 
+TEST_P(ArithmethicTestError, ArithmethicErrorTests) {
+    // Inside a test, access the test parameter with the GetParam() method
+    // of the TestWithParam<T> class:
+    std::filesystem::path base_path = "errortests";
+    base_path /= "arithmetic";
+    const auto &name = GetParam();
+    std::filesystem::path input_path = base_path / (name + ".zeus");
+    std::filesystem::path output_path = base_path / (name + ".txt");
+
+    ASSERT_TRUE(std::filesystem::exists(input_path));
+    ASSERT_TRUE(std::filesystem::exists(output_path));
+    std::stringstream ostream;
+    std::stringstream erstream;
+    compiler::CompilerOptions options;
+    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.emplace_back(base_path);
+    options.colorOutput = false;
+    compiler::parse_and_compile(options, environment, moduleCache, input_path, erstream, ostream);
+
+    std::ifstream file;
+    std::istringstream is;
+    std::string s;
+    std::string group;
+
+    file.open(output_path, std::ios::in);
+
+    if (!file.is_open()) {
+        std::cerr << input_path.string() << "\n";
+        std::cerr << std::filesystem::absolute(input_path);
+        FAIL();
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    auto expected = buffer.str();
+    std::string placeholder = "FILENAME";
+    while (expected.find(placeholder) != std::string::npos)
+        expected = expected.replace(expected.find(placeholder), placeholder.size(), input_path.string());
+    std::cout << "expected: " << expected;
+    std::cout << ostream.str() << "\n";
+    ASSERT_EQ(erstream.str(), expected);
+    ASSERT_EQ(ostream.str(), "");
+}
+
 //
 TEST_P(PanicTest, PanicTest) {
     // Inside a test, access the test parameter with the GetParam() method
@@ -370,16 +416,18 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
-                             "interpolation-utf8-error","unimplemented-interface","interface-by-value",
-                             "arithmetic-division-by-zero","arithmetic-string-plus-number","arithmetic-modulo-float",
+                             "interpolation-utf8-error","unimplemented-interface","interface-by-value"
+                         ));
+INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
+                         testing::Values( "arithmetic-division-by-zero","arithmetic-string-plus-number",
+                             "arithmetic-modulo-float",
                              "arithmetic-unary-minus-string","arithmetic-undefined-variable",
                              "arithmetic-multiply-incompatible-types","arithmetic-bitwise-not-float",
                              "arithmetic-subtract-string","arithmetic-divide-string","arithmetic-bitwise-and-float",
                              "arithmetic-left-shift-string","arithmetic-right-shift-float",
                              "arithmetic-bitwise-or-string",
                              "arithmetic-compound-expression-mismatch","arithmetic-bitwise-xor-string",
-                             "arithmetic-modulo-float-float","arithmetic-divide-string-compound"
-                         ));
+                             "arithmetic-modulo-float-float","arithmetic-divide-string-compound"));
 //
 INSTANTIATE_TEST_SUITE_P(ProjectEuler, ProjectEulerTest,
                          testing::Values("problem1","problem2", "problem3"));

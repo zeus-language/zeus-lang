@@ -1,6 +1,0 @@
-FILENAME:4:25: error: Could not determine type of initial value for variable 'result'.
-    let result : i32 = x ^ s;  // Error: bitwise XOR not supported with string
-                        ^
-FILENAME:4:25: error: Operator '__xor__' is not overloaded for struct type 'string'.
-    let result : i32 = x ^ s;  // Error: bitwise XOR not supported with string
-                        ^

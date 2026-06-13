@@ -3,4 +3,3 @@ fn main() : i32 {
     let result : i32 = ~x;  // Error: bitwise NOT not supported for float
     return 0;
 }
-

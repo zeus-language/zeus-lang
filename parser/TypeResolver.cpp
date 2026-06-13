@@ -65,15 +65,17 @@ namespace types {
             case ast::NodeType::BINARY_EXPRESSION: {
                 auto binaryExpr = dynamic_cast<ast::BinaryExpression *>(node);
                 if (typeName.empty()) {
-                    if (auto result = resolveRawTypeFromUsage(binaryExpr->lhs(), typeName)) {
-                        return result;
+                    if (binaryExpr->lhs()) {
+                        if (auto result = resolveRawTypeFromUsage(binaryExpr->lhs().value(), typeName)) {
+                            return result;
+                        }
                     }
                     if (auto result = resolveRawTypeFromUsage(binaryExpr->rhs(), typeName)) {
                         return result;
                     }
                 }
-
-                if (binaryExpr->lhs()->expressionToken().lexical() == typeName) {
+                // if the left hand side is the target var, then the right hand side might contain the target type
+                if (binaryExpr->lhs() and binaryExpr->lhs().value()->expressionToken().lexical() == typeName) {
                     return resolveRawTypeFromUsage(binaryExpr->rhs(), typeName);
                 }
                 if (binaryExpr->rhs()->expressionToken().lexical() == typeName) {

@@ -1,6 +1,0 @@
-FILENAME:4:25: error: Could not determine type of initial value for variable 'result'.
-    let result : i32 = x - s;  // Error: cannot subtract string from i32
-                        ^
-FILENAME:4:25: error: Operator '__sub__' is not overloaded for struct type 'string'.
-    let result : i32 = x - s;  // Error: cannot subtract string from i32
-                        ^

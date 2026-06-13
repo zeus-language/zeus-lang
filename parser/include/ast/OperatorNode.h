@@ -10,7 +10,7 @@ namespace ast {
 
     class OperatorNode : public ASTNode {
     protected:
-        std::shared_ptr<ASTNode> m_lhs;
+        std::shared_ptr<ASTNode> m_lhs = nullptr;
         std::shared_ptr<ASTNode> m_rhs;
         std::optional<ast::FunctionDefinitionBase *> m_operatorFunction = std::nullopt;
 
@@ -23,7 +23,10 @@ namespace ast {
 
         ~OperatorNode() override = default;
 
-        [[nodiscard]] ASTNode *lhs() const { return m_lhs.get(); }
+        [[nodiscard]] std::optional<ASTNode *> lhs() const {
+            return (m_lhs != nullptr) ? std::make_optional<ASTNode *>(m_lhs.get()) : std::nullopt;
+        }
+
         [[nodiscard]] std::shared_ptr<ASTNode> movelhs() { return std::move(m_lhs); }
         [[nodiscard]] ASTNode *rhs() const { return m_rhs.get(); }
         void setLhs(std::shared_ptr<ASTNode> lhs) { m_lhs = std::move(lhs); }

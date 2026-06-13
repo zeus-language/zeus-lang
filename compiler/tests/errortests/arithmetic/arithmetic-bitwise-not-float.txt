@@ -1,0 +1,6 @@
+FILENAME:3:24: error: The bitwise NOT operator requires an integer operand, but got 'float'.
+    let result : i32 = ~x;  // Error: bitwise NOT not supported for float
+                       ^
+FILENAME:3:24: error: Type mismatch in variable initialization: variable 'result' is of type 'i32', but got initial value of type 'float'.
+    let result : i32 = ~x;  // Error: bitwise NOT not supported for float
+                       ^
