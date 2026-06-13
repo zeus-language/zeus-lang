@@ -793,6 +793,13 @@ namespace parser {
                 }
                 if (tryConsume(Token::PERCENT)) {
                     auto rhs = tryParseToken(allowInit);
+                    if (!rhs || !rhs.value()) {
+                        m_messages.push_back(ParserMessasge{
+                            .token = current(),
+                            .message = "missing right hand side expression after '%' operator",
+                        });
+                        return lhs;
+                    }
                     return parseExpression(false,
                                            std::make_shared<ast::BinaryExpression>(
                                                operatorToken, ast::BinaryOperator::MOD,

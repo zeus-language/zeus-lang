@@ -1,0 +1,3 @@
+FILENAME:2:21: error: expected a right hand side after a '~'!
+    let a : i32 = ~ ;
+                    ^

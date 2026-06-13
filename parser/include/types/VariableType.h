@@ -198,8 +198,6 @@ namespace types {
 
         [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
 
-        [[nodiscard]] std::optional<std::shared_ptr<ast::FunctionSignature> > findMethod(
-            const std::string &method_name) const;
 
         [[nodiscard]] std::optional<std::pair<std::shared_ptr<ast::FunctionSignature>, size_t> >
         findMethodWithIndex(

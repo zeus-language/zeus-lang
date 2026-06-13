@@ -1,0 +1,3 @@
+FILENAME:3:24: error: missing right hand side expression after 'left shift' operator
+    let y : i32 = x << ;
+                       ^
