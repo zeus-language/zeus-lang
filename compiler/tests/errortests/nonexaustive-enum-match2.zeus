@@ -1,0 +1,18 @@
+
+enum Bla {
+    A,
+    A2,
+    B,
+    C,
+    D,
+};
+
+fn main() : i32{
+    let x : Bla = Bla::A;
+    match x {
+        Bla::A | Bla::A2 => println("A"),
+        Bla::B => println("B"),
+    };
+    return 0;
+
+}

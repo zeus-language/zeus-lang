@@ -416,7 +416,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "fail-decl-in-blocks","defer-noarg",
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
-                             "interpolation-utf8-error","unimplemented-interface","interface-by-value"
+                             "interpolation-utf8-error","unimplemented-interface","interface-by-value",
+                             "nonexaustive-enum-match","nonexaustive-enum-match2"
                          ));
 INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                          testing::Values( "arithmetic-bitwise-and-float",
