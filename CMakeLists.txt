@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(zeus-parent)
 set(ZEUS_VERSION_MAJOR 0)
-set(ZEUS_VERSION_MINOR 1)
-set(ZEUS_VERSION_PATCH 3)
+set(ZEUS_VERSION_MINOR 2)
+set(ZEUS_VERSION_PATCH 0)
 add_subdirectory(parser)
 add_subdirectory(compiler)
 

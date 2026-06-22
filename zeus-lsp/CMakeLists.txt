@@ -7,6 +7,7 @@ CPMAddPackage(
         NAME lsp
         GIT_REPOSITORY "https://github.com/leon-bckl/lsp-framework"
         GIT_TAG "1.3.1"
+        OPTIONS "LSP_INSTALL Off"
 )
 file(GLOB SRC
         src/lsp/CompilerOptions.cpp
@@ -21,4 +22,4 @@ add_executable(${PROJECT_NAME} main.cpp ${SRC})
 # Make the headers in src available for includes
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_link_libraries(zeusls PUBLIC lsp parser)
+target_link_libraries(zeusls PRIVATE lsp parser)
