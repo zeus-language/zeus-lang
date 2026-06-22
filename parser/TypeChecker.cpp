@@ -982,24 +982,57 @@ namespace types {
         }
     }
 
+    bool check_case_matching(const EnumVariant &variant, const std::vector<ast::MatchCase> &match_cases) {
+        for (const auto &[caseKeys, _]: match_cases) {
+            if (std::ranges::any_of(caseKeys, [&](const auto &key) {
+                if (const auto &enumAccess = std::dynamic_pointer_cast<ast::EnumAccess>(key)) {
+                    return enumAccess->variantName().lexical() == variant.name;
+                }
+                return false;
+            })) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void type_check(ast::MatchExpression *node, Context &context) {
         type_check_base(node->accessNode(), context);
+        bool isExhaustive = false;
+
         for (auto &[matchKeys, expression]: node->matchCases()) {
             for (auto &key: matchKeys) {
                 type_check_base(key.get(), context);
+                if (key->expressionToken().lexical() == "_") {
+                    isExhaustive = true;
+                }
                 if (key->expressionType() != node->accessNode()->expressionType() and
                     key->expressionToken().lexical() != "_"
                 ) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         key->expressionToken(),
-                        "The case element has a diffent type than the match expression!"
+                        "The case element has a different type than the match expression!"
                     });
                 }
             }
             type_check_base(expression.get(), context);
             if (expression->expressionType()) {
                 node->setExpressionType(expression->expressionType().value());
+            }
+        }
+        if (node->accessNode()->expressionType() && !isExhaustive) {
+            if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(
+                node->accessNode()->expressionType().value())) {
+                for (const auto &variant: enumType->variants()) {
+                    if (!check_case_matching(variant, node->matchCases())) {
+                        context.messages.insert({
+                            parser::OutputType::ERROR,
+                            node->expressionToken(),
+                            "Non-exhaustive match expression: missing case for variant '" + variant.name + "'."
+                        });
+                    }
+                }
             }
         }
     }
