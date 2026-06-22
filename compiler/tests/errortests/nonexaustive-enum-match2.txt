@@ -1,0 +1,6 @@
+FILENAME:12:5: error: Non-exhaustive match expression: missing case for variant 'C'.
+    match x {
+    ^----
+FILENAME:12:5: error: Non-exhaustive match expression: missing case for variant 'D'.
+    match x {
+    ^----
