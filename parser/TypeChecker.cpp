@@ -2453,7 +2453,7 @@ namespace types {
                     "'."
                 });
             }
-            if (arg.type.value()->typeKind() == TypeKind::INTERFACE) {
+            if (arg.type.has_value() and arg.type.value()->typeKind() == TypeKind::INTERFACE) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),

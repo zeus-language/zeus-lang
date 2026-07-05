@@ -42,6 +42,7 @@
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
 #include "ast/TypeDefinition.h"
+#include "ast/UnionDeclaration.h"
 #include "ast/UseModule.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
@@ -1667,6 +1668,8 @@ namespace parser {
                     result = std::move(interfaceDef.value());
                 } else if (auto enumDef = parseEnumDeclaration()) {
                     result = std::move(enumDef.value());
+                } else if (auto taggedUnion = parseTaggedUnion()) {
+                    result = std::move(taggedUnion.value());
                 } else if (auto functionDef = parseFunctionDefinition()) {
                     result = std::move(functionDef.value());
                 } else if (auto externFunctionDef = parseExternFunctionDefinition()) {
@@ -2352,6 +2355,97 @@ namespace parser {
                                                             methods, interfaceNames, genericParam);
         }
 
+        std::optional<std::shared_ptr<ast::ASTNode> > parseTaggedUnion() {
+            if (!canConsumeKeyWord("union")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("union");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected union name after 'union'!"
+                });
+                return std::nullopt;
+            }
+            Token unionName = current();
+            consume(Token::IDENTIFIER);
+
+            std::vector<Token> genericParams;
+            std::vector<ast::UnionVariant> variants;
+            if (tryConsume(Token::LESS)) {
+                while (canConsume(Token::IDENTIFIER)) {
+                    auto genericParamToken = current();
+                    consume(Token::IDENTIFIER);
+                    genericParams.push_back(genericParamToken);
+                    if (!canConsume(Token::COMMA)) {
+                        if (!canConsume(Token::GREATER)) {
+                            m_messages.push_back(ParserMessasge{
+                                .token = current(),
+                                .message = "expected '>' to close generic struct declaration!"
+                            });
+                            return std::nullopt;
+                        }
+                        consume(Token::GREATER);
+                    }
+                }
+            }
+
+            consume(Token::OPEN_BRACE);
+            // TODO parse union fields
+            while (!canConsume(Token::CLOSE_BRACE)) {
+                auto variantName = current();
+                consume(Token::IDENTIFIER);
+                ast::UnionVariant variant(variantName);
+                // parse tuple
+                if (canConsume(Token::LEFT_CURLY)) {
+                    variant.type = ast::UnionVariantType::TUPLE;
+                    consume(Token::LEFT_CURLY);
+                    while (canConsume(Token::IDENTIFIER)) {
+                        auto rawType = parseRawType();
+                        if (!rawType) {
+                            m_messages.push_back(ParserMessasge{
+                                .token = current(),
+                                .message = "expected type after '{' in union variant declaration!"
+                            });
+                            return std::nullopt;
+                        }
+                        variant.associatedRawTypes.push_back(rawType.value());
+                        tryConsume(Token::COMMA);
+                    }
+                    consume(Token::RIGHT_CURLY);
+                } else if (canConsume(Token::OPEN_BRACE)) {
+                    variant.type = ast::UnionVariantType::STRUCT;
+                    consume(Token::OPEN_BRACE);
+                    while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                        auto visibilityModifier = ast::VisibilityModifier::PUBLIC;
+
+                        auto fieldName = current();
+                        consume(Token::IDENTIFIER);
+                        consume(Token::COLON);
+                        auto type = parseRawType();
+                        if (!type) {
+                            m_messages.push_back(ParserMessasge{
+                                .token = current(),
+                                .message = "expected type after field name in struct declaration!"
+                            });
+                            return std::nullopt;
+                        }
+
+                        variant.fields.push_back(ast::StructField{
+                            .visibilityModifier = visibilityModifier, .name = fieldName, .type = std::move(type.value())
+                        });
+                        tryConsume(Token::COMMA);
+                    }
+                    consume(Token::CLOSE_BRACE);
+                }
+                tryConsume(Token::COMMA);
+                variants.push_back(variant);
+            }
+            consume(Token::CLOSE_BRACE);
+            tryConsume(Token::SEMICOLON);
+            return std::make_shared<ast::UnionDeclaration>(unionName, genericParams, variants);
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseEnumDeclaration() {
             if (!canConsumeKeyWord("enum")) {
                 return std::nullopt;
@@ -2395,7 +2489,7 @@ namespace parser {
                 }
             }
             consume(Token::CLOSE_BRACE);
-            consume(Token::SEMICOLON);
+            tryConsume(Token::SEMICOLON);
             return std::make_shared<ast::EnumDeclaration>(enumName, variants);
         }
 
@@ -2424,6 +2518,8 @@ namespace parser {
                     module->nodes.push_back(std::move(std::move(interfaceDef.value())));
                 } else if (auto enumDecl = parseEnumDeclaration()) {
                     module->nodes.push_back(std::move(enumDecl.value()));
+                } else if (auto taggedUnion = parseTaggedUnion()) {
+                    module->nodes.push_back(std::move(taggedUnion.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
