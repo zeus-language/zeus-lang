@@ -53,6 +53,49 @@ bool types::InterfaceType::compare(const VariableType &other) const {
     return false;
 }
 
+static std::string getGenericParamName(const std::vector<std::shared_ptr<types::VariableType> > &genericParams) {
+    if (genericParams.empty()) {
+        return "";
+    }
+    std::string result = "<";
+    for (size_t i = 0; i < genericParams.size(); ++i) {
+        if (i > 0) {
+            result += ", ";
+        }
+        result += genericParams[i]->name();
+    }
+    result += '>';
+    return result;
+}
+
+static std::string getGenericParamLinkageName(const std::vector<std::shared_ptr<types::VariableType> > &genericParams) {
+    if (genericParams.empty()) {
+        return "";
+    }
+    std::string result;
+    for (const auto &genericParam: genericParams) {
+        result += "_" + genericParam->name();
+    }
+    return result;
+}
+
+types::UnionType::UnionType(const std::string &name, const std::vector<UnionVariant> &m_variants,
+                            const std::vector<std::shared_ptr<VariableType> > &m_generic_params)
+    : VariableType(name, TypeKind::UNION), m_variants(m_variants), m_genericParams(m_generic_params) {
+    m_typename = VariableType::name() + getGenericParamName(m_genericParams);
+    m_linkageName = VariableType::name() + getGenericParamLinkageName(m_genericParams);
+}
+
+std::optional<types::UnionVariant> types::UnionType::getVariant(const std::string &variantName) const {
+    for (const auto &variant: m_variants) {
+        if (variant.name == variantName) {
+            return variant;
+        }
+    }
+    return std::nullopt;
+}
+
+
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
                               const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
                               const std::vector<std::shared_ptr<InterfaceType> > &interfaces,

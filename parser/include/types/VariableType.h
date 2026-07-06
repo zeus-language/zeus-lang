@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include <stdexcept>
 
@@ -30,7 +31,8 @@ namespace types {
         ENUM,
         GENERIC,
         FUNCTION,
-        INTERFACE
+        INTERFACE,
+        UNION
     };
 
     class VariableType {
@@ -205,6 +207,46 @@ namespace types {
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override;
+    };
+
+    enum class UnionVariantType {
+        UNIT,
+        TUPLE,
+        STRUCT,
+    };
+
+    struct UnionVariant {
+        UnionVariantType type = UnionVariantType::UNIT;
+        std::vector<std::shared_ptr<VariableType> > associatedTypes; // for TUPLE
+        std::vector<StructField> fields; // for STRUCT
+
+        std::string name;
+    };
+
+    class UnionType : public VariableType {
+    public:
+        UnionType(const std::string &name, const std::vector<UnionVariant> &m_variants,
+                  const std::vector<std::shared_ptr<VariableType> > &m_generic_params);
+
+        [[nodiscard]] const std::vector<UnionVariant> &variants() const { return m_variants; }
+
+        [[nodiscard]] const std::vector<std::shared_ptr<VariableType> > &genericParams() const {
+            return m_genericParams;
+        }
+
+        [[nodiscard]] const std::string &name() const override {
+            return m_typename;
+        }
+
+        [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
+
+        [[nodiscard]] std::optional<UnionVariant> getVariant(const std::string &variantName) const;
+
+    private:
+        std::vector<UnionVariant> m_variants;
+        std::vector<std::shared_ptr<VariableType> > m_genericParams;
+        std::string m_typename;
+        std::string m_linkageName;
     };
 
     class StructType : public VariableType {

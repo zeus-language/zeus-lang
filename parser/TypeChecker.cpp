@@ -16,6 +16,8 @@
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
 #include "ast/DerefNode.h"
+#include "ast/DestructureStruct.h"
+#include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -42,6 +44,7 @@
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
 #include "ast/TypeDefinition.h"
+#include "ast/UnionDeclaration.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
 #include "ast/VariableDeclaration.h"
@@ -358,6 +361,11 @@ namespace types {
     void type_check(ast::ContinueStatement *node, Context &context) {
     }
 
+    void type_check(ast::DestructureStruct *node, Context &context);
+
+    void type_check(ast::DestructureTuple *node, Context &context);
+
+
     void type_check_typedef(ast::TypeDefinition *node, Context &context) {
         auto type = resolveFromRawType(node->getType().get(), context.currentScope, true);
         if (!type) {
@@ -565,6 +573,12 @@ namespace types {
         if (const auto interpolatedString = dynamic_cast<ast::InterpolatedString *>(node)) {
             return type_check(interpolatedString, context);
         }
+        if (const auto destructureStruct = dynamic_cast<ast::DestructureStruct *>(node)) {
+            return type_check(destructureStruct, context);
+        }
+        if (const auto destructureTuple = dynamic_cast<ast::DestructureTuple *>(node)) {
+            return type_check(destructureTuple, context);
+        }
 
         DBG_ASSERT(node != nullptr, "Node is null");
 
@@ -575,13 +589,116 @@ namespace types {
         });
     }
 
+    void type_check(ast::DestructureStruct *node, Context &context) {
+        const auto type = context.currentScope->getTypeByName(node->variantName().lexical());
+        if (!type) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->variantName(),
+                "Unknown variant type '" + node->variantName().lexical() + "'."
+            });
+            return;
+        }
+        node->setExpressionType(type.value());
+        const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value());
+        const auto variant = unionType->getVariant(node->expressionToken().lexical());
+        if (!variant) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Unknown variant '" + node->expressionToken().lexical() + "' in union type '" +
+                node->variantName().lexical() + "'."
+            });
+            return;
+        }
+        if (variant.value().type != types::UnionVariantType::STRUCT) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variant '" + node->expressionToken().lexical() + "' in union type '" +
+                node->variantName().lexical() + "' is not a struct."
+            });
+            return;
+        }
+        auto fields = variant.value().fields;
+        for (const auto &memberName: node->memberNames()) {
+            auto field = std::ranges::find_if(fields, [&](const types::StructField &field) {
+                return field.name == memberName.lexical();
+            });
+            if (field == fields.end()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    memberName,
+                    "Unknown field '" + memberName.lexical() + "' in variant type '" +
+                    variant.value().name + "'."
+                });
+            } else {
+                auto variable = Variable{
+                    .name = memberName.lexical(),
+                    .type = field->type,
+
+                };
+                context.currentScope->addVariable(memberName.lexical(), variable);
+            }
+        }
+    }
+
+    void type_check(ast::DestructureTuple *node, Context &context) {
+        const auto type = context.currentScope->getTypeByName(node->variantName().lexical());
+        if (!type) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->variantName(),
+                "Unknown variant type '" + node->variantName().lexical() + "'."
+            });
+            return;
+        }
+        node->setExpressionType(type.value());
+
+        const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value());
+        const auto variant = unionType->getVariant(node->expressionToken().lexical());
+        if (!variant) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Unknown variant '" + node->expressionToken().lexical() + "' in union type '" +
+                node->variantName().lexical() + "'."
+            });
+            return;
+        }
+        if (variant.value().type != types::UnionVariantType::TUPLE) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Variant '" + node->expressionToken().lexical() + "' in union type '" +
+                node->variantName().lexical() + "' is not a tuple."
+            });
+            return;
+        }
+        const auto fields = variant.value().associatedTypes;
+        for (size_t i = 0; i < node->memberNames().size(); ++i) {
+            if (i >= fields.size()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->memberNames()[i],
+                    "Too many members in destructure of variant '" + variant.value().name + "'."
+                });
+                break;
+            }
+            auto variable = Variable{
+                .name = node->memberNames()[i].lexical(),
+                .type = fields[i],
+            };
+            context.currentScope->addVariable(node->memberNames()[i].lexical(), variable);
+        }
+    }
+
     void type_check(ast::InterpolatedString *node, Context &context) {
         for (auto &part: node->nodes()) {
             type_check_base(part.get(), context);
         }
         type_check_base(node->accessNode().get(), context);
-        const auto type = node->accessNode()->expressionType();
-        if (type) {
+        if (const auto type = node->accessNode()->expressionType()) {
             node->setExpressionType(type.value());
         } else {
             context.messages.insert({
@@ -595,7 +712,7 @@ namespace types {
     void type_check_deref(ast::DerefNode *node, Context &context) {
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType()) {
-            auto accessType = node->accessNode()->expressionType().value();
+            const auto accessType = node->accessNode()->expressionType().value();
             node->setExpressionType(context.currentScope->getPointerType(accessType).value());
         } else {
             context.messages.insert({
@@ -932,6 +1049,22 @@ namespace types {
                         parser::OutputType::ERROR,
                         node->expressionToken(),
                         "Enum '" + enumType->name() + "' does not have a variant named '" +
+                        node->variantName().lexical() + "'."
+                    });
+                    return;
+                }
+                node->setExpressionType(type.value());
+            } else if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value())) {
+                const auto variantIt = std::ranges::find_if(unionType->variants(),
+                                                            [&](const types::UnionVariant &variant) {
+                                                                return variant.name == node->variantName().
+                                                                       lexical();
+                                                            });
+                if (variantIt == unionType->variants().end()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Union '" + unionType->name() + "' does not have a variant named '" +
                         node->variantName().lexical() + "'."
                     });
                     return;
@@ -2729,8 +2862,205 @@ namespace types {
         eval_block(node->block(), context);
     }
 
-    void type_check_internal(const std::shared_ptr<parser::Module> &module, const env::Environment &environment,
-                             Context &context) {
+    static void process_struct_declaration(ast::StructDeclaration *const structDecl, Context &context) {
+        std::vector<types::StructField> structFields;
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+        std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
+        if (auto genericParams = structDecl->genericParam()) {
+            genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
+            context.currentScope->registerTypeInScope(genericType.value());
+        }
+        for (const auto &[visibility,name, type]: structDecl->fields()) {
+            const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
+            if (!fieldType) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    type->typeToken,
+                    "Unknown type '" + type->typeToken.lexical() + "' for field '" + name.lexical() +
+                    "' in struct '" + structDecl->expressionToken().lexical() + "'."
+                });
+                continue;
+            }
+            structFields.push_back({
+                .visibilityModifier = visibility,
+                .type = fieldType.value(),
+                .name = name.lexical()
+            });
+        }
+        std::vector<std::weak_ptr<ast::FunctionDefinition> > methods;
+        methods.reserve(structDecl->methods().size());
+        for (const auto &method: structDecl->methods()) {
+            methods.push_back(method);
+        }
+        //structDecl->methods().clear();
+        std::vector<std::shared_ptr<InterfaceType> > interfaces;
+        for (const auto &interfaceName: structDecl->interfaceNames()) {
+            const auto interfaceType = context.currentScope->getTypeByName(interfaceName.lexical());
+            if (!interfaceType) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    interfaceName,
+                    "Unknown interface '" + interfaceName.lexical() + "' implemented by struct '" +
+                    structDecl->expressionToken().lexical() + "'."
+                });
+            } else if (interfaceType.value()->typeKind() != types::TypeKind::INTERFACE) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    interfaceName,
+                    "Type '" + interfaceName.lexical() + "' implemented by struct '" +
+                    structDecl->expressionToken().lexical() + "' is not an interface."
+                });
+            } else {
+                interfaces.push_back(
+                    std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
+            }
+            for (const auto &method: interfaces.back()->methods()) {
+                bool methodImplemented = false;
+                for (const auto &structMethod: methods) {
+                    if (method->functionName() == structMethod.lock()->functionName()) {
+                        methodImplemented = true;
+                        break;
+                    }
+                }
+                if (!methodImplemented) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        structDecl->expressionToken(),
+                        "Struct '" + structDecl->expressionToken().lexical() +
+                        "' does not implement method '" + method->functionSignature() +
+                        "' required by interface '" + interfaceName.lexical() + "'."
+                    });
+                }
+            }
+        }
+
+
+        auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
+                                                        structFields, methods, interfaces, genericType);
+
+        const auto parentScope = context.currentScope->parentScope();
+        context.currentScope->registerType(type);
+        for (const auto &method: type->methods()) {
+            method->setParentStruct(type.get());
+        }
+        for (const auto &method: type->methods()) {
+            type_check_funcdef(method.get(), context);
+        }
+        // check for duplicate type names in the same scope
+        if (auto existingType = context.currentScope->getTypeByName(type->name())) {
+            if (auto existingStruct = std::dynamic_pointer_cast<types::StructType>(existingType.value())) {
+                existingStruct->setMethods(type->methods());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    structDecl->expressionToken(),
+                    "Type name conflict: '" + type->name() +
+                    "' is already used for a different type in this scope."
+                });
+            }
+        }
+
+        structDecl->setExpressionType(type);
+        context.currentScope = parentScope;
+    }
+
+    void process_union_declaration(ast::UnionDeclaration *unionDecl, Context &context) {
+        std::vector<types::UnionVariant> unionVariants;
+
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+        std::vector<std::shared_ptr<VariableType> > genericTypes;
+        for (auto &genericParam: unionDecl->genericParams()) {
+            auto genericType = std::make_shared<types::GenericType>(genericParam.lexical());
+            context.currentScope->registerTypeInScope(genericType);
+            genericTypes.push_back(genericType);
+        }
+
+        for (const auto &variant: unionDecl->variants()) {
+            switch (variant.type) {
+                case ast::UnionVariantType::UNIT:
+                    unionVariants.push_back(types::UnionVariant{
+                        .type = types::UnionVariantType::UNIT,
+                        .name = variant.name.lexical()
+                    });
+                    break;
+                case ast::UnionVariantType::TUPLE: {
+                    std::vector<std::shared_ptr<types::VariableType> > associatedTypes;
+                    for (auto &rawType: variant.associatedRawTypes) {
+                        auto type = resolveFromRawType(rawType.get(), context.currentScope, false);
+                        if (!type) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                rawType->typeToken,
+                                "Unknown type '" + rawType->typeToken.lexical() +
+                                "' for associated type in union variant '" +
+                                variant.name.lexical() + "' in union '" + unionDecl->expressionToken().lexical() +
+                                "'."
+                            });
+                            continue;
+                        }
+                        associatedTypes.push_back(type.value());
+                    }
+                    unionVariants.push_back(types::UnionVariant{
+                        .type = types::UnionVariantType::TUPLE,
+                        .associatedTypes = associatedTypes,
+                        .name = variant.name.lexical()
+                    });
+                }
+                break;
+                case ast::UnionVariantType::STRUCT: {
+                    std::vector<StructField> fields;
+                    for (const auto &[visibility, name, rawType]: variant.fields) {
+                        auto type = resolveFromRawType(rawType.get(), context.currentScope, false);
+                        if (!type) {
+                            context.messages.insert({
+                                parser::OutputType::ERROR,
+                                rawType->typeToken,
+                                "Unknown type '" + rawType->typeToken.lexical() + "' for field '" + name.lexical() +
+                                "' in union variant '" +
+                                variant.name.lexical() + "' in union '" + unionDecl->expressionToken().lexical() +
+                                "'."
+                            });
+                            continue;
+                        }
+                        fields.push_back(StructField{
+                            .visibilityModifier = visibility,
+                            .type = type.value(),
+                            .name = name.lexical()
+                        });
+                    }
+                    unionVariants.push_back(types::UnionVariant{
+                        .type = types::UnionVariantType::STRUCT,
+                        .fields = fields,
+                        .name = variant.name.lexical(),
+                    });
+                }
+                break;
+            }
+        }
+        const auto type = std::make_shared<types::UnionType>(unionDecl->expressionToken().lexical(),
+                                                             unionVariants, genericTypes);
+        const auto parentScope = context.currentScope->parentScope();
+        context.currentScope->registerType(type);
+        // check for duplicate type names in the same scope
+        if (const auto existingType = context.currentScope->getTypeByName(type->name())) {
+            if (auto existingStruct = std::dynamic_pointer_cast<types::UnionType>(existingType.value())) {
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    unionDecl->expressionToken(),
+                    "Type name conflict: '" + type->name() +
+                    "' is already used for a different type in this scope."
+                });
+            }
+        }
+
+        unionDecl->setExpressionType(type);
+        context.currentScope = parentScope;
+    }
+
+    static void type_check_internal(const std::shared_ptr<parser::Module> &module,
+                                    const env::Environment &environment,
+                                    Context &context) {
         // if (module->isTypeChecked) {
         //     return;
         // }
@@ -2767,106 +3097,10 @@ namespace types {
                 // for (const auto &method: type->methods()) {
                 //     type_check_base(method.get(), context);
                 // }
+            } else if (const auto unionDecls = dynamic_cast<ast::UnionDeclaration *>(node.get())) {
+                process_union_declaration(unionDecls, context);
             } else if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
-                std::vector<types::StructField> structFields;
-                context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
-                std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
-                if (auto genericParams = structDecl->genericParam()) {
-                    genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
-                    context.currentScope->registerTypeInScope(genericType.value());
-                }
-                for (const auto &[visibility,name, type]: structDecl->fields()) {
-                    const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
-                    if (!fieldType) {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            type->typeToken,
-                            "Unknown type '" + type->typeToken.lexical() + "' for field '" + name.lexical() +
-                            "' in struct '" + structDecl->expressionToken().lexical() + "'."
-                        });
-                        continue;
-                    }
-                    structFields.push_back({
-                        .visibilityModifier = visibility,
-                        .type = fieldType.value(),
-                        .name = name.lexical()
-                    });
-                }
-                std::vector<std::weak_ptr<ast::FunctionDefinition> > methods;
-                methods.reserve(structDecl->methods().size());
-                for (const auto &method: structDecl->methods()) {
-                    methods.push_back(method);
-                }
-                //structDecl->methods().clear();
-                std::vector<std::shared_ptr<InterfaceType> > interfaces;
-                for (const auto &interfaceName: structDecl->interfaceNames()) {
-                    const auto interfaceType = context.currentScope->getTypeByName(interfaceName.lexical());
-                    if (!interfaceType) {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            interfaceName,
-                            "Unknown interface '" + interfaceName.lexical() + "' implemented by struct '" +
-                            structDecl->expressionToken().lexical() + "'."
-                        });
-                    } else if (interfaceType.value()->typeKind() != types::TypeKind::INTERFACE) {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            interfaceName,
-                            "Type '" + interfaceName.lexical() + "' implemented by struct '" +
-                            structDecl->expressionToken().lexical() + "' is not an interface."
-                        });
-                    } else {
-                        interfaces.push_back(
-                            std::dynamic_pointer_cast<types::InterfaceType>(interfaceType.value()));
-                    }
-                    for (const auto &method: interfaces.back()->methods()) {
-                        bool methodImplemented = false;
-                        for (const auto &structMethod: methods) {
-                            if (method->functionName() == structMethod.lock()->functionName()) {
-                                methodImplemented = true;
-                                break;
-                            }
-                        }
-                        if (!methodImplemented) {
-                            context.messages.insert({
-                                parser::OutputType::ERROR,
-                                structDecl->expressionToken(),
-                                "Struct '" + structDecl->expressionToken().lexical() +
-                                "' does not implement method '" + method->functionSignature() +
-                                "' required by interface '" + interfaceName.lexical() + "'."
-                            });
-                        }
-                    }
-                }
-
-
-                auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                                structFields, methods, interfaces, genericType);
-
-                const auto parentScope = context.currentScope->parentScope();
-                context.currentScope->registerType(type);
-                for (const auto &method: type->methods()) {
-                    method->setParentStruct(type.get());
-                }
-                for (const auto &method: type->methods()) {
-                    type_check_funcdef(method.get(), context);
-                }
-                // check for duplicate type names in the same scope
-                if (auto existingType = context.currentScope->getTypeByName(type->name())) {
-                    if (auto existingStruct = std::dynamic_pointer_cast<types::StructType>(existingType.value())) {
-                        existingStruct->setMethods(type->methods());
-                    } else {
-                        context.messages.insert({
-                            parser::OutputType::ERROR,
-                            structDecl->expressionToken(),
-                            "Type name conflict: '" + type->name() +
-                            "' is already used for a different type in this scope."
-                        });
-                    }
-                }
-
-                structDecl->setExpressionType(type);
-                context.currentScope = parentScope;
+                process_struct_declaration(structDecl, context);
             } else if (const auto enumDecl = dynamic_cast<ast::EnumDeclaration *>(node.get())) {
                 std::vector<EnumVariant> enumVariants;
                 int64_t nextValue = 0;

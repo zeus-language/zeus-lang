@@ -63,6 +63,8 @@ namespace ast {
 
         [[nodiscard]] const std::vector<UnionVariant> &variants() const { return m_variants; }
 
+        [[nodiscard]] const std::vector<Token> &genericParams() const { return m_genericArguments; }
+
         std::shared_ptr<ASTNode> clone() override {
             std::vector<UnionVariant> variants;
             for (const auto &variant: m_variants) {
