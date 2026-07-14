@@ -15,7 +15,7 @@ fn print_animal(animal: Animal) :void{
 }
 
 fn main() :i32 {
-    let dog = Animal::Dog("Fido",12.4);
+    let dog :Animal = Animal::Dog("Fido",12.4);
     let cat = Animal::Cat { name: "Garfield", weight:4.21};
     print_animal(dog);
     print_animal(cat);

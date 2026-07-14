@@ -434,13 +434,15 @@ namespace parser {
                 return std::nullopt;
             }
 
-            Token unionName = current();
+            std::optional<Token> unionName = current();
             auto structNameToken = current();
 
             consume(Token::IDENTIFIER);
             if (tryConsume(Token::NS_SEPARATOR)) {
                 structNameToken = current();
                 consume(Token::IDENTIFIER);
+            } else {
+                unionName = std::nullopt;
             }
 
 
@@ -502,7 +504,7 @@ namespace parser {
             }
             consume(Token::CLOSE_BRACE);
 
-            return std::make_shared<ast::StructInitialization>(structNameToken, genericParam, fields);
+            return std::make_shared<ast::StructInitialization>(structNameToken, genericParam, fields, unionName);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseReferenceAccess() {
