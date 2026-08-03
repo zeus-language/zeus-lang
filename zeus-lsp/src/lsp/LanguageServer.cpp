@@ -311,6 +311,7 @@ void LanguageServer::handleRequest() {
                     };
                 })
                 .add<lsp::requests::Shutdown>([&]() {
+                    running = false;
                     return lsp::requests::Shutdown::Result();
                 })
                 .add<lsp::notifications::Exit>([&]() {
@@ -447,13 +448,16 @@ void LanguageServer::handleRequest() {
         while (running) {
             try {
                 messageHandler.processIncomingMessages();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             } catch (const lsp::MessageError &e) {
                 std::cerr << "LSP Exception: " << e.what() << "\n";
                 std::cerr << "LSP Exception code: " << e.code() << "\n";
                 if (e.data())
                     std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
+                break;
             } catch (const std::exception &e) {
                 std::cerr << "EXCEPTION: " << e.what() << std::endl;
+                break;
             }
         }
     } catch (const lsp::MessageError &e) {
