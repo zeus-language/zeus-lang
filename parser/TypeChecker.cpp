@@ -19,6 +19,7 @@
 #include "ast/DestructureStruct.h"
 #include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
+#include "ast/EnumValue.h"
 #include "ast/EnumDeclaration.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
@@ -343,6 +344,8 @@ namespace types {
 
     void type_check(ast::EnumAccess *node, Context &context);
 
+    void type_check(ast::EnumValue *node, Context &context);
+
     void type_check(ast::MethodCallNode *node, Context &context);
 
     void type_check(ast::BlockNode *node, Context &context);
@@ -548,6 +551,9 @@ namespace types {
         }
         if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
             return type_check(enumAccess, context);
+        }
+        if (const auto enumValue = dynamic_cast<ast::EnumValue *>(node)) {
+            return type_check(enumValue, context);
         }
         if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
             return type_check(methodCall, context);
@@ -1035,6 +1041,59 @@ namespace types {
         context.currentScope = context.currentScope->parentScope();
     }
 
+    void type_check(ast::EnumValue *node, Context &context) {
+        if (const auto type = context.currentScope->getTypeByName(node->expressionToken().lexical())) {
+            if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(
+                type.value())) {
+                const auto variantIt = std::ranges::find_if(enumType->variants(),
+                                                            [&](const types::EnumVariant &variant) {
+                                                                return variant.name == node->variantName().
+                                                                       lexical();
+                                                            });
+                if (variantIt == enumType->variants().end()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Enum '" + enumType->name() + "' does not have a variant named '" +
+                        node->variantName().lexical() + "'."
+                    });
+                    return;
+                }
+                node->setExpressionType(type.value());
+            } else if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value())) {
+                const auto variantIt = std::ranges::find_if(unionType->variants(),
+                                                            [&](const types::UnionVariant &variant) {
+                                                                return variant.name == node->variantName().
+                                                                       lexical();
+                                                            });
+                if (variantIt == unionType->variants().end()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Union '" + unionType->name() + "' does not have a variant named '" +
+                        node->variantName().lexical() + "'."
+                    });
+                    return;
+                }
+                node->setExpressionType(type.value());
+            } else {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Attempting to access enum variant on a non-enum type '" +
+                    node->variantName().lexical() + "'."
+                });
+                return;
+            }
+        } else {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Could not determine type of enum access base."
+            });
+        }
+    }
+
     void type_check(ast::EnumAccess *node, Context &context) {
         if (const auto type = context.currentScope->getTypeByName(node->expressionToken().lexical())) {
             if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(
@@ -1118,7 +1177,7 @@ namespace types {
     bool check_case_matching(const EnumVariant &variant, const std::vector<ast::MatchCase> &match_cases) {
         for (const auto &[caseKeys, _]: match_cases) {
             if (std::ranges::any_of(caseKeys, [&](const auto &key) {
-                if (const auto &enumAccess = std::dynamic_pointer_cast<ast::EnumAccess>(key)) {
+                if (const auto &enumAccess = std::dynamic_pointer_cast<ast::EnumValue>(key)) {
                     return enumAccess->variantName().lexical() == variant.name;
                 }
                 return false;
@@ -1365,6 +1424,11 @@ namespace types {
                 return;
             }
         }
+        context.messages.insert({
+            .outputType = parser::OutputType::ERROR,
+            .token = field.name,
+            .message = "Field '" + field.name.lexical() + "' does not exist in the struct."
+        });
     }
 
     void type_check(ast::StructInitialization *node, Context &context) {

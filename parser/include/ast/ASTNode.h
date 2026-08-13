@@ -33,7 +33,7 @@ namespace ast {
         STRUCT_INITIALIZATION,
         REFERENCE_ACCESS,
         ARRAY_ACCESS,
-        MATCH_STATEMENT,
+        MATCH_EXPRESSION,
         ENUM_DECLARATION,
         ENUM_VARIANT,
         UNION_DECLARATION,

@@ -19,7 +19,8 @@ namespace ast {
 
     public:
         explicit MatchExpression(Token name, std::shared_ptr<ASTNode> accessNode,
-                                 std::vector<MatchCase> matchCases) : ASTNode(std::move(name)),
+                                 std::vector<MatchCase> matchCases) : ASTNode(std::move(name),
+                                                                              ast::NodeType::MATCH_EXPRESSION),
                                                                       m_accessNode(std::move(accessNode)),
                                                                       m_matchCases(std::move(matchCases)) {
         }
@@ -85,5 +86,3 @@ namespace ast {
         }
     };
 } // ast
-
-

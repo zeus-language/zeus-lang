@@ -47,6 +47,7 @@
 #include "ast/DestructureStruct.h"
 #include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
+#include "ast/EnumValue.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -590,6 +591,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::EnumValue *node, LLVMBackendState &llvmState);
+
     llvm::Value *codegen(ast::MethodCallNode *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::BlockNode *node, LLVMBackendState &llvmState);
@@ -704,6 +707,9 @@ namespace llvm_backend {
         }
         if (const auto enumAccess = dynamic_cast<ast::EnumAccess *>(node)) {
             return llvm_backend::codegen(enumAccess, llvmState);
+        }
+        if (const auto enumValue = dynamic_cast<ast::EnumValue *>(node)) {
+            return llvm_backend::codegen(enumValue, llvmState);
         }
         if (const auto methodCall = dynamic_cast<ast::MethodCallNode *>(node)) {
             return llvm_backend::codegen(methodCall, llvmState);
@@ -850,6 +856,23 @@ namespace llvm_backend {
         return lastValue;
     }
 
+    llvm::Value *codegen(ast::EnumValue *node, LLVMBackendState &llvmState) {
+        if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(node->expressionType().value())) {
+            const auto enumVariant = enumType->getVariantByName(node->variantName().lexical());
+            if (!enumVariant) {
+                throw std::runtime_error("Enum value not found: " + node->variantName().lexical());
+            }
+            const auto enumValue = enumVariant.value().value;
+            return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+        }
+        if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
+            const auto enumValue = unionType->getVariantIndex(node->variantName().lexical());
+            return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+        }
+        assert(false && "EnumValue node does not have an EnumType or UnionType");
+        return nullptr;
+    }
+
     llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState) {
         if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(node->expressionType().value())) {
             const auto enumVariant = enumType->getVariantByName(node->variantName().lexical());
@@ -859,9 +882,13 @@ namespace llvm_backend {
             const auto enumValue = enumVariant.value().value;
             return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
         }
-        if (const auto enumType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
-            const auto enumValue = enumType->getVariantIndex(node->variantName().lexical());
-            return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+        if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
+            const auto enumValue = unionType->getVariantIndex(node->variantName().lexical());
+            const auto type = resolveLlvmType(unionType, llvmState);
+            const auto allocValue = llvmState.Builder->CreateAlloca(type, nullptr, "enum_value");
+            llvmState.Builder->CreateStore(llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue),
+                                           allocValue);
+            return allocValue;
         }
         assert(false && "EnumAccess node does not have an EnumType or UnionType");
         return nullptr;

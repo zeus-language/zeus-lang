@@ -19,6 +19,7 @@
 #include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
+#include "ast/EnumValue.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -471,7 +472,6 @@ namespace parser {
                         .token = current(),
                         .message = "expected field name in struct initialization",
                     });
-                    return std::nullopt;
                 }
                 const auto &fieldNameToken = current();
                 consume(Token::IDENTIFIER);
@@ -481,7 +481,6 @@ namespace parser {
                         .token = current(),
                         .message = "expected ':' after field name in struct initialization",
                     });
-                    return std::nullopt;
                 }
                 consume(Token::COLON);
                 auto fieldValue = parseExpression(false);
@@ -571,6 +570,19 @@ namespace parser {
             Token variantNameToken = current();
             consume(Token::IDENTIFIER);
             return std::make_shared<ast::EnumAccess>(enumNameToken, variantNameToken);
+        }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > parseEnumValue() {
+            if (!canConsume(Token::IDENTIFIER) or !canConsume(Token::NS_SEPARATOR, 1) or !canConsume(
+                    Token::IDENTIFIER, 2)) {
+                return std::nullopt;
+            }
+            Token enumNameToken = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::NS_SEPARATOR);
+            Token variantNameToken = current();
+            consume(Token::IDENTIFIER);
+            return std::make_shared<ast::EnumValue>(enumNameToken, variantNameToken);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseNull() {
@@ -1681,8 +1693,8 @@ namespace parser {
                 result = std::move(destructureStruct.value());
             } else if (auto destructureTuple = parseDestructureTuple()) {
                 result = std::move(destructureTuple.value());
-            } else if (auto enumAccess = parseEnumAccess()) {
-                result = std::move(enumAccess.value());
+            } else if (auto enumValue = parseEnumValue()) {
+                result = std::move(enumValue.value());
             } else if (auto varAccess = parseVariableAccess()) {
                 result = std::move(varAccess.value());
             }
