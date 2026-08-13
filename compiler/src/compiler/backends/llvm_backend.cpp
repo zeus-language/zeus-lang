@@ -44,6 +44,8 @@
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
 #include "ast/DerefNode.h"
+#include "ast/DestructureStruct.h"
+#include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
@@ -73,8 +75,7 @@
 #include "llvm/IR/DIBuilder.h"
 #include "parser/Parser.h"
 
-
-namespace llvm_backend {
+namespace {
     struct BreakBlock {
         llvm::BasicBlock *afterLoop = nullptr;
         llvm::BasicBlock *currentLoop = nullptr;
@@ -185,12 +186,16 @@ namespace llvm_backend {
         }
     };
 
+
     struct Defer {
         std::vector<ast::ASTNode *> deferedStatements;
 
-        llvm::BasicBlock *deferBlock;
+        llvm::BasicBlock *deferBlock = nullptr;
     };
+}
 
+
+namespace llvm_backend {
     struct LLVMBackendState {
     private:
         std::vector<ast::FunctionDefinitionBase *> function_definition;
@@ -218,22 +223,6 @@ namespace llvm_backend {
             return scope->findVariable(Builder, name, loadValue);
         }
 
-        llvm::Value *findNamedAllocation(const std::string &name) const {
-            return scope->findNamedAllocation(name);
-        }
-
-        llvm::Value *findNamedValue(const std::string &name) const {
-            return scope->findNamedValue(name);
-        }
-
-        bool hasNamedAllocation(const std::string &name) const {
-            return scope->hasNamedAllocation(name);
-        }
-
-        bool hasNamedValue(const std::string &name) const {
-            return scope->hasNamedValue(name);
-        }
-
         std::shared_ptr<types::VariableType> findVariableType(const std::string &name) const {
             return scope->findVariableType(name);
         }
@@ -244,11 +233,6 @@ namespace llvm_backend {
 
         void addNamedValue(const std::string &name, llvm::Value *value) const {
             scope->addNamedValue(name, value);
-        }
-
-
-        void removeNamedValue(const std::string &name) const {
-            scope->removeNamedValue(name);
         }
 
         void removeNamedAllocation(const std::string &name) const {
@@ -315,9 +299,8 @@ namespace llvm_backend {
         }
 
         void removeDeferForBlock(llvm::BasicBlock *block) {
-            deferStack.erase(std::remove_if(deferStack.begin(), deferStack.end(),
-                                            [block](const Defer &defer) { return defer.deferBlock == block; }),
-                             deferStack.end());
+            std::erase_if(deferStack,
+                          [block](const Defer &defer) { return defer.deferBlock == block; });
         }
     };
 
@@ -336,8 +319,8 @@ namespace llvm_backend {
         InitializeNativeTargetAsmPrinter();
     }
 
-    llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
-                                bool functionTypeAsPointer = true, bool unnamedType = false);
+    static llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
+                                       bool functionTypeAsPointer = true, bool unnamedType = false);
 
 
     static llvm::StructType *checkAndGenerateVTableForInterface(
@@ -425,6 +408,41 @@ namespace llvm_backend {
     }
 
 
+    static llvm::Type *resolveUnionType(const std::shared_ptr<types::UnionType> &unionType,
+                                        const LLVMBackendState &context, bool unnamedType) {
+        size_t maxTypeSize = 4;
+        const llvm::DataLayout &DL = context.TheModule->getDataLayout();
+
+        for (auto &variant: unionType->variants()) {
+            size_t typeSize = 4; // tag
+
+            switch (variant.type) {
+                case types::UnionVariantType::UNIT:
+                    break;
+                case types::UnionVariantType::TUPLE: {
+                    for (const auto &type: variant.associatedTypes) {
+                        const auto llvmType = resolveLlvmType(type, const_cast<LLVMBackendState &>(context));
+                        if (llvmType == nullptr)
+                            return nullptr;
+                        typeSize += DL.getTypeAllocSize(llvmType);
+                    }
+                    break;
+                }
+                case types::UnionVariantType::STRUCT: {
+                    for (const auto &field: variant.fields) {
+                        const auto llvmType = resolveLlvmType(field.type, const_cast<LLVMBackendState &>(context));
+                        if (llvmType == nullptr)
+                            return nullptr;
+                        typeSize += DL.getTypeAllocSize(llvmType);
+                    }
+                    break;
+                }
+            }
+            maxTypeSize = std::max(maxTypeSize, typeSize);
+        }
+        return llvm::ArrayType::get(llvm::Type::getInt8Ty(*context.TheContext), maxTypeSize);
+    }
+
     llvm::Type *resolveLlvmType(const std::shared_ptr<types::VariableType> &value, LLVMBackendState &context,
                                 const bool functionTypeAsPointer, const bool unnamedType) {
         assert(value != nullptr && "Type is null");
@@ -489,6 +507,8 @@ namespace llvm_backend {
             case types::TypeKind::INTERFACE:
                 checkAndGenerateVTableForInterface(value, context);
                 return llvm::PointerType::getUnqual(*context.TheContext);
+            case types::TypeKind::UNION:
+                return resolveUnionType(std::dynamic_pointer_cast<types::UnionType>(value), context, unnamedType);
         }
         assert(false && "Unknown type");
         return nullptr;
@@ -581,6 +601,10 @@ namespace llvm_backend {
     llvm::Value *codegen(ast::LambdaExpression *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::DestructureStruct *node, LLVMBackendState &llvmState);
+
+    llvm::Value *codegen(ast::DestructureTuple *node, LLVMBackendState &llvmState);
 
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
@@ -702,10 +726,92 @@ namespace llvm_backend {
         if (const auto interpolatedString = dynamic_cast<ast::InterpolatedString *>(node)) {
             return llvm_backend::codegen(interpolatedString, llvmState);
         }
+        if (const auto destructuredStruct = dynamic_cast<ast::DestructureStruct *>(node)) {
+            return llvm_backend::codegen(destructuredStruct, llvmState);
+        }
+        if (const auto destructuredTuple = dynamic_cast<ast::DestructureTuple *>(node)) {
+            return llvm_backend::codegen(destructuredTuple, llvmState);
+        }
 
         // Handle other node types or throw an error
         assert(false && "Unknown AST node type for code generation");
         return nullptr; // Placeholder
+    }
+
+    static void createMemCpy(const LLVMBackendState &llvmState, llvm::Value *dest, llvm::Value *src,
+                             llvm::Type *fieldtype) {
+        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+        const size_t size = DL.getTypeAllocSize(fieldtype);
+
+        llvmState.Builder->CreateMemCpy(dest, llvm::MaybeAlign(), src, llvm::MaybeAlign(), size);
+    }
+
+    llvm::Value *codegen(ast::DestructureStruct *node, LLVMBackendState &llvmState) {
+        const auto type = node->expressionType().value();
+        const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type);
+        const size_t enumValue = unionType->getVariantIndex(node->expressionToken().lexical());
+        const auto variant = unionType->getVariant(node->expressionToken().lexical());
+        const auto unionPointer = codegen_base(node->accessNode(), llvmState);
+        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+        for (auto &member: node->memberNames()) {
+            types::StructField structField;
+            size_t offset = 4;
+            switch (variant->type) {
+                case types::UnionVariantType::STRUCT:
+                    for (const auto &field: variant.value().fields) {
+                        if (field.name == member.lexical()) {
+                            structField = field;
+                            break;
+                        }
+                        offset += DL.getTypeAllocSize(resolveLlvmType(field.type, llvmState));
+                    }
+                    break;
+                default:
+                    assert(false && "Destructuring non-struct union variant is not supported");
+            }
+            auto fieldType = resolveLlvmType(structField.type, llvmState);
+            const auto arrayValue = llvmState.Builder->CreateConstGEP1_32(
+                llvmState.Builder->getInt8Ty(), unionPointer, offset, structField.name);
+            auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, structField.name);
+            if (fieldType->isStructTy()) {
+                auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
+                createMemCpy(llvmState, dest, arrayValue, fieldType);
+                llvmState.addNamedValue(member.lexical(), dest);
+            } else {
+                llvmState.addNamedValue(member.lexical(), value);
+            }
+        }
+        return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+    }
+
+    llvm::Value *codegen(ast::DestructureTuple *node, LLVMBackendState &llvmState) {
+        const auto type = node->expressionType().value();
+        const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type);
+        const size_t enumValue = unionType->getVariantIndex(node->expressionToken().lexical());
+        const auto variant = unionType->getVariant(node->expressionToken().lexical());
+        const auto unionPointer = codegen_base(node->accessNode(), llvmState);
+        size_t index = 0;
+        size_t offset = 4;
+        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+        for (auto &member: node->memberNames()) {
+            auto fieldType = resolveLlvmType(variant.value().associatedTypes.at(index), llvmState);
+            const auto arrayValue = llvmState.Builder->CreateConstGEP1_32(
+                llvmState.Builder->getInt8Ty(), unionPointer, offset, member.lexical());
+            auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, member.lexical());
+            if (fieldType->isStructTy()) {
+                auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
+                createMemCpy(llvmState, dest, arrayValue, fieldType);
+                llvmState.addNamedValue(member.lexical(), dest);
+            } else {
+                llvmState.addNamedValue(member.lexical(), value);
+            }
+            offset += DL.getTypeAllocSize(fieldType);
+            index++;
+        }
+        return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
     }
 
     llvm::Value *codegen(ast::InterpolatedString *node, LLVMBackendState &llvmState) {
@@ -721,19 +827,15 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::DeferStatement *node, LLVMBackendState &llvmState) {
-        auto &defer = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
-        defer.deferedStatements.push_back(node->deferredNode());
+        auto &[deferedStatements, deferBlock] = llvmState.findDeferForBlock(llvmState.Builder->GetInsertBlock());
+        deferedStatements.push_back(node->deferredNode());
         return nullptr;
     }
 
 
     llvm::Value *codegen(ast::BlockNode *node, LLVMBackendState &llvmState) {
         llvm::Value *lastValue = nullptr;
-        // const auto block = llvm::BasicBlock::Create(*llvmState.TheContext, "block",
-        //                                             llvmState.Builder->GetInsertBlock()->getParent());
-        // llvmState.Builder->CreateBr(block);
-        // llvmState.Builder->SetInsertPoint(block);
-        auto block = llvmState.Builder->GetInsertBlock();
+        const auto block = llvmState.Builder->GetInsertBlock();
 
         for (const auto &statement: node->statements()) {
             lastValue = codegen_base(statement.get(), llvmState);
@@ -749,13 +851,20 @@ namespace llvm_backend {
     }
 
     llvm::Value *codegen(ast::EnumAccess *node, LLVMBackendState &llvmState) {
-        const auto enumType = std::dynamic_pointer_cast<types::EnumType>(node->expressionType().value());
-        const auto enumVariant = enumType->getVariantByName(node->variantName().lexical());
-        if (!enumVariant) {
-            throw std::runtime_error("Enum value not found: " + node->variantName().lexical());
+        if (const auto enumType = std::dynamic_pointer_cast<types::EnumType>(node->expressionType().value())) {
+            const auto enumVariant = enumType->getVariantByName(node->variantName().lexical());
+            if (!enumVariant) {
+                throw std::runtime_error("Enum value not found: " + node->variantName().lexical());
+            }
+            const auto enumValue = enumVariant.value().value;
+            return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
         }
-        const auto enumValue = enumVariant.value().value;
-        return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+        if (const auto enumType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
+            const auto enumValue = enumType->getVariantIndex(node->variantName().lexical());
+            return llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue);
+        }
+        assert(false && "EnumAccess node does not have an EnumType or UnionType");
+        return nullptr;
     }
 
     llvm::Value *codegen(const ast::ReferenceAccess *node, LLVMBackendState &llvmState) {
@@ -768,21 +877,17 @@ namespace llvm_backend {
         return value;
     }
 
-    void createMemCpy(const LLVMBackendState &llvmState, llvm::Value *dest, llvm::Value *src, llvm::Type *fieldtype) {
-        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
-
-        const size_t size = DL.getTypeAllocSize(fieldtype);
-
-        llvmState.Builder->CreateMemCpy(dest, llvm::MaybeAlign(), src, llvm::MaybeAlign(), size);
-    }
 
     llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState) {
-        const auto value = codegen_base(node->accessNode(), llvmState);
+        auto value = codegen_base(node->accessNode(), llvmState);
         const auto resultType = resolveLlvmType(node->expressionType().value(), llvmState);
         auto result = (!resultType->isVoidTy())
                           ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
                           : nullptr;
-
+        if (auto unionType = std::dynamic_pointer_cast<
+            types::UnionType>(node->accessNode()->expressionType().value())) {
+            value = llvmState.Builder->CreateLoad(llvmState.Builder->getInt32Ty(), value, "match_union_value");
+        }
         const auto function = llvmState.Builder->GetInsertBlock()->getParent();
         llvm::BasicBlock *defaultBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "default", function);
         llvm::BasicBlock *defaultStep2Block = llvm::BasicBlock::Create(*llvmState.TheContext, "defaultStep2", function);
@@ -798,14 +903,16 @@ namespace llvm_backend {
             }
             const auto selectorBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "case", function);
             llvmState.Builder->SetInsertPoint(selectorBlock);
-            const auto tmpResult = codegen_base(expression.get(), llvmState);
-            if (result != nullptr)
-                createMemCpy(llvmState, result, tmpResult, resultType);
-            llvmState.Builder->CreateBr(endBlock);
             for (auto &selectorNode: selectorNodes) {
                 const auto selectorValue = codegen_base(selectorNode.get(), llvmState);
                 switchInstruction->addCase(llvm::cast<llvm::ConstantInt>(selectorValue), selectorBlock);
             }
+
+
+            const auto tmpResult = codegen_base(expression.get(), llvmState);
+            if (result != nullptr)
+                createMemCpy(llvmState, result, tmpResult, resultType);
+            llvmState.Builder->CreateBr(endBlock);
         }
         llvmState.Builder->SetInsertPoint(defaultBlock);
         for (const auto &[selectorNodes, expression]: node->matchCases()) {
@@ -917,11 +1024,12 @@ namespace llvm_backend {
         return llvmState.Builder->CreateLoad(resolveLlvmType(field->type, llvmState), arrayValue, fieldName);
     }
 
-    llvm::Value *codegen(const ast::StructInitialization *node, LLVMBackendState &llvmState) {
+    llvm::Value *codegen_struct_init(const ast::StructInitialization *node,
+                                     const std::shared_ptr<types::StructType> &type,
+                                     LLVMBackendState &llvmState) {
         bool isConstantInitialisation = true;
-
         const auto structType = resolveLlvmType(node->expressionType().value(), llvmState);
-        const auto type = std::dynamic_pointer_cast<types::StructType>(node->expressionType().value());
+
         std::vector<llvm::Constant *> fields;
         std::vector<llvm::Value *> values;
         for (const auto &interface: type->interfaces()) {
@@ -983,6 +1091,82 @@ namespace llvm_backend {
             }
         }
         return val;
+    }
+
+    llvm::Value *codegen_struct_union_init(const ast::StructInitialization *node,
+                                           const std::shared_ptr<types::UnionType> &type,
+                                           LLVMBackendState &llvmState) {
+        bool isConstantInitialisation = true;
+        const auto structType = resolveLlvmType(node->expressionType().value(), llvmState);
+        auto variantType = type->getVariant(node->expressionToken().lexical()).value();
+        const auto variantIndex = type->getVariantIndex(node->expressionToken().lexical());
+
+        std::vector<llvm::Constant *> fields;
+        std::vector<llvm::Value *> values;
+
+        for (const auto &[name, value]: node->fields()) {
+            auto llvmValue = codegen_base(value.get(), llvmState);
+            values.push_back(llvmValue);
+
+
+            if (!llvm::isa<llvm::Constant>(llvmValue)) {
+                isConstantInitialisation = false;
+            } else {
+                fields.push_back(llvm::cast<llvm::Constant>(llvmValue));
+            }
+        }
+        // if (isConstantInitialisation) {
+        //     const llvm::ArrayRef<llvm::Constant *> tmp{fields};
+        //     llvm::Constant *structDef = llvm::ConstantStruct::get(llvm::cast<llvm::StructType>(structType), tmp);
+        //     auto *structValue = new llvm::GlobalVariable(*llvmState.TheModule,
+        //                                                  structType,
+        //                                                  true,
+        //                                                  llvm::GlobalValue::PrivateLinkage,
+        //                                                  structDef,
+        //                                                  node->expressionToken().lexical()
+        //     );
+        //     return structValue;
+        // }
+        const auto val = llvmState.Builder->CreateAlloca(structType);
+        const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+        llvmState.Builder->CreateStore(llvmState.Builder->getInt32(variantIndex), val);
+
+        size_t offset = 4;
+        for (size_t i = 0; i < values.size(); i++) {
+            const auto [visibility,fieldType, fieldName] = variantType.fields[i];
+            const auto elementPointer =
+                    llvmState.Builder->CreateConstGEP1_32(llvmState.Builder->getInt8Ty(), val, offset, fieldName);
+            const auto llvmFieldType = resolveLlvmType(fieldType, llvmState);
+            offset += DL.getTypeAllocSize(llvmFieldType);
+            const auto alignment = DL.getPrefTypeAlign(llvmFieldType);
+            if (fieldType->typeKind() == types::TypeKind::STRUCT or fieldType->typeKind() == types::TypeKind::SLICE) {
+                const auto value = (values[i]->getType()->isPointerTy())
+                                       ? values[i]
+                                       : getLoadStorePointerOperand(values[i]);
+
+                const size_t size = DL.getTypeAllocSize(llvmFieldType);
+                llvmState.Builder->CreateMemCpy(elementPointer,
+                                                llvm::MaybeAlign(),
+                                                value,
+                                                llvm::MaybeAlign(),
+                                                size);
+            } else {
+                llvmState.Builder->CreateAlignedStore(values[i], elementPointer, alignment);
+            }
+        }
+        return val;
+    }
+
+    llvm::Value *codegen(const ast::StructInitialization *node, LLVMBackendState &llvmState) {
+        if (const auto type = std::dynamic_pointer_cast<types::StructType>(node->expressionType().value())) {
+            return codegen_struct_init(node, type, llvmState);
+        }
+        if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
+            return codegen_struct_union_init(node, unionType, llvmState);
+        }
+        assert(false && "unsupported type for struct initialization!");
+        return nullptr;
     }
 
     llvm::Value *codegen(const ast::TypeCast *node, LLVMBackendState &llvmState) {
@@ -2340,6 +2524,42 @@ namespace llvm_backend {
                 return call;
             return nullptr;
         }
+        if (auto unionType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
+            const auto variant = unionType->getVariant(node->functionName());
+            if (variant && variant->type == types::UnionVariantType::TUPLE) {
+                llvm::Type *varType = resolveLlvmType(unionType, llvmState);
+
+                llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr,
+                                                                           node->expressionToken().lexical());
+                std::vector<llvm::Constant *> elements;
+                auto variantIndex = unionType->getVariantIndex(node->functionName());
+
+                size_t byteOffset = 0;
+                byteOffset += 4;
+                llvmState.Builder->CreateStore(llvmState.Builder->getInt32(variantIndex), alloca);
+                const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+                for (size_t i = 0; i < variant.value().associatedTypes.size(); i++) {
+                    const auto arg = node->args()[i];
+                    const auto argType = resolveLlvmType(arg->expressionType().value(), llvmState);
+                    const auto value = codegen_base(arg.get(), llvmState);
+
+                    const auto offsetLhs = llvmState.Builder->CreateConstGEP1_32(
+                        llvmState.Builder->getInt8Ty(), alloca, byteOffset, "tuple_offset");
+                    byteOffset += DL.getTypeAllocSize(argType);
+
+                    if (arg->expressionType().value()->typeKind() == types::TypeKind::STRUCT or
+                        arg->expressionType().value()->typeKind() == types::TypeKind::SLICE) {
+                        llvmState.Builder->CreateMemCpy(offsetLhs, llvm::MaybeAlign(),
+                                                        value, llvm::MaybeAlign(),
+                                                        DL.getTypeAllocSize(argType));
+                    } else {
+                        llvmState.Builder->CreateStore(value, offsetLhs);
+                    }
+                }
+                return alloca;
+            }
+        }
 
         if (!functionCall) {
             for (auto &func: llvmState.TheModule->functions()) {
@@ -2386,6 +2606,14 @@ namespace llvm_backend {
                             }
                         }
                     }
+                } else if (arg->expressionType().value()->typeKind() == types::TypeKind::UNION) {
+                    auto llvmArgType = resolveLlvmType(arg->expressionType().value(), llvmState);
+                    auto unionAlloc = llvmState.Builder->CreateAlloca(
+                        llvmArgType, nullptr, "union_alloc");
+                    createMemCpy(llvmState, unionAlloc, value, llvmArgType);
+
+                    args.push_back(unionAlloc);
+                    continue;
                 }
                 args.push_back(value);
             } else {
@@ -2712,7 +2940,8 @@ namespace llvm_backend {
         }
         for (const auto &param: node->args()) {
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
-                types::TypeKind::SLICE) {
+                types::TypeKind::SLICE or param.type.value()->typeKind() ==
+                types::TypeKind::UNION) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
@@ -2772,7 +3001,7 @@ namespace llvm_backend {
 
         for (const auto &param: node->args()) {
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
-                types::TypeKind::SLICE) {
+                types::TypeKind::SLICE || param.type.value()->typeKind() == types::TypeKind::UNION) {
                 params.push_back(llvm::PointerType::getUnqual(*llvmState.TheContext));
             } else {
                 params.push_back(resolveLlvmType(param.type.value(), llvmState));
@@ -2827,7 +3056,8 @@ namespace llvm_backend {
             }
             // Store the initial value into the alloca.
             if (param.type.value()->typeKind() == types::TypeKind::STRUCT or param.type.value()->typeKind() ==
-                types::TypeKind::SLICE) {
+                types::TypeKind::SLICE or param.type.value()->typeKind() ==
+                types::TypeKind::UNION) {
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                 const size_t size = DL.getTypeAllocSize(varType);
                 llvmState.Builder->CreateMemCpy(alloca,

@@ -3,22 +3,34 @@
 union Animal {
   Dog(string, double),
   Cat { name: string, weight: double },
-  Undefined,
+  Undefined
 }
 
 fn print_animal(animal: Animal) :void{
     match animal {
-      Animal::Dog(name, weight) => println("Dog: ${name}, weight: ${weight}"),
-      Animal::Cat { name, weight } => println("Cat: ${name}, weight: ${weight}"),
+      Animal::Dog(name, weight) => {
+          let mut msg = "Dog: ${name} weight: ${weight}";
+          println(msg);
+      },
+      Animal::Cat { name, weight } => {
+          let mut msg2 = "Cat: ${name}  weight: ${weight}";
+          println(msg2);
+      },
       Animal::Undefined => println("Undefined"),
-    }
+      _ => println("error"),
+    };
+
 }
 
 fn main() :i32 {
-    let dog :Animal = Animal::Dog("Fido",12.4);
-    let cat = Animal::Cat { name: "Garfield", weight:4.21};
+    let mut dog_name = string::from_slice("Fido");
+    defer dog_name.destroy();
+    let dog :Animal = Animal::Dog(dog_name,12.4);
+    let mut cat_name = string::from_slice("Garfield");
+    defer cat_name.destroy();
+    let cat = Animal::Cat { name: cat_name, weight:4.21};
     print_animal(dog);
     print_animal(cat);
-    print_animal(Animal::Undefined);
+    //print_animal(Animal::Undefined);
     return 0;
 }

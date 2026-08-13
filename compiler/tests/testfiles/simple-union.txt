@@ -1,0 +1,2 @@
+Dog: Fido weight: 12.400000000
+Cat: Garfield  weight: 4.209999999

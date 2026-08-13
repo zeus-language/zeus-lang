@@ -95,6 +95,15 @@ std::optional<types::UnionVariant> types::UnionType::getVariant(const std::strin
     return std::nullopt;
 }
 
+size_t types::UnionType::getVariantIndex(const std::string &variantName) const {
+    for (size_t i = 0; i < m_variants.size(); ++i) {
+        if (m_variants[i].name == variantName) {
+            return i;
+        }
+    }
+    throw std::invalid_argument("Variant not found");
+}
+
 
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
                               const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,

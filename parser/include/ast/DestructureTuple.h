@@ -6,6 +6,7 @@ namespace ast {
     class DestructureTuple : public ast::ASTNode {
         Token m_variantName;
         std::vector<Token> m_memberNames;
+        ast::ASTNode *m_accessNode = nullptr;
 
     public:
         explicit DestructureTuple(const Token &token, const Token &variantName, const std::vector<Token> &memberNames)
@@ -29,6 +30,14 @@ namespace ast {
 
         [[nodiscard]] const std::vector<Token> &memberNames() const {
             return m_memberNames;
+        }
+
+        void setAccessNode(ast::ASTNode *accessNode) {
+            m_accessNode = accessNode;
+        }
+
+        [[nodiscard]] ast::ASTNode *accessNode() const {
+            return m_accessNode;
         }
 
         std::shared_ptr<ASTNode> clone() override {

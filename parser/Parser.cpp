@@ -1683,6 +1683,8 @@ namespace parser {
                 result = std::move(destructureTuple.value());
             } else if (auto enumAccess = parseEnumAccess()) {
                 result = std::move(enumAccess.value());
+            } else if (auto varAccess = parseVariableAccess()) {
+                result = std::move(varAccess.value());
             }
 
             if (result) {
@@ -2576,7 +2578,7 @@ namespace parser {
             }
 
             consume(Token::OPEN_BRACE);
-            while (!canConsume(Token::CLOSE_BRACE)) {
+            while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
                 auto variantName = current();
                 consume(Token::IDENTIFIER);
                 ast::UnionVariant variant(variantName);
@@ -2584,15 +2586,7 @@ namespace parser {
                 if (canConsume(Token::LEFT_CURLY)) {
                     variant.type = ast::UnionVariantType::TUPLE;
                     consume(Token::LEFT_CURLY);
-                    while (canConsume(Token::IDENTIFIER)) {
-                        auto rawType = parseRawType();
-                        if (!rawType) {
-                            m_messages.push_back(ParserMessasge{
-                                .token = current(),
-                                .message = "expected type after '{' in union variant declaration!"
-                            });
-                            return std::nullopt;
-                        }
+                    while (auto rawType = parseRawType()) {
                         variant.associatedRawTypes.push_back(rawType.value());
                         tryConsume(Token::COMMA);
                     }

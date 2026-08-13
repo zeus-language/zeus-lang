@@ -242,6 +242,8 @@ namespace types {
 
         [[nodiscard]] std::optional<UnionVariant> getVariant(const std::string &variantName) const;
 
+        size_t getVariantIndex(const std::string &variantName) const;
+
     private:
         std::vector<UnionVariant> m_variants;
         std::vector<std::shared_ptr<VariableType> > m_genericParams;
@@ -379,7 +381,7 @@ namespace types {
             return m_variants;
         }
 
-        std::optional<EnumVariant> getVariantByName(const std::string &name) const {
+        [[nodiscard]] std::optional<EnumVariant> getVariantByName(const std::string &name) const {
             for (const auto &variant: m_variants) {
                 if (variant.name == name) {
                     return variant;

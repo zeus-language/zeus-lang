@@ -1148,6 +1148,11 @@ namespace types {
                         "The case element has a different type than the match expression!"
                     });
                 }
+                if (auto destructureStructNode = std::dynamic_pointer_cast<ast::DestructureStruct>(key)) {
+                    destructureStructNode->setAccessNode(node->accessNode());
+                } else if (auto destructureTupleNode = std::dynamic_pointer_cast<ast::DestructureTuple>(key)) {
+                    destructureTupleNode->setAccessNode(node->accessNode());
+                }
             }
             type_check_base(expression.get(), context);
             if (expression->expressionType()) {
@@ -2178,7 +2183,7 @@ namespace types {
                         }
                     }
                 } else if (auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value())) {
-                    auto variant = unionType->getVariant(node->functionName());
+                    const auto variant = unionType->getVariant(node->functionName());
                     if (variant && variant->type == UnionVariantType::TUPLE) {
                         node->setExpressionType(unionType);
                         return;
@@ -2678,7 +2683,7 @@ namespace types {
                                     returnStatement->returnValue().value()->expressionType().value()->name() + "'."
                                 });
                             }
-                        } else {
+                        } else if ( node->returnType().value()->fullTypeName()!= "void") {
                             context.messages.insert({
                                 parser::OutputType::ERROR,
                                 returnStatement->expressionToken(),
