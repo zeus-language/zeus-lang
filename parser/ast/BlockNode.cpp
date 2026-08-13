@@ -11,7 +11,7 @@
 
 namespace ast {
     BlockNode::BlockNode(const Token &token, std::vector<std::shared_ptr<ASTNode> > statements)
-        : ASTNode(token), m_statements(std::move(statements)) {
+        : ASTNode(token, NodeType::BLOCK), m_statements(std::move(statements)) {
     }
 
     std::vector<std::shared_ptr<ASTNode> > &BlockNode::statements() {

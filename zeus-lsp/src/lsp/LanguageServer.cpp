@@ -18,6 +18,7 @@
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/LambdaExpression.h"
+#include "ast/MatchExpression.h"
 #include "ast/MethodCallNode.h"
 #include "ast/ReferenceAccess.h"
 #include "ast/StructDeclaration.h"
@@ -311,6 +312,7 @@ void LanguageServer::handleRequest() {
                     };
                 })
                 .add<lsp::requests::Shutdown>([&]() {
+                    running = false;
                     return lsp::requests::Shutdown::Result();
                 })
                 .add<lsp::notifications::Exit>([&]() {
@@ -447,13 +449,16 @@ void LanguageServer::handleRequest() {
         while (running) {
             try {
                 messageHandler.processIncomingMessages();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             } catch (const lsp::MessageError &e) {
                 std::cerr << "LSP Exception: " << e.what() << "\n";
                 std::cerr << "LSP Exception code: " << e.code() << "\n";
                 if (e.data())
                     std::cerr << "LSP Exception data: " << e.data().value().string() << "\n";
+                break;
             } catch (const std::exception &e) {
                 std::cerr << "EXCEPTION: " << e.what() << std::endl;
+                break;
             }
         }
     } catch (const lsp::MessageError &e) {
@@ -499,7 +504,7 @@ void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::v
 
 void resolveInlayHintsForLambda(const ast::LambdaExpression *funcDef, std::vector<lsp::InlayHint> &hints);
 
-void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHint> &hints) {
+static void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHint> &hints) {
     switch (node->nodeType()) {
         case ast::NodeType::FUNCTION_DEFINITION: {
             if (const auto funcDef = dynamic_cast<const ast::FunctionDefinition *>(node))
@@ -528,6 +533,20 @@ void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::InlayHin
             }
             if (varDecl->initialValue().has_value()) {
                 resolveInlayHintForNode(varDecl->initialValue().value(), hints);
+            }
+            break;
+        }
+        case ast::NodeType::MATCH_EXPRESSION: {
+            auto matchStmt = const_cast<ast::MatchExpression *>(dynamic_cast<const ast::MatchExpression *>(node));
+            for (const auto &[matchKeys, expression]: matchStmt->matchCases()) {
+                resolveInlayHintForNode(expression.get(), hints);
+            }
+            break;
+        }
+        case ast::NodeType::BLOCK: {
+            auto blockStmt = const_cast<ast::BlockNode *>(dynamic_cast<const ast::BlockNode *>(node));
+            for (const auto &stmt: blockStmt->statements()) {
+                resolveInlayHintForNode(stmt.get(), hints);
             }
             break;
         }
@@ -607,8 +626,8 @@ lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
 }
 
 
-void addToCompletionListIfMatches(lsp::CompletionItem item,
-                                  lsp::CompletionList &completionList) {
+static void addToCompletionListIfMatches(lsp::CompletionItem item,
+                                         lsp::CompletionList &completionList) {
     const auto containsItem = std::ranges::find(completionList.items, item.label,
                                                 &lsp::CompletionItem::label);
     if (containsItem == completionList.items.end()) {
@@ -616,7 +635,8 @@ void addToCompletionListIfMatches(lsp::CompletionItem item,
     }
 }
 
-void addCompletionItemForModule(const parser::Module *module, const char *token, lsp::CompletionList &completions) {
+static void addCompletionItemForModule(const parser::Module *module, const char *token,
+                                       lsp::CompletionList &completions) {
     auto moduleName = module->modulePath().back().lexical();
     if (module->aliasName.has_value()) {
         moduleName = module->aliasName.value();
@@ -632,10 +652,10 @@ void addCompletionItemForModule(const parser::Module *module, const char *token,
     }
 }
 
-void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, const std::string &nsPrefix,
-                                  const std::string &token,
-                                  lsp::CompletionList &completions) {
-    const auto definedName = function->functionName();
+static void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, const std::string &nsPrefix,
+                                         const std::string &token,
+                                         lsp::CompletionList &completions) {
+    const auto &definedName = function->functionName();
     if (definedName.find(token) != std::string::npos) {
         lsp::CompletionItem item;
         item.label = function->functionName();
@@ -646,7 +666,7 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, c
                 insertText += ", ";
             }
         }
-        insertText += ")";
+        insertText += ')';
         item.insertText = insertText;
         item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
         item.insertTextFormat = lsp::InsertTextFormat::Snippet;
@@ -666,8 +686,9 @@ void addCompletionItemForFunction(const ast::FunctionDefinitionBase *function, c
 }
 
 
-bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList,
-                          std::optional<Token> foundToken, const parser::ParseResult &parseResult) {
+static bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result,
+                                 lsp::CompletionList completionList,
+                                 std::optional<Token> foundToken, const parser::ParseResult &parseResult) {
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
         auto [parent, node] = resultPair.value();
         if (auto varAccess = dynamic_cast<const ast::VariableAccess *>(node)) {
@@ -751,8 +772,8 @@ bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result
     return false;
 }
 
-std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std::optional<Token> &foundToken,
-                                                 bool &isUseCompletion) {
+static std::vector<Token> build_path_from_token_reverse(std::vector<Token> tokens, std::optional<Token> &foundToken,
+                                                        bool &isUseCompletion) {
     std::vector<Token> pathTokens;
     while (true) {
         pathTokens.push_back(foundToken.value());

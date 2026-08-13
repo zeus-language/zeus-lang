@@ -15,8 +15,11 @@
 #include "ast/ContinueStatement.h"
 #include "ast/DeferStatement.h"
 #include "ast/DerefNode.h"
+#include "ast/DestructureStruct.h"
+#include "ast/DestructureTuple.h"
 #include "ast/EnumAccess.h"
 #include "ast/EnumDeclaration.h"
+#include "ast/EnumValue.h"
 #include "ast/ExternFunctionDefinition.h"
 #include "ast/FieldAccess.h"
 #include "ast/FieldAssignment.h"
@@ -42,6 +45,7 @@
 #include "ast/StructInitialization.h"
 #include "ast/TypeCast.h"
 #include "ast/TypeDefinition.h"
+#include "ast/UnionDeclaration.h"
 #include "ast/UseModule.h"
 #include "ast/VariableAccess.h"
 #include "ast/VariableAssignment.h"
@@ -404,6 +408,14 @@ namespace parser {
                 return false;
             }
             lookaheadIndex++;
+            while (canConsume(Token::NS_SEPARATOR, lookaheadIndex)) {
+                lookaheadIndex++;
+                if (!canConsume(Token::IDENTIFIER, lookaheadIndex)) {
+                    return false;
+                }
+                lookaheadIndex++;
+            }
+
             if (canConsume(Token::LESS, lookaheadIndex)) {
                 lookaheadIndex++;
                 // Skip generic parameters
@@ -422,8 +434,18 @@ namespace parser {
             if (!isStructInitializationAhead() || !allowInit) {
                 return std::nullopt;
             }
-            auto &structNameToken = current();
+
+            std::optional<Token> unionName = current();
+            auto structNameToken = current();
+
             consume(Token::IDENTIFIER);
+            if (tryConsume(Token::NS_SEPARATOR)) {
+                structNameToken = current();
+                consume(Token::IDENTIFIER);
+            } else {
+                unionName = std::nullopt;
+            }
+
 
             std::optional<Token> genericParam = std::nullopt;
             if (tryConsume(Token::LESS)) {
@@ -450,7 +472,6 @@ namespace parser {
                         .token = current(),
                         .message = "expected field name in struct initialization",
                     });
-                    return std::nullopt;
                 }
                 const auto &fieldNameToken = current();
                 consume(Token::IDENTIFIER);
@@ -460,7 +481,6 @@ namespace parser {
                         .token = current(),
                         .message = "expected ':' after field name in struct initialization",
                     });
-                    return std::nullopt;
                 }
                 consume(Token::COLON);
                 auto fieldValue = parseExpression(false);
@@ -483,7 +503,7 @@ namespace parser {
             }
             consume(Token::CLOSE_BRACE);
 
-            return std::make_shared<ast::StructInitialization>(structNameToken, genericParam, fields);
+            return std::make_shared<ast::StructInitialization>(structNameToken, genericParam, fields, unionName);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseReferenceAccess() {
@@ -552,6 +572,19 @@ namespace parser {
             return std::make_shared<ast::EnumAccess>(enumNameToken, variantNameToken);
         }
 
+        std::optional<std::shared_ptr<ast::ASTNode> > parseEnumValue() {
+            if (!canConsume(Token::IDENTIFIER) or !canConsume(Token::NS_SEPARATOR, 1) or !canConsume(
+                    Token::IDENTIFIER, 2)) {
+                return std::nullopt;
+            }
+            Token enumNameToken = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::NS_SEPARATOR);
+            Token variantNameToken = current();
+            consume(Token::IDENTIFIER);
+            return std::make_shared<ast::EnumValue>(enumNameToken, variantNameToken);
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseNull() {
             if (!canConsumeKeyWord("null")) {
                 return std::nullopt;
@@ -560,6 +593,7 @@ namespace parser {
             consumeKeyWord("null");
             return std::make_shared<ast::NumberConstant>(nullToken, ast::NumberType::NULLPTR);
         }
+
 
         std::optional<std::shared_ptr<ast::ASTNode> > tryParseToken(bool allowInit = false) {
             std::optional<std::shared_ptr<ast::ASTNode> > result = std::nullopt;
@@ -588,12 +622,12 @@ namespace parser {
                 result = std::move(nullPointer.value());
             } else if (auto functionCall = parseFunctionCall()) {
                 result = std::move(functionCall.value());
+            } else if (auto structInitilization = parseStructInitialization(allowInit)) {
+                result = std::move(structInitilization.value());
             } else if (auto enumAccess = parseEnumAccess()) {
                 result = std::move(enumAccess.value());
             } else if (auto referenceAccess = parseReferenceAccess()) {
                 result = std::move(referenceAccess.value());
-            } else if (auto structInitilization = parseStructInitialization(allowInit)) {
-                result = std::move(structInitilization.value());
             } else if (auto varAccess = parseVariableAccess()) {
                 result = std::move(varAccess.value());
             } else if (auto arrayInit = parseArrayInitializer(allowInit)) {
@@ -1143,9 +1177,9 @@ namespace parser {
                                                               std::move(value.value()),
                                                               std::move(indexNode.value()));
             }
-            if (auto fieldAccess = dynamic_cast<ast::FieldAccess *>(varAccess.value().get())) {
-                return std::make_shared<ast::FieldAssignment>(std::move(varAccess.value()->expressionToken()),
-                                                              std::move(varAccess.value()),
+            if (auto fieldAccess = std::dynamic_pointer_cast<ast::FieldAccess>(varAccess.value())) {
+                return std::make_shared<ast::FieldAssignment>(fieldAccess->expressionToken(),
+                                                              std::move(fieldAccess),
                                                               std::move(value.value()));
             }
             return std::make_shared<ast::VariableAssignment>(varAccess.value()->expressionToken(),
@@ -1193,9 +1227,9 @@ namespace parser {
             const Token nameToken = expectedName.value_or(current());
 
             if (tryConsumeKeyWord("fn")) {
-                consume(Token::Type::LEFT_CURLY);
+                consume(Token::LEFT_CURLY);
                 std::vector<std::shared_ptr<ast::RawType> > functionArgs;
-                while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                     if (auto arg = parseRawType()) {
                         functionArgs.push_back(std::move(arg.value()));
                         tryConsume(Token::COMMA);
@@ -1207,7 +1241,7 @@ namespace parser {
                         break;
                     }
                 }
-                consume(Token::Type::RIGHT_CURLY);
+                consume(Token::RIGHT_CURLY);
                 consume(Token::COLON);
                 auto returnType = parseRawType();
                 if (!returnType) {
@@ -1323,10 +1357,10 @@ namespace parser {
                 constant = false;
             }
             Token &nameToken = current();
-            if (!consume(Token::Type::IDENTIFIER))
+            if (!consume(Token::IDENTIFIER))
                 next(); // we go further even with an error
             std::optional<std::shared_ptr<ast::RawType> > type = std::nullopt;
-            if (tryConsume(Token::Type::COLON)) {
+            if (tryConsume(Token::COLON)) {
                 type = parseRawType();
                 if (!type) {
                     m_messages.push_back(ParserMessasge{
@@ -1341,9 +1375,9 @@ namespace parser {
             std::optional<std::shared_ptr<ast::ASTNode> > value = std::nullopt;
             if (tryConsume(Token::EQUAL)) {
                 value = parseExpression(true);
-                consume(Token::Type::SEMICOLON);
+                consume(Token::SEMICOLON);
             } else {
-                consume(Token::Type::SEMICOLON);
+                consume(Token::SEMICOLON);
             }
 
             return std::make_shared<ast::VariableDeclaration>(nameToken, type,
@@ -1511,16 +1545,182 @@ namespace parser {
             return std::make_shared<ast::WhileLoop>(whileToken, std::move(condition.value()), block);
         }
 
+        std::optional<std::shared_ptr<ast::ASTNode> > parseLeftHandSide() {
+            std::optional<std::shared_ptr<ast::ASTNode> > result = std::nullopt;
+
+            if (auto varAccess = parseVariableAccess()) {
+                result = std::move(varAccess.value());
+            }
+            if (result) {
+                assert(result.has_value() && result.value() != nullptr && "Parsed expression is null");
+                if (canParseMemberAccess()) {
+                    result = std::move(parseMemberAccess(result).value());
+                }
+                if (canParseArrayAccess()) {
+                    result = std::move(parseArrayAccess(result).value());
+                }
+            }
+            return result;
+        }
+
+        [[nodiscard]] bool canParseDestructureTuple() const {
+            size_t current = m_current;
+            if (current >= m_tokens.size()) {
+                return false;
+            }
+            if (m_tokens[current].type != Token::IDENTIFIER) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type != Token::NS_SEPARATOR) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type != Token::IDENTIFIER) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type == Token::LEFT_CURLY) {
+                return true;
+            }
+            return false;
+        }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > parseDestructureTuple() {
+            if (!canParseDestructureTuple()) {
+                return std::nullopt;
+            }
+            auto unionName = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::NS_SEPARATOR);
+            auto unionVariant = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::LEFT_CURLY);
+            std::vector<Token> memberNames;
+            while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
+                auto name = current();
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected identifier in destructure tuple!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::IDENTIFIER);
+                memberNames.push_back(name);
+                tryConsume(Token::COMMA);
+            }
+            consume(Token::RIGHT_CURLY);
+            return std::make_shared<ast::DestructureTuple>(unionVariant, unionName, memberNames);
+        }
+
+        [[nodiscard]] bool canParseDestructureStruct() const {
+            size_t current = m_current;
+            if (current >= m_tokens.size()) {
+                return false;
+            }
+            if (m_tokens[current].type != Token::IDENTIFIER) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type != Token::NS_SEPARATOR) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type != Token::IDENTIFIER) {
+                return false;
+            }
+            current++;
+            if (m_tokens[current].type == Token::OPEN_BRACE) {
+                return true;
+            }
+            return false;
+        }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > parseDestructureStruct() {
+            if (!canParseDestructureStruct()) {
+                return std::nullopt;
+            }
+            auto unionName = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::NS_SEPARATOR);
+            auto unionVariant = current();
+            consume(Token::IDENTIFIER);
+            consume(Token::OPEN_BRACE);
+            std::vector<Token> memberNames;
+            while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                auto name = current();
+                if (!canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected identifier in destructure tuple!"
+                    });
+                    return std::nullopt;
+                }
+                consume(Token::IDENTIFIER);
+                memberNames.push_back(name);
+                tryConsume(Token::COMMA);
+            }
+            consume(Token::CLOSE_BRACE);
+            return std::make_shared<ast::DestructureStruct>(unionVariant, unionName, memberNames);
+        }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > tryParseMatchToken() {
+            std::optional<std::shared_ptr<ast::ASTNode> > result = std::nullopt;
+            if (auto number = parseNumber()) {
+                result = std::move(number.value());
+            } else if (auto octNumber = parseOctNumber()) {
+                result = std::move(octNumber.value());
+            } else if (auto hexNumber = parseHexNumber()) {
+                result = std::move(hexNumber.value());
+            } else if (auto binNumber = parseBinNumber()) {
+                result = std::move(binNumber.value());
+            } else if (auto floatNumber = parseFloatNumber()) {
+                result = std::move(floatNumber.value());
+            } else if (auto string = parseString()) {
+                result = std::move(string.value());
+            } else if (auto interpolatedString = parseInterpolatedString()) {
+                result = std::move(interpolatedString.value());
+            } else if (auto rawString = parseRawString()) {
+                result = std::move(rawString.value());
+            } else if (auto character = parseChar()) {
+                result = std::move(character.value());
+            } else if (auto boolean = parseBoolean()) {
+                result = std::move(boolean.value());
+            } else if (auto nullPointer = parseNull()) {
+                result = std::move(nullPointer.value());
+            } else if (auto destructureStruct = parseDestructureStruct()) {
+                result = std::move(destructureStruct.value());
+            } else if (auto destructureTuple = parseDestructureTuple()) {
+                result = std::move(destructureTuple.value());
+            } else if (auto enumValue = parseEnumValue()) {
+                result = std::move(enumValue.value());
+            } else if (auto varAccess = parseVariableAccess()) {
+                result = std::move(varAccess.value());
+            }
+
+            if (result) {
+                assert(result.has_value() && result.value() != nullptr && "Parsed expression is null");
+
+                if (canParseTypeCast()) {
+                    result = std::move(tryParseTypeCast(result).value());
+                }
+                if (canParseRange()) {
+                    result = std::move(parseRange(result).value());
+                }
+            }
+            return result;
+        }
+
+
         std::optional<ast::MatchCase> parseMatch() {
-            auto token = tryParseToken();
-
-
+            auto token = tryParseMatchToken();
             if (!token) {
                 return std::nullopt;
             }
             std::vector<std::shared_ptr<ast::ASTNode> > matchKeys;
             while (tryConsume(Token::PIPE)) {
-                auto nextKey = tryParseToken();
+                auto nextKey = tryParseMatchToken();
                 if (!nextKey) {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -1558,7 +1758,7 @@ namespace parser {
             }
             consumeKeyWord("match");
             auto identifier = tryParseToken();
-            consume(Token::Type::OPEN_BRACE);
+            consume(Token::OPEN_BRACE);
             std::vector<ast::MatchCase> matchCases;
             while (true) {
                 auto parsedMatch = parseMatch();
@@ -1567,7 +1767,7 @@ namespace parser {
                 }
                 matchCases.emplace_back(std::move(parsedMatch.value()));
             }
-            consume(Token::Type::CLOSE_BRACE);
+            consume(Token::CLOSE_BRACE);
             return std::make_shared<ast::MatchExpression>(name, std::move(identifier.value()), matchCases);
         }
 
@@ -1667,6 +1867,8 @@ namespace parser {
                     result = std::move(interfaceDef.value());
                 } else if (auto enumDef = parseEnumDeclaration()) {
                     result = std::move(enumDef.value());
+                } else if (auto taggedUnion = parseTaggedUnion()) {
+                    result = std::move(taggedUnion.value());
                 } else if (auto functionDef = parseFunctionDefinition()) {
                     result = std::move(functionDef.value());
                 } else if (auto externFunctionDef = parseExternFunctionDefinition()) {
@@ -1682,7 +1884,7 @@ namespace parser {
                                    std::string(magic_enum::enum_name(current().type)) + "!"
                     });
                     next();
-                    if (current().type == Token::Type::END_OF_FILE) {
+                    if (current().type == Token::END_OF_FILE) {
                         return std::nullopt;
                     }
                 }
@@ -1696,7 +1898,7 @@ namespace parser {
 
         std::shared_ptr<ast::BlockNode> parseBlock() {
             Token &token = current();
-            consume(Token::Type::OPEN_BRACE);
+            consume(Token::OPEN_BRACE);
             std::vector<std::shared_ptr<ast::ASTNode> > nodes;
 
             while (!canConsume(Token::CLOSE_BRACE)) {
@@ -1711,12 +1913,12 @@ namespace parser {
                                    std::string(magic_enum::enum_name(current().type)) + "!"
                     });
                     next();
-                    if (current().type == Token::Type::END_OF_FILE) {
+                    if (current().type == Token::END_OF_FILE) {
                         break;
                     }
                 }
             }
-            consume(Token::Type::CLOSE_BRACE);
+            consume(Token::CLOSE_BRACE);
 
             return std::make_shared<ast::BlockNode>(token, nodes);
         }
@@ -1725,15 +1927,15 @@ namespace parser {
             if (!canConsume(Token::IDENTIFIER))
                 return std::nullopt;
             const Token nameToken = current();
-            consume(Token::Type::IDENTIFIER);
+            consume(Token::IDENTIFIER);
             bool isConstant = true;
             std::optional<std::shared_ptr<ast::RawType> > type = std::nullopt;
-            if (tryConsume(Token::Type::COLON)) {
+            if (tryConsume(Token::COLON)) {
                 isConstant = !tryConsumeKeyWord("mut");
                 if (tryConsumeKeyWord("fn")) {
-                    consume(Token::Type::LEFT_CURLY);
+                    consume(Token::LEFT_CURLY);
                     std::vector<std::shared_ptr<ast::RawType> > functionArgs;
-                    while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                    while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                         if (auto arg = parseRawType()) {
                             functionArgs.push_back(std::move(arg.value()));
                             tryConsume(Token::COMMA);
@@ -1745,7 +1947,7 @@ namespace parser {
                             break;
                         }
                     }
-                    consume(Token::Type::RIGHT_CURLY);
+                    consume(Token::RIGHT_CURLY);
                     consume(Token::COLON);
                     auto returnType = parseRawType();
                     if (!returnType) {
@@ -1872,11 +2074,11 @@ namespace parser {
                     });
                     return std::nullopt;
                 }
-                consume(Token::Type::IDENTIFIER);
+                consume(Token::IDENTIFIER);
 
-                consume(Token::Type::LEFT_CURLY);
+                consume(Token::LEFT_CURLY);
                 std::vector<ast::FunctionArgument> functionArgs;
-                while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+                while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                     if (auto arg = tryParseFunctionArgument()) {
                         functionArgs.push_back(std::move(arg.value()));
                         tryConsume(Token::COMMA);
@@ -1887,10 +2089,10 @@ namespace parser {
                         });
                         break;
                     }
-                    if (canConsume(Token::Type::RIGHT_CURLY))
+                    if (canConsume(Token::RIGHT_CURLY))
                         break;
                 }
-                consume(Token::Type::RIGHT_CURLY);
+                consume(Token::RIGHT_CURLY);
                 consume(Token::COLON);
                 auto returnType = parseRawType();
                 consume(Token::SEMICOLON);
@@ -1982,7 +2184,7 @@ namespace parser {
                 });
                 return std::nullopt;
             }
-            consume(Token::Type::IDENTIFIER);
+            consume(Token::IDENTIFIER);
 
             std::optional<Token> genericParam = std::nullopt;
             if (tryConsume(Token::LESS)) {
@@ -2000,9 +2202,9 @@ namespace parser {
                 consume(Token::GREATER);
             }
 
-            consume(Token::Type::LEFT_CURLY);
+            consume(Token::LEFT_CURLY);
             std::vector<ast::FunctionArgument> functionArgs;
-            while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+            while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                 if (auto arg = tryParseFunctionArgument()) {
                     functionArgs.push_back(std::move(arg.value()));
                     tryConsume(Token::COMMA);
@@ -2013,10 +2215,10 @@ namespace parser {
                     });
                     break;
                 }
-                if (canConsume(Token::Type::RIGHT_CURLY))
+                if (canConsume(Token::RIGHT_CURLY))
                     break;
             }
-            consume(Token::Type::RIGHT_CURLY);
+            consume(Token::RIGHT_CURLY);
             consume(Token::COLON);
             auto returnType = parseRawType();
 
@@ -2092,10 +2294,10 @@ namespace parser {
             }
             auto nameToken = current();
             std::vector<Token> namespacePrefix;
-            consume(Token::Type::IDENTIFIER);
+            consume(Token::IDENTIFIER);
             while (canConsume(Token::NS_SEPARATOR)) {
                 namespacePrefix.push_back(nameToken);
-                consume(Token::Type::NS_SEPARATOR);
+                consume(Token::NS_SEPARATOR);
                 nameToken = current();
                 if (!canConsume(Token::IDENTIFIER)) {
                     m_messages.push_back(ParserMessasge{
@@ -2104,7 +2306,7 @@ namespace parser {
                     });
                     return std::nullopt;
                 }
-                consume(Token::Type::IDENTIFIER);
+                consume(Token::IDENTIFIER);
             }
 
             std::optional<Token> genericParam = std::nullopt;
@@ -2123,9 +2325,9 @@ namespace parser {
                 consume(Token::GREATER);
             }
 
-            consume(Token::Type::LEFT_CURLY);
+            consume(Token::LEFT_CURLY);
             std::vector<std::shared_ptr<ast::ASTNode> > args;
-            while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+            while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                 if (auto arg = parseExpression(true)) {
                     args.push_back(std::move(arg.value()));
                     if (canConsume(Token::COMMA)) {
@@ -2140,7 +2342,7 @@ namespace parser {
                     next();
                 }
             }
-            consume(Token::Type::RIGHT_CURLY);
+            consume(Token::RIGHT_CURLY);
             return std::make_shared<ast::FunctionCallNode>(nameToken, namespacePrefix, args, genericParam);
         }
 
@@ -2196,11 +2398,11 @@ namespace parser {
                 });
                 return std::nullopt;
             }
-            consume(Token::Type::IDENTIFIER);
+            consume(Token::IDENTIFIER);
 
-            consume(Token::Type::LEFT_CURLY);
+            consume(Token::LEFT_CURLY);
             std::vector<ast::FunctionArgument> functionArgs;
-            while (!canConsume(Token::Type::RIGHT_CURLY) && hasNext()) {
+            while (!canConsume(Token::RIGHT_CURLY) && hasNext()) {
                 if (auto arg = tryParseFunctionArgument()) {
                     functionArgs.push_back(std::move(arg.value()));
                     tryConsume(Token::COMMA);
@@ -2211,10 +2413,10 @@ namespace parser {
                     });
                     break;
                 }
-                if (canConsume(Token::Type::RIGHT_CURLY))
+                if (canConsume(Token::RIGHT_CURLY))
                     break;
             }
-            consume(Token::Type::RIGHT_CURLY);
+            consume(Token::RIGHT_CURLY);
             consume(Token::COLON);
             auto returnType = parseRawType();
             consume(Token::SEMICOLON);
@@ -2352,6 +2554,88 @@ namespace parser {
                                                             methods, interfaceNames, genericParam);
         }
 
+        std::optional<std::shared_ptr<ast::ASTNode> > parseTaggedUnion() {
+            if (!canConsumeKeyWord("union")) {
+                return std::nullopt;
+            }
+            consumeKeyWord("union");
+            if (!canConsume(Token::IDENTIFIER)) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected union name after 'union'!"
+                });
+                return std::nullopt;
+            }
+            Token unionName = current();
+            consume(Token::IDENTIFIER);
+
+            std::vector<Token> genericParams;
+            std::vector<ast::UnionVariant> variants;
+            if (tryConsume(Token::LESS)) {
+                while (canConsume(Token::IDENTIFIER)) {
+                    auto genericParamToken = current();
+                    consume(Token::IDENTIFIER);
+                    genericParams.push_back(genericParamToken);
+                    if (!canConsume(Token::COMMA)) {
+                        if (!canConsume(Token::GREATER)) {
+                            m_messages.push_back(ParserMessasge{
+                                .token = current(),
+                                .message = "expected '>' to close generic struct declaration!"
+                            });
+                            return std::nullopt;
+                        }
+                        consume(Token::GREATER);
+                    }
+                }
+            }
+
+            consume(Token::OPEN_BRACE);
+            while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                auto variantName = current();
+                consume(Token::IDENTIFIER);
+                ast::UnionVariant variant(variantName);
+                // parse tuple
+                if (canConsume(Token::LEFT_CURLY)) {
+                    variant.type = ast::UnionVariantType::TUPLE;
+                    consume(Token::LEFT_CURLY);
+                    while (auto rawType = parseRawType()) {
+                        variant.associatedRawTypes.push_back(rawType.value());
+                        tryConsume(Token::COMMA);
+                    }
+                    consume(Token::RIGHT_CURLY);
+                } else if (canConsume(Token::OPEN_BRACE)) {
+                    variant.type = ast::UnionVariantType::STRUCT;
+                    consume(Token::OPEN_BRACE);
+                    while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
+                        auto visibilityModifier = ast::VisibilityModifier::PUBLIC;
+
+                        auto fieldName = current();
+                        consume(Token::IDENTIFIER);
+                        consume(Token::COLON);
+                        auto type = parseRawType();
+                        if (!type) {
+                            m_messages.push_back(ParserMessasge{
+                                .token = current(),
+                                .message = "expected type after field name in struct declaration!"
+                            });
+                            return std::nullopt;
+                        }
+
+                        variant.fields.push_back(ast::StructField{
+                            .visibilityModifier = visibilityModifier, .name = fieldName, .type = std::move(type.value())
+                        });
+                        tryConsume(Token::COMMA);
+                    }
+                    consume(Token::CLOSE_BRACE);
+                }
+                tryConsume(Token::COMMA);
+                variants.push_back(variant);
+            }
+            consume(Token::CLOSE_BRACE);
+            tryConsume(Token::SEMICOLON);
+            return std::make_shared<ast::UnionDeclaration>(unionName, genericParams, variants);
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseEnumDeclaration() {
             if (!canConsumeKeyWord("enum")) {
                 return std::nullopt;
@@ -2395,7 +2679,7 @@ namespace parser {
                 }
             }
             consume(Token::CLOSE_BRACE);
-            consume(Token::SEMICOLON);
+            tryConsume(Token::SEMICOLON);
             return std::make_shared<ast::EnumDeclaration>(enumName, variants);
         }
 
@@ -2424,6 +2708,8 @@ namespace parser {
                     module->nodes.push_back(std::move(std::move(interfaceDef.value())));
                 } else if (auto enumDecl = parseEnumDeclaration()) {
                     module->nodes.push_back(std::move(enumDecl.value()));
+                } else if (auto taggedUnion = parseTaggedUnion()) {
+                    module->nodes.push_back(std::move(taggedUnion.value()));
                 } else {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
@@ -2528,11 +2814,11 @@ namespace parser {
         }
 
         [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword, const size_t next) const {
-            return canConsume(Token::Type::KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
+            return canConsume(Token::KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
         }
 
         [[nodiscard]] bool canConsumeMacro(const std::string &keyword, const size_t next = 0) const {
-            return canConsume(Token::Type::MACRO_KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
+            return canConsume(Token::MACRO_KEYWORD, next) && m_tokens[m_current + next].lexical() == keyword;
         }
 
         [[nodiscard]] bool canConsumeKeyWord(const std::string &keyword) const {

@@ -76,5 +76,5 @@ struct array<T>{
 }
 
 pub fn new_array<T>() : array<T> {
-    return array<T> { data: null, length: 0, capacity: 0 };
+    return array<T> { data: null, length: 0 as i64, capacity: 0 as i64};
 }

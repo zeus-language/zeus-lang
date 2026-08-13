@@ -9,7 +9,7 @@ namespace lexer {
     static const std::vector<std::string_view> possible_tokens = {
         "fn", "return", "let", "mut", "if", "else", "true", "false", "while", "for", "in", "break", "continue",
         "use", "or", "and", "as", "struct", "extern", "match", "enum", "null", "type", "not", "pub", "defer",
-        "interface", "implements"
+        "interface", "implements", "union"
     };
 
     static const std::vector<std::string_view> macro_tokens = {"#if", "#else", "#endif", "#elif"};

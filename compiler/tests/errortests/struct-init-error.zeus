@@ -1,0 +1,13 @@
+struct Test {
+    a: i32,
+    b: *u8
+}
+
+
+
+fn main() : i32 {
+    let test = Test{12};
+    let test2 = Test{x:12};
+    return 0;
+}
+

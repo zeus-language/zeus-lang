@@ -33,9 +33,10 @@ namespace ast {
         STRUCT_INITIALIZATION,
         REFERENCE_ACCESS,
         ARRAY_ACCESS,
-        MATCH_STATEMENT,
+        MATCH_EXPRESSION,
         ENUM_DECLARATION,
         ENUM_VARIANT,
+        UNION_DECLARATION,
         USE_MODULE,
         MODULE,
         ANNOTATION,
@@ -43,7 +44,9 @@ namespace ast {
         OTHER,
         DEREFERENCE,
         BINARY_EXPRESSION,
-        INTERFACE_DECLARATION
+        INTERFACE_DECLARATION,
+        DESTRUCTURE_TUPLE,
+        DESTRUCTURE_STRUCT,
     };
 
     class ASTNode {

@@ -1,0 +1,12 @@
+FILENAME:9:32: error: Type mismatch for argument 1 in union variant 'First': expected 'string', but got '[u8]'.
+    let test= TestUnion::First("my string",12);
+                               ^----------
+FILENAME:12:36: error: Type mismatch for argument 1 in union variant 'Second': expected 'double', but got 'i32'.
+    let second = TestUnion::Second(12);
+                                   ^-
+FILENAME:10:41: error: Type mismatch for argument 2 in union variant 'First': expected 'i32', but got 'double'.
+    let secondarg= TestUnion::First(str,12.0);
+                                        ^---
+FILENAME:11:30: error: Union variant 'First' expects 2 arguments, but got 1.
+    let one_arg = TestUnion::First(str);
+                             ^----

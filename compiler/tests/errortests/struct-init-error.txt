@@ -1,0 +1,18 @@
+FILENAME:9:21: error: expected field name in struct initialization
+    let test = Test{12};
+                    ^-
+FILENAME:9:21: error: expected token 'IDENTIFIER' but found NUMBER!
+    let test = Test{12};
+                    ^-
+FILENAME:9:21: error: expected ':' after field name in struct initialization
+    let test = Test{12};
+                    ^-
+FILENAME:9:21: error: expected token 'COLON' but found NUMBER!
+    let test = Test{12};
+                    ^-
+FILENAME:9:21: error: Field '12' does not exist in the struct.
+    let test = Test{12};
+                    ^-
+FILENAME:10:22: error: Field 'x' does not exist in the struct.
+    let test2 = Test{x:12};
+                     ^
