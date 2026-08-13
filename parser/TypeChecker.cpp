@@ -1340,8 +1340,31 @@ namespace types {
         DBG_ASSERT(node->structType(), "Struct type is null in field access");
     }
 
-    void type_check_field(const ast::StructInitField &field, Context &context) {
+    static void type_check_field(const ast::StructInitField &field, const std::vector<StructField> &structFields,
+                                 Context &context) {
         type_check_base(field.value.get(), context);
+        for (auto &sourceField: structFields) {
+            if (sourceField.name == field.name.lexical()) {
+                if (!field.value->expressionType()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        field.value->expressionToken(),
+                        "Could not determine type of expression for field '" + field.name.lexical() + "'."
+                    });
+                    return;
+                }
+                if (*field.value->expressionType().value() != *sourceField.type) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        field.value->expressionToken(),
+                        "Type mismatch for field '" + field.name.lexical() + "': expected '" +
+                        sourceField.type->name() + "', but got '" +
+                        field.value->expressionType().value()->name() + "'."
+                    });
+                }
+                return;
+            }
+        }
     }
 
     void type_check(ast::StructInitialization *node, Context &context) {
@@ -1356,11 +1379,12 @@ namespace types {
                 return;
             }
             if (const auto structType = std::dynamic_pointer_cast<types::UnionType>(unionType.value())) {
+                const auto variant = structType->getVariant(node->structName());
                 for (auto &field: node->fields()) {
-                    type_check_field(field, context);
+                    type_check_field(field, variant->fields, context);
                 }
                 node->setExpressionType(unionType.value());
-                const auto variant = structType->getVariant(node->structName());
+
                 if (!variant) {
                     context.messages.insert({
                         .outputType = parser::OutputType::ERROR,
@@ -1378,9 +1402,9 @@ namespace types {
                 });
             }
         } else if (const auto type = context.currentScope->getTypeByName(node->structName())) {
-            if (auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
+            if (const auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
                 for (auto &field: node->fields()) {
-                    type_check_field(field, context);
+                    type_check_field(field, structType->fields(), context);
                 }
                 node->setExpressionType(type.value());
             } else {
@@ -1415,9 +1439,9 @@ namespace types {
         type_check_base(node->value(), context);
         if (!node->value()->expressionType()) {
             context.messages.insert({
-                parser::OutputType::ERROR,
-                node->value()->expressionToken(),
-                "Could not determine type of expression in type cast."
+                .outputType = parser::OutputType::ERROR,
+                .token = node->value()->expressionToken(),
+                .message = "Could not determine type of expression in type cast."
             });
             return;
         }
@@ -1432,11 +1456,11 @@ namespace types {
             if (node->lhs()->expressionType().value()->name() != "bool" ||
                 node->rhs()->expressionType().value()->name() != "bool") {
                 context.messages.insert({
-                    parser::OutputType::ERROR,
-                    node->expressionToken(),
-                    "Logical expressions require boolean operands, but got '" +
-                    node->lhs()->expressionType().value()->name() + "' and '" +
-                    node->rhs()->expressionType().value()->name() + "'."
+                    .outputType = parser::OutputType::ERROR,
+                    .token = node->expressionToken(),
+                    .message = "Logical expressions require boolean operands, but got '" +
+                               node->lhs()->expressionType().value()->name() + "' and '" +
+                               node->rhs()->expressionType().value()->name() + "'."
                 });
                 return;
             }
@@ -1504,7 +1528,7 @@ namespace types {
     static bool typecheckOperatorMethod(ast::OperatorNode *node, Context &context) {
         std::optional<std::shared_ptr<types::StructType> > lhsStructType = std::nullopt;
         if (node->lhs()) {
-            if (auto lhsType = node->lhs().value()->expressionType()) {
+            if (const auto lhsType = node->lhs().value()->expressionType()) {
                 if (auto structType = std::dynamic_pointer_cast<types::StructType>(
                     lhsType.value())) {
                     lhsStructType = structType;
@@ -2185,6 +2209,33 @@ namespace types {
                 } else if (auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value())) {
                     const auto variant = unionType->getVariant(node->functionName());
                     if (variant && variant->type == UnionVariantType::TUPLE) {
+                        // check arguments
+                        if (node->args().size() != variant->associatedTypes.size()) {
+                            context.messages.insert({
+                                .outputType = parser::OutputType::ERROR,
+                                .token = node->expressionToken(),
+                                .message = "Union variant '" + node->functionName() + "' expects " +
+                                           std::to_string(variant->associatedTypes.size()) + " arguments, but got " +
+                                           std::to_string(node->args().size()) + "."
+                            });
+                        }
+                        for (int i = 0; i < node->args().size(); ++i) {
+                            auto arg = node->args()[i];
+                            auto associatedType = variant->associatedTypes[i];
+                            if (!arg->expressionType() || *arg->expressionType().value() != *associatedType) {
+                                context.messages.insert({
+                                    .outputType = parser::OutputType::ERROR,
+                                    .token = arg->expressionToken(),
+                                    .message = "Type mismatch for argument " + std::to_string(i + 1) +
+                                               " in union variant '" + node->functionName() + "': expected '" +
+                                               associatedType->name() + "', but got '" +
+                                               (arg->expressionType()
+                                                    ? arg->expressionType().value()->name()
+                                                    : "unknown") + "'."
+                                });
+                            }
+                        }
+
                         node->setExpressionType(unionType);
                         return;
                     }
@@ -2683,7 +2734,7 @@ namespace types {
                                     returnStatement->returnValue().value()->expressionType().value()->name() + "'."
                                 });
                             }
-                        } else if ( node->returnType().value()->fullTypeName()!= "void") {
+                        } else if (node->returnType().value()->fullTypeName() != "void") {
                             context.messages.insert({
                                 parser::OutputType::ERROR,
                                 returnStatement->expressionToken(),

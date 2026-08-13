@@ -1,0 +1,9 @@
+FILENAME:9:35: error: Type mismatch for field 'a': expected 'string', but got '[u8]'.
+    let test= TestUnion::First{a: "my string",b: 12};
+                                  ^----------
+FILENAME:10:48: error: Type mismatch for field 'b': expected 'i32', but got 'double'.
+    let secondarg= TestUnion::First{a: str, b: 12.0};
+                                               ^---
+FILENAME:12:39: error: Type mismatch for field 'x': expected 'double', but got 'i32'.
+    let second = TestUnion::Second{x: 12};
+                                      ^-

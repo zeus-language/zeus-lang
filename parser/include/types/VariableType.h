@@ -43,7 +43,7 @@ namespace types {
     protected:
         void setTypeKind(const TypeKind typeKind) { m_typeKind = typeKind; }
 
-        virtual bool compare(const VariableType &other) const {
+        [[nodiscard]] virtual bool compare(const VariableType &other) const {
             return this->name() == other.name();
         }
 
@@ -64,7 +64,7 @@ namespace types {
 
         [[nodiscard]] TypeKind typeKind() const { return m_typeKind; }
 
-        bool operator==(const VariableType &other) const {
+        [[nodiscard]] bool operator==(const VariableType &other) const {
             return compare(other);
         }
 
@@ -118,8 +118,10 @@ namespace types {
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
-            if (auto otherPtrType = dynamic_cast<const PointerType *>(&other)) {
-                return *this->baseType() == *otherPtrType->baseType();
+            if (const auto otherPtrType = dynamic_cast<const PointerType *>(&other)) {
+                const bool isOneSideVoid = this->baseType()->typeKind() == TypeKind::VOID || otherPtrType->baseType()->
+                                           typeKind() == TypeKind::VOID;
+                return *this->baseType() == *otherPtrType->baseType() or isOneSideVoid;
             }
             return false;
         }
