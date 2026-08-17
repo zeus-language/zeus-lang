@@ -278,7 +278,7 @@ namespace lexer {
             *endPosition = start;
             int index = 0;
             char current = content[start];
-            if (current == '-' && !isNumberStart(content[start + 1]))
+            if (current == '-' && !isNumber(content[start + 1]))
                 return false;
             if (!isNumberStart(current))
                 return false;
@@ -506,6 +506,11 @@ namespace lexer {
                         .row = row,
                         .col = col
                     };
+                    SourceLocation double_length_loc = {
+                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                        .row = row,
+                        .col = col
+                    };
 
                     switch (source_code[start]) {
                         case '\n':
@@ -514,19 +519,66 @@ namespace lexer {
                             //start++;
                             continue;
                         case '+':
-                            tokens.emplace_back(Token::PLUS, std::move(source_location));
+                            switch (source_code[start + 1]) {
+                                case '+':
+                                    tokens.emplace_back(Token::INCREMENT, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                case '=':
+                                    tokens.emplace_back(Token::PLUS_EQUAL, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                default:
+                                    tokens.emplace_back(Token::PLUS, std::move(source_location));
+                                    break;
+                            }
+
                             break;
                         case '-':
-                            tokens.emplace_back(Token::MINUS, std::move(source_location));
+                            switch (source_code[start + 1]) {
+                                case '-':
+                                    tokens.emplace_back(Token::DECREMENT, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                case '=':
+                                    tokens.emplace_back(Token::MINUS_EQUAL, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                default:
+                                    tokens.emplace_back(Token::MINUS, std::move(source_location));
+                                    break;
+                            }
                             break;
                         case '*':
-                            tokens.emplace_back(Token::MUL, std::move(source_location));
+                            switch (source_code[start + 1]) {
+                                case '=':
+                                    tokens.emplace_back(Token::MULTIPLY_EQUAL, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                default:
+                                    tokens.emplace_back(Token::MUL, std::move(source_location));
+                                    break;
+                            }
                             break;
                         case '%':
                             tokens.emplace_back(Token::PERCENT, std::move(source_location));
                             break;
                         case '/':
-                            tokens.emplace_back(Token::DIV, std::move(source_location));
+                            switch (source_code[start + 1]) {
+                                case '=':
+                                    tokens.emplace_back(Token::DIV_EQUAL, std::move(double_length_loc));
+                                    col++;
+                                    start++;
+                                    break;
+                                default:
+                                    tokens.emplace_back(Token::DIV, std::move(source_location));
+                                    break;
+                            }
                             break;
                         case '(':
                             tokens.emplace_back(Token::LEFT_CURLY, std::move(source_location));

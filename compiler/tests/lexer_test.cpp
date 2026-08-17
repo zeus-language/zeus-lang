@@ -610,3 +610,57 @@ TEST(LexerLexNumbersTest, LexBinaryNumbers) {
     EXPECT_EQ(tokens[3].type, Token::Type::BIN_NUMBER);
     VerifyTokenPosition(tokens[3], source, 11, 10, "0b11000101");
 }
+
+TEST(LexerLexOperators, LexIncrement) {
+    const std::string source = "i++;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 4);
+    EXPECT_EQ(tokens[1].type, Token::Type::INCREMENT);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "++");
+}
+
+TEST(LexerLexOperators, LexDecrement) {
+    const std::string source = "i--;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 4);
+    EXPECT_EQ(tokens[1].type, Token::Type::DECREMENT);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "--");
+}
+
+TEST(LexerLexOperators, LexPlusEqual) {
+    const std::string source = "i+=1;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[1].type, Token::Type::PLUS_EQUAL);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "+=");
+}
+
+TEST(LexerLexOperators, LexMinusEqual) {
+    const std::string source = "i-=1;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[1].type, Token::Type::MINUS_EQUAL);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "-=");
+}
+
+TEST(LexerLexOperators, LexMultiplyEqual) {
+    const std::string source = "i*=1;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[1].type, Token::Type::MULTIPLY_EQUAL);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "*=");
+}
+
+TEST(LexerLexOperators, LexDivisionEqual) {
+    const std::string source = "i/=1;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    ASSERT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[1].type, Token::Type::DIV_EQUAL);
+    VerifyTokenPosition(tokens[1], source, 1, 2, "/=");
+}

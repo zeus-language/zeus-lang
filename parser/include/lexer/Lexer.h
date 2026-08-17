@@ -119,6 +119,12 @@ public:
         INTERPOLATED_STRING,
         LEFT_SHIFT,
         RIGHT_SHIFT,
+        INCREMENT,
+        DECREMENT,
+        PLUS_EQUAL,
+        MINUS_EQUAL,
+        MULTIPLY_EQUAL,
+        DIV_EQUAL
     } type;
 
     SourceLocation source_location;
