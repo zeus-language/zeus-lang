@@ -6,12 +6,8 @@ union Animal {
 
 fn print_animal(animal: Animal) :void{
     match animal {
-      Animal::Dog(name, weight) => {
-          println("Dog: ${name} weight: ${weight}");
-      },
-      Animal::Cat { name, weight } => {
-          println("Cat: ${name}  weight: ${weight}");
-      },
+      Animal::Dog(name, weight) => println("Dog: ${name} weight: ${weight}"),
+      Animal::Cat { name, weight } => println("Cat: ${name}  weight: ${weight}"),
       Animal::Undefined => println("Undefined"),
       _ => println("error"),
     };

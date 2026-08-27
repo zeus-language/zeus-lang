@@ -1834,11 +1834,15 @@ namespace parser {
                 }
                 matchKeys.push_back(std::move(nextKey.value()));
             }
+            auto implicitBlockStart = current();
             consume(Token::EQUAL);
             consume(Token::GREATER);
             auto expression = parseExpression(false);
             if (!expression) {
                 expression = parseBlock();
+            } else {
+                auto statements = std::vector<std::shared_ptr<ast::ASTNode> >{std::move(expression.value())};
+                expression = std::make_shared<ast::BlockNode>(implicitBlockStart, statements);
             }
             if (!expression) {
                 m_messages.push_back(ParserMessasge{

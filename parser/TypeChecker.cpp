@@ -827,6 +827,9 @@ namespace types {
             type_check_base(stmt.get(), context);
         }
         context.currentScope = context.currentScope->parentScope();
+        if (!node->statements().empty() && node->statements().back()->expressionType()) {
+            node->setExpressionType(node->statements().back()->expressionType().value());
+        }
     }
 
     void type_check(ast::MethodCallNode *node, Context &context) {
@@ -1266,6 +1269,9 @@ namespace types {
                     }
                 }
             }
+        }
+        if (!node->expressionType()) {
+            node->setExpressionType(context.typeRegistry.getTypeByName("void", false).value());
         }
     }
 
