@@ -9,6 +9,7 @@
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/ArrayRepeatInitializer.h"
+#include "ast/BinaryAssignmentExpression.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -914,6 +915,19 @@ namespace parser {
                                                operatorToken, ast::BinaryOperator::XOR,
                                                std::move(lhs.value()), std::move(rhs.value())));
                 }
+
+                if (tryConsume(Token::INCREMENT)) {
+                    return parseExpression(false,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::INC,
+                                               std::move(lhs.value())));
+                }
+                if (tryConsume(Token::DECREMENT)) {
+                    return parseExpression(false,
+                                           std::make_shared<ast::BinaryExpression>(
+                                               operatorToken, ast::BinaryOperator::DEC,
+                                               std::move(lhs.value())));
+                }
             } else {
                 auto operatorToken = current();
                 if (canConsume(Token::MINUS)) {
@@ -1127,8 +1141,37 @@ namespace parser {
             return result;
         }
 
+        [[nodiscard]] bool isAssignment() const {
+            size_t offset = m_current + 1;
+            while (offset < m_tokens.size()) {
+                if (m_tokens[offset].type == Token::EQUAL) {
+                    return true;
+                }
+                if (m_tokens[offset].type == Token::SEMICOLON) {
+                    return false;
+                }
+                offset++;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool isBinaryAssignment() const {
+            size_t offset = m_current + 1;
+            while (offset < m_tokens.size()) {
+                if (m_tokens[offset].type == Token::PLUS_EQUAL || m_tokens[offset].type == Token::MINUS_EQUAL ||
+                    m_tokens[offset].type == Token::MULTIPLY_EQUAL || m_tokens[offset].type == Token::DIV_EQUAL) {
+                    return true;
+                }
+                if (m_tokens[offset].type == Token::SEMICOLON) {
+                    return false;
+                }
+                offset++;
+            }
+            return false;
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseVariableAssignment() {
-            if (!canConsume(Token::IDENTIFIER)) {
+            if (!canConsume(Token::IDENTIFIER) || !isAssignment()) {
                 return std::nullopt;
             }
             Token nameToken = current();
@@ -1185,6 +1228,67 @@ namespace parser {
             return std::make_shared<ast::VariableAssignment>(varAccess.value()->expressionToken(),
                                                              std::move(value.value()));
         }
+
+        std::optional<std::shared_ptr<ast::ASTNode> > parseBinaryAssignment() {
+            if (!canConsume(Token::IDENTIFIER) || !isBinaryAssignment()) {
+                return std::nullopt;
+            }
+            Token nameToken = current();
+            auto varAccess = parseMemberAccess(std::move(parseVariableAccess()));
+            if (!varAccess) {
+                return std::nullopt;
+            }
+            bool isArrayAccess = false;
+            std::optional<std::shared_ptr<ast::ASTNode> > indexNode = std::nullopt;
+            if (tryConsume(Token::LEFT_SQUAR)) {
+                isArrayAccess = true;
+                if (!canConsume(Token::NUMBER) && !canConsume(Token::IDENTIFIER)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected number or identifier inside array access '[]' in variable assignment!"
+                    });
+                    return std::nullopt;
+                }
+                indexNode = parseExpression(false);
+                if (!tryConsume(Token::RIGHT_SQUAR)) {
+                    m_messages.push_back(ParserMessasge{
+                        .token = current(),
+                        .message = "expected ']' at the end of array access in variable assignment!"
+                    });
+                    return std::nullopt;
+                }
+            }
+            ast::BinaryAssignmentOperator binAssignOp;
+            if (tryConsume(Token::PLUS_EQUAL)) {
+                binAssignOp = ast::BinaryAssignmentOperator::ADD;
+            } else if (tryConsume(Token::MINUS_EQUAL)) {
+                binAssignOp = ast::BinaryAssignmentOperator::SUB;
+            } else if (tryConsume(Token::MULTIPLY_EQUAL)) {
+                binAssignOp = ast::BinaryAssignmentOperator::MUL;
+            } else if (tryConsume(Token::DIV_EQUAL)) {
+                binAssignOp = ast::BinaryAssignmentOperator::DIV;
+            } else {
+                m_messages.push_back(ParserMessasge{
+                    .token = nameToken,
+                    .message = "expected binary assignment operator after variable name in assignment!"
+                });
+                return varAccess;
+            }
+            auto value = parseExpression(false);
+            if (!value) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "expected expression after '=' in variable assignment!"
+                });
+                return std::nullopt;
+            }
+            consume(Token::SEMICOLON);
+            return std::make_shared<ast::BinaryAssignmentExpression>(varAccess.value()->expressionToken(),
+                                                                     binAssignOp,
+                                                                     std::move(varAccess.value()),
+                                                                     std::move(value.value()));
+        }
+
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseFieldAssignment() {
             if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::DOT, 1) || !canConsume(Token::IDENTIFIER, 2)) {
@@ -1845,6 +1949,8 @@ namespace parser {
                 result = std::move(varAssign.value());
             } else if (auto fieldAssign = parseFieldAssignment()) {
                 result = std::move(fieldAssign.value());
+            } else if (auto binaryAssign = parseBinaryAssignment()) {
+                result = std::move(binaryAssign.value());
             } else if (auto ifCondition = parseIfCondition()) {
                 result = std::move(ifCondition.value());
             } else if (auto whileLoop = parseWhileLoop()) {
@@ -1857,6 +1963,8 @@ namespace parser {
                 result = std::move(continueStmt.value());
             } else if (auto matchStatement = parseMatchExpression()) {
                 result = std::move(matchStatement.value());
+            } else if (auto expr = parseExpression(allowTopLevel)) {
+                result = std::move(expr.value());
             }
             if (!result && allowTopLevel) {
                 if (auto useModule = parseUseModule()) {

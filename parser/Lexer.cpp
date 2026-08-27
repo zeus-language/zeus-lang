@@ -58,548 +58,602 @@ namespace lexer {
 
     static constexpr bool isNumberStart(const char c) { return isNumber(c) || c == '-'; }
 
-    class Lexer {
-        std::vector<Token> tokens;
-        std::shared_ptr<std::string> contentPtr;
-        size_t row = 1;
-        size_t col = 1;
-        size_t start = 0;
-        std::string file_path;
+    namespace {
+        class Lexer {
+            std::vector<Token> tokens;
+            std::shared_ptr<std::string> contentPtr;
+            size_t row = 1;
+            size_t col = 1;
+            size_t start = 0;
+            std::string file_path;
 
-        void addTokenToResult(const size_t tempStart, const size_t endPosition, const Token::Type type) {
-            const size_t offset = endPosition - tempStart;
-            const auto string_length = (offset);
-            SourceLocation source_location = {
-                .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
-                .row = row,
-                .col = col
-            };
-            tokens.emplace_back(type, std::move(source_location));
-            col += offset;
-            for (size_t i = start; i < endPosition; i++) {
-                if ((*contentPtr)[i] == '\n') {
-                    row++;
-                    col = 1;
+            void addTokenToResult(const size_t tempStart, const size_t endPosition, const Token::Type type) {
+                const size_t offset = endPosition - tempStart;
+                const auto string_length = (offset);
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = tempStart, .num_bytes = string_length,
+                    .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(type, std::move(source_location));
+                col += offset;
+                for (size_t i = start; i < endPosition; i++) {
+                    if ((*contentPtr)[i] == '\n') {
+                        row++;
+                        col = 1;
+                    }
                 }
             }
-        }
 
-        bool find_raw_string(const std::string &content, size_t *endPosition) {
-            char current = content[start];
-            if (current != 'r' || content[start + 1] != '"')
-                return false;
-            *endPosition = start + 2;
-            current = content[start + 2];
-            while (true) {
-                if (current == '"') {
-                    *endPosition += 1;
-
-                    break;
-                }
-                if (*endPosition >= content.size()) {
-                    addTokenToResult(start, *endPosition, Token::UNCLOSED_RAW_STRING);
-                    start = *endPosition - 1;
-                    return true;
-                }
-
-
-                *endPosition += 1;
-                current = content[*endPosition];
-            }
-            addTokenToResult(start, *endPosition, Token::RAW_STRING);
-            start = *endPosition - 1;
-            return true;
-        }
-
-
-        bool find_string(const std::string &content, size_t *endPosition) {
-            char current = content[start];
-            if (current != '"')
-                return false;
-            *endPosition = start + 1;
-            current = content[start + 1];
-            size_t tempStart = start;
-            bool isInterpolation = false;
-            while (true) {
-                if (current == '"') {
-                    *endPosition += 1;
-                    break;
-                }
-                if (*endPosition >= content.size()) {
-                    addTokenToResult(tempStart, *endPosition, Token::UNCLOSED_STRING);
-                    start = *endPosition - 1;
-                    return true;
-                }
-                const size_t oldEndPosition = *endPosition;
-                if (current == '$' && content[*endPosition + 1] == '{' && *endPosition + 1 < content.size()) {
-                    isInterpolation = true;
-                    *endPosition += 1;
-                    current = content[*endPosition];
-                    if (current == '{') {
+            bool find_raw_string(const std::string &content, size_t *endPosition) {
+                char current = content[start];
+                if (current != 'r' || content[start + 1] != '"')
+                    return false;
+                *endPosition = start + 2;
+                current = content[start + 2];
+                while (true) {
+                    if (current == '"') {
                         *endPosition += 1;
-                        current = content[*endPosition];
-                        addTokenToResult(tempStart, oldEndPosition, Token::INTERPOLATED_STRING);
-                        tempStart = oldEndPosition;
-                        addTokenToResult(tempStart, *endPosition, Token::INTERPOLATION_START);
-                        tempStart = *endPosition;
-                        continue;
-                    }
-                }
-                if (isInterpolation && current == '}') {
-                    *endPosition += 1;
-                    addTokenToResult(tempStart, oldEndPosition, Token::IDENTIFIER);
-                    tempStart = oldEndPosition;
 
-                    addTokenToResult(tempStart, *endPosition, Token::INTERPOLATION_END);
-                    tempStart = *endPosition;
-                    current = content[*endPosition];
-                    continue;
-                    //isInterpolation = false;
-                }
-
-                *endPosition += 1;
-                current = content[*endPosition];
-            }
-            if (isInterpolation)
-                addTokenToResult(tempStart, *endPosition, Token::INTERPOLATED_STRING);
-            else
-                addTokenToResult(tempStart, *endPosition, Token::STRING);
-
-            start = *endPosition - 1;
-            return true;
-        }
-
-        bool find_token(const std::string &content, size_t *endPosition) const {
-            char current = content[start];
-            *endPosition = start;
-            if (!validStartNameChar(current))
-                return false;
-
-            while (validNameChar(current)) {
-                *endPosition += 1;
-                current = content[*endPosition];
-            }
-            while (!validNameChar(current)) {
-                *endPosition -= 1;
-                current = content[*endPosition];
-            }
-            return true;
-        }
-
-
-        bool find_comment(const std::string &content, size_t *endPosition) const {
-            if (content[start] != '/')
-                return false;
-
-            if (content[start] == '/' && content[start + 1] == '*') {
-                char current = content[start];
-                char next = content[start + 1];
-                *endPosition = start + 1;
-
-                while (!(current == '*' && next == '/') && current != 0) {
-                    *endPosition += 1;
-
-                    if (*endPosition >= content.size()) {
-                        return true;
-                    }
-                    current = content[*endPosition];
-                    next = content[*endPosition + 1];
-                }
-                *endPosition += 1;
-                return true;
-            }
-            if (content[start] == '/' && content[start + 1] == '/') {
-                char current = content[start];
-                *endPosition = start + 3;
-
-                while (current != '\n' && current != 0) {
-                    *endPosition += 1;
-                    if (*endPosition >= content.size()) {
                         break;
                     }
+                    if (*endPosition >= content.size()) {
+                        addTokenToResult(start, *endPosition, Token::UNCLOSED_RAW_STRING);
+                        start = *endPosition - 1;
+                        return true;
+                    }
+
+
+                    *endPosition += 1;
                     current = content[*endPosition];
                 }
-                *endPosition -= 1;
+                addTokenToResult(start, *endPosition, Token::RAW_STRING);
+                start = *endPosition - 1;
                 return true;
             }
 
-            return false;
-        }
 
-        bool find_hex_number(const std::string &content, size_t *endPosition) const {
-            *endPosition = start;
-            char current = content[start];
-            if (current != '0' or content[start + 1] != 'x')
-                return false;
-            *endPosition += 2;
-            current = content[*endPosition];
-            while ((current >= '0' && current <= '9') || (current >= 'a' && current <= 'f') || (
-                       current >= 'A' && current <= 'F')) {
-                *endPosition += 1;
-                current = content[*endPosition];
+            bool find_string(const std::string &content, size_t *endPosition) {
+                char current = content[start];
+                if (current != '"')
+                    return false;
+                *endPosition = start + 1;
+                current = content[start + 1];
+                size_t tempStart = start;
+                bool isInterpolation = false;
+                while (true) {
+                    if (current == '"') {
+                        *endPosition += 1;
+                        break;
+                    }
+                    if (*endPosition >= content.size()) {
+                        addTokenToResult(tempStart, *endPosition, Token::UNCLOSED_STRING);
+                        start = *endPosition - 1;
+                        return true;
+                    }
+                    const size_t oldEndPosition = *endPosition;
+                    if (current == '$' && content[*endPosition + 1] == '{' && *endPosition + 1 < content.size()) {
+                        isInterpolation = true;
+                        *endPosition += 1;
+                        current = content[*endPosition];
+                        if (current == '{') {
+                            *endPosition += 1;
+                            current = content[*endPosition];
+                            addTokenToResult(tempStart, oldEndPosition, Token::INTERPOLATED_STRING);
+                            tempStart = oldEndPosition;
+                            addTokenToResult(tempStart, *endPosition, Token::INTERPOLATION_START);
+                            tempStart = *endPosition;
+                            continue;
+                        }
+                    }
+                    if (isInterpolation && current == '}') {
+                        *endPosition += 1;
+                        addTokenToResult(tempStart, oldEndPosition, Token::IDENTIFIER);
+                        tempStart = oldEndPosition;
+
+                        addTokenToResult(tempStart, *endPosition, Token::INTERPOLATION_END);
+                        tempStart = *endPosition;
+                        current = content[*endPosition];
+                        continue;
+                        //isInterpolation = false;
+                    }
+
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                }
+                if (isInterpolation)
+                    addTokenToResult(tempStart, *endPosition, Token::INTERPOLATED_STRING);
+                else
+                    addTokenToResult(tempStart, *endPosition, Token::STRING);
+
+                start = *endPosition - 1;
+                return true;
             }
-            return true;
-        }
 
-        bool find_oct_number(const std::string &content, size_t *endPosition) const {
-            *endPosition = start;
-            char current = content[start];
-            if (current != '0' or content[start + 1] != 'o')
-                return false;
-            *endPosition += 2;
-            current = content[*endPosition];
-            while (current >= '0' && current <= '7') {
-                *endPosition += 1;
-                current = content[*endPosition];
-                if (content.size() <= *endPosition)
-                    break;
+            bool find_token(const std::string &content, size_t *endPosition) const {
+                char current = content[start];
+                *endPosition = start;
+                if (!validStartNameChar(current))
+                    return false;
+
+                while (validNameChar(current)) {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                }
+                while (!validNameChar(current)) {
+                    *endPosition -= 1;
+                    current = content[*endPosition];
+                }
+                return true;
             }
-            return true;
-        }
 
-        bool find_bin_number(const std::string &content, size_t *endPosition) const {
-            *endPosition = start;
-            char current = content[start];
-            if (current != '0' or content[start + 1] != 'b')
+
+            bool find_comment(const std::string &content, size_t *endPosition) const {
+                if (content[start] != '/')
+                    return false;
+
+                if (content[start] == '/' && content[start + 1] == '*') {
+                    char current = content[start];
+                    char next = content[start + 1];
+                    *endPosition = start + 1;
+
+                    while (!(current == '*' && next == '/') && current != 0) {
+                        *endPosition += 1;
+
+                        if (*endPosition >= content.size()) {
+                            return true;
+                        }
+                        current = content[*endPosition];
+                        next = content[*endPosition + 1];
+                    }
+                    *endPosition += 1;
+                    return true;
+                }
+                if (content[start] == '/' && content[start + 1] == '/') {
+                    char current = content[start];
+                    *endPosition = start + 3;
+
+                    while (current != '\n' && current != 0) {
+                        *endPosition += 1;
+                        if (*endPosition >= content.size()) {
+                            break;
+                        }
+                        current = content[*endPosition];
+                    }
+                    *endPosition -= 1;
+                    return true;
+                }
+
                 return false;
-            *endPosition += 2;
-            current = content[*endPosition];
-            while (current >= '0' && current <= '1') {
-                *endPosition += 1;
-                current = content[*endPosition];
-                if (content.size() <= *endPosition)
-                    break;
             }
-            return true;
-        }
 
-        bool find_number(const std::string &content, size_t *endPosition,
-                         Token::Type *numberTokenType) const {
-            *endPosition = start;
-            int index = 0;
-            char current = content[start];
-            if (current == '-' && !isNumberStart(content[start + 1]))
-                return false;
-            if (!isNumberStart(current))
-                return false;
-            *endPosition += 1;
-            current = content[*endPosition];
-            index++;
-            while (isNumber(current) or (index == 0 and current == '-') or
-                   (current == '.' and isNumber(content[*endPosition + 1]))) {
+            bool find_hex_number(const std::string &content, size_t *endPosition) const {
+                *endPosition = start;
+                char current = content[start];
+                if (current != '0' or content[start + 1] != 'x')
+                    return false;
+                *endPosition += 2;
+                current = content[*endPosition];
+                while ((current >= '0' && current <= '9') || (current >= 'a' && current <= 'f') || (
+                           current >= 'A' && current <= 'F')) {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                }
+                return true;
+            }
+
+            bool find_oct_number(const std::string &content, size_t *endPosition) const {
+                *endPosition = start;
+                char current = content[start];
+                if (current != '0' or content[start + 1] != 'o')
+                    return false;
+                *endPosition += 2;
+                current = content[*endPosition];
+                while (current >= '0' && current <= '7') {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                    if (content.size() <= *endPosition)
+                        break;
+                }
+                return true;
+            }
+
+            bool find_bin_number(const std::string &content, size_t *endPosition) const {
+                *endPosition = start;
+                char current = content[start];
+                if (current != '0' or content[start + 1] != 'b')
+                    return false;
+                *endPosition += 2;
+                current = content[*endPosition];
+                while (current >= '0' && current <= '1') {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                    if (content.size() <= *endPosition)
+                        break;
+                }
+                return true;
+            }
+
+            bool find_number(const std::string &content, size_t *endPosition,
+                             Token::Type *numberTokenType) const {
+                *endPosition = start;
+                int index = 0;
+                char current = content[start];
+                if (current == '-' && !isNumber(content[start + 1]))
+                    return false;
+                if (!isNumberStart(current))
+                    return false;
                 *endPosition += 1;
                 current = content[*endPosition];
                 index++;
-                if (content.size() <= *endPosition)
-                    break;
-            };
-            if (current == 'f' || current == 'F') {
-                *numberTokenType = Token::FLOAT_NUMBER;
-                *endPosition += 1;
+                while (isNumber(current) or (index == 0 and current == '-') or
+                       (current == '.' and isNumber(content[*endPosition + 1]))) {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                    index++;
+                    if (content.size() <= *endPosition)
+                        break;
+                };
+                if (current == 'f' || current == 'F') {
+                    *numberTokenType = Token::FLOAT_NUMBER;
+                    *endPosition += 1;
+                }
+                // if (current < '0' || current > '9')
+                //     *endPosition -= 1;
+                return true;
             }
-            // if (current < '0' || current > '9')
-            //     *endPosition -= 1;
-            return true;
-        }
 
-        bool lex_annotation(const std::string &content, size_t *endPosition) const {
-            char current = content[start];
-            *endPosition = start;
-            if (!(current == '@' && validNameChar(content[start + 1])))
-                return false;
+            bool lex_annotation(const std::string &content, size_t *endPosition) const {
+                char current = content[start];
+                *endPosition = start;
+                if (!(current == '@' && validNameChar(content[start + 1])))
+                    return false;
 
-            do {
-                *endPosition += 1;
-                current = content[*endPosition];
-            } while (validNameChar(current));
+                do {
+                    *endPosition += 1;
+                    current = content[*endPosition];
+                } while (validNameChar(current));
 
-            return true;
-        }
+                return true;
+            }
 
-        void add_number(const std::string &file_path, size_t endPosition, Token::Type numberTokenType) {
-            const size_t offset = endPosition - start;
+            void add_number(const std::string &filepath, size_t endPosition, Token::Type numberTokenType) {
+                const size_t offset = endPosition - start;
 
-            SourceLocation source_location = {
-                .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
-                .row = row,
-                .col = col
-            };
-            tokens.emplace_back(numberTokenType, std::move(source_location));
-            start = endPosition;
+                SourceLocation source_location = {
+                    .filename = filepath, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                    .row = row,
+                    .col = col
+                };
+                tokens.emplace_back(numberTokenType, std::move(source_location));
+                start = endPosition;
 
-            col += offset;
-        }
+                col += offset;
+            }
 
-    public:
-        std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code, bool skipComments) {
-            contentPtr = std::make_shared<std::string>(source_code);
-            this->file_path = filepath;
-            tokens.reserve(contentPtr->size() / 4);
+        public:
+            std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code, bool skipComments) {
+                contentPtr = std::make_shared<std::string>(source_code);
+                this->file_path = filepath;
+                tokens.reserve(contentPtr->size() / 4);
 
-            for (start = 0; start < source_code.length(); start++) {
-                size_t endPosition = start;
-                bool found = find_raw_string(source_code, &endPosition);
-                if (found) {
-                    continue;
-                }
-                found = find_string(source_code, &endPosition);
-                if (found) {
-                    continue;
-                }
-                if (source_code[start] == '\'') {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 3,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::CHAR, std::move(source_location));
-                    col += 3;
-                    start += 2;
-                    continue;
-                }
+                for (start = 0; start < source_code.length(); start++) {
+                    size_t endPosition = start;
+                    bool found = find_raw_string(source_code, &endPosition);
+                    if (found) {
+                        continue;
+                    }
+                    found = find_string(source_code, &endPosition);
+                    if (found) {
+                        continue;
+                    }
+                    if (source_code[start] == '\'') {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 3,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::CHAR, std::move(source_location));
+                        col += 3;
+                        start += 2;
+                        continue;
+                    }
 
-                found = find_comment(source_code, &endPosition);
-                if (found) {
-                    // count lines
+                    found = find_comment(source_code, &endPosition);
+                    if (found) {
+                        // count lines
 
-                    size_t offset = endPosition - start + 1;
+                        size_t offset = endPosition - start + 1;
 
-                    if (!skipComments) {
+                        if (!skipComments) {
+                            SourceLocation source_location = {
+                                .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                                .row = row,
+                                .col = col
+                            };
+                            if (source_code[start] == '/' && source_code[start + 1] == '/') {
+                                tokens.emplace_back(Token::LINE_COMMENT, std::move(source_location));
+                            } else {
+                                tokens.emplace_back(Token::BLOCK_COMMENT, std::move(source_location));
+                            }
+                        }
+                        for (size_t i = start; i < endPosition; i++) {
+                            if (source_code[i] == '\n')
+                                row++;
+                        }
+                        start = endPosition;
+                        col += offset;
+                        continue;
+                    }
+
+                    found = find_macro_token(source_code, start, &endPosition);
+                    if (found) {
+                        const size_t offset = endPosition - start;
                         SourceLocation source_location = {
                             .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
                             .row = row,
                             .col = col
                         };
-                        if (source_code[start] == '/' && source_code[start + 1] == '/') {
-                            tokens.emplace_back(Token::LINE_COMMENT, std::move(source_location));
-                        } else {
-                            tokens.emplace_back(Token::BLOCK_COMMENT, std::move(source_location));
+                        tokens.emplace_back(Token::MACRO_KEYWORD, std::move(source_location));
+                        start = endPosition;
+                        col += offset - 1;
+                        continue;
+                    }
+
+                    found = find_fixed_token(source_code, start, &endPosition);
+                    if (found) {
+                        const size_t offset = endPosition - start;
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::KEYWORD, std::move(source_location));
+                        start = endPosition;
+                        col += offset;
+                    }
+                    found = find_bin_number(source_code, &endPosition);
+                    if (found) {
+                        add_number(file_path, endPosition, Token::BIN_NUMBER);
+                    }
+                    found = find_hex_number(source_code, &endPosition);
+                    if (found) {
+                        add_number(file_path, endPosition, Token::HEX_NUMBER);
+                    }
+                    found = find_oct_number(source_code, &endPosition);
+                    if (found) {
+                        add_number(file_path, endPosition, Token::OCT_NUMBER);
+                    }
+
+                    Token::Type numberTokenType = Token::NUMBER;
+                    found = find_number(source_code, &endPosition, &numberTokenType);
+                    if (found) {
+                        add_number(file_path, endPosition, numberTokenType);
+                        //continue;
+                    }
+
+                    found = lex_annotation(source_code, &endPosition);
+                    if (found) {
+                        const size_t offset = endPosition - start;
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::ANNOTATION, std::move(source_location));
+                        start = endPosition - 1;
+                        col += offset;
+                        continue;
+                    }
+                    found = find_token(source_code, &endPosition);
+                    if (found) {
+                        const size_t offset = endPosition - start + 1;
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::IDENTIFIER, std::move(source_location));
+                        start = endPosition;
+                        col += offset;
+                        continue;
+                    }
+                    if (source_code[start] == '.' && source_code[start + 1] == '.') {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::RANGE, std::move(source_location));
+                        start++;
+                        col += 2;
+                        continue;
+                    }
+                    if (source_code[start] == '<' && source_code[start + 1] == '<') {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::LEFT_SHIFT, std::move(source_location));
+                        start++;
+                        col += 2;
+                        continue;
+                    }
+                    if (source_code[start] == '>' && source_code[start + 1] == '>') {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::RIGHT_SHIFT, std::move(source_location));
+                        start++;
+                        col += 2;
+                        continue;
+                    }
+                    if (source_code[start] == ':' && source_code[start + 1] == ':') {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                            .row = row,
+                            .col = col
+                        };
+                        tokens.emplace_back(Token::NS_SEPARATOR, std::move(source_location));
+                        start++;
+                        col += 2;
+                        continue;
+                    } else {
+                        SourceLocation source_location = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1,
+                            .row = row,
+                            .col = col
+                        };
+                        SourceLocation double_length_loc = {
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
+                            .row = row,
+                            .col = col
+                        };
+
+                        switch (source_code[start]) {
+                            case '\n':
+                                col = 1;
+                                row++;
+                                //start++;
+                                continue;
+                            case '+':
+                                switch (source_code[start + 1]) {
+                                    case '+':
+                                        tokens.emplace_back(Token::INCREMENT, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    case '=':
+                                        tokens.emplace_back(Token::PLUS_EQUAL, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    default:
+                                        tokens.emplace_back(Token::PLUS, std::move(source_location));
+                                        break;
+                                }
+
+                                break;
+                            case '-':
+                                switch (source_code[start + 1]) {
+                                    case '-':
+                                        tokens.emplace_back(Token::DECREMENT, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    case '=':
+                                        tokens.emplace_back(Token::MINUS_EQUAL, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    default:
+                                        tokens.emplace_back(Token::MINUS, std::move(source_location));
+                                        break;
+                                }
+                                break;
+                            case '*':
+                                switch (source_code[start + 1]) {
+                                    case '=':
+                                        tokens.emplace_back(Token::MULTIPLY_EQUAL, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    default:
+                                        tokens.emplace_back(Token::MUL, std::move(source_location));
+                                        break;
+                                }
+                                break;
+                            case '%':
+                                tokens.emplace_back(Token::PERCENT, std::move(source_location));
+                                break;
+                            case '/':
+                                switch (source_code[start + 1]) {
+                                    case '=':
+                                        tokens.emplace_back(Token::DIV_EQUAL, std::move(double_length_loc));
+                                        col++;
+                                        start++;
+                                        break;
+                                    default:
+                                        tokens.emplace_back(Token::DIV, std::move(source_location));
+                                        break;
+                                }
+                                break;
+                            case '(':
+                                tokens.emplace_back(Token::LEFT_CURLY, std::move(source_location));
+                                break;
+                            case ')':
+                                tokens.emplace_back(Token::RIGHT_CURLY, std::move(source_location));
+                                break;
+                            case '[':
+                                tokens.emplace_back(Token::LEFT_SQUAR, std::move(source_location));
+                                break;
+                            case ']':
+                                tokens.emplace_back(Token::RIGHT_SQUAR, std::move(source_location));
+                                break;
+                            case '=':
+                                tokens.emplace_back(Token::EQUAL, std::move(source_location));
+                                break;
+                            case '<':
+                                tokens.emplace_back(Token::LESS, std::move(source_location));
+                                break;
+                            case '>':
+                                tokens.emplace_back(Token::GREATER, std::move(source_location));
+                                break;
+                            case ',':
+                                tokens.emplace_back(Token::COMMA, std::move(source_location));
+                                break;
+                            case ';':
+                                tokens.emplace_back(Token::SEMICOLON, std::move(source_location));
+                                break;
+                            case ':':
+                                tokens.emplace_back(Token::COLON, std::move(source_location));
+                                break;
+                            case '.':
+                                tokens.emplace_back(Token::DOT, std::move(source_location));
+                                break;
+                            case '^':
+                                tokens.emplace_back(Token::CARET, std::move(source_location));
+                                break;
+                            case '!':
+                                tokens.emplace_back(Token::BANG, std::move(source_location));
+                                break;
+                            case '@':
+                                tokens.emplace_back(Token::AT, std::move(source_location));
+                                break;
+                            case '{':
+                                tokens.emplace_back(Token::OPEN_BRACE, std::move(source_location));
+                                break;
+                            case '}':
+                                tokens.emplace_back(Token::CLOSE_BRACE, std::move(source_location));
+                                break;
+                            case '&':
+                                tokens.emplace_back(Token::AND, std::move(source_location));
+                                break;
+                            case '|':
+                                tokens.emplace_back(Token::PIPE, std::move(source_location));
+                                break;
+                            case '~':
+                                tokens.emplace_back(Token::BITNOT, std::move(source_location));
+                                break;
+                            default:
+                                break;
                         }
+
+                        col++;
                     }
-                    for (size_t i = start; i < endPosition; i++) {
-                        if (source_code[i] == '\n')
-                            row++;
-                    }
-                    start = endPosition;
-                    col += offset;
-                    continue;
                 }
-
-                found = find_macro_token(source_code, start, &endPosition);
-                if (found) {
-                    const size_t offset = endPosition - start;
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::MACRO_KEYWORD, std::move(source_location));
-                    start = endPosition;
-                    col += offset - 1;
-                    continue;
-                }
-
-                found = find_fixed_token(source_code, start, &endPosition);
-                if (found) {
-                    const size_t offset = endPosition - start;
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::KEYWORD, std::move(source_location));
-                    start = endPosition;
-                    col += offset;
-                }
-                found = find_bin_number(source_code, &endPosition);
-                if (found) {
-                    add_number(file_path, endPosition, Token::BIN_NUMBER);
-                }
-                found = find_hex_number(source_code, &endPosition);
-                if (found) {
-                    add_number(file_path, endPosition, Token::HEX_NUMBER);
-                }
-                found = find_oct_number(source_code, &endPosition);
-                if (found) {
-                    add_number(file_path, endPosition, Token::OCT_NUMBER);
-                }
-
-                Token::Type numberTokenType = Token::NUMBER;
-                found = find_number(source_code, &endPosition, &numberTokenType);
-                if (found) {
-                    add_number(file_path, endPosition, numberTokenType);
-                    //continue;
-                }
-
-                found = lex_annotation(source_code, &endPosition);
-                if (found) {
-                    const size_t offset = endPosition - start;
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::ANNOTATION, std::move(source_location));
-                    start = endPosition - 1;
-                    col += offset;
-                    continue;
-                }
-                found = find_token(source_code, &endPosition);
-                if (found) {
-                    const size_t offset = endPosition - start + 1;
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::IDENTIFIER, std::move(source_location));
-                    start = endPosition;
-                    col += offset;
-                    continue;
-                }
-                if (source_code[start] == '.' && source_code[start + 1] == '.') {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::RANGE, std::move(source_location));
-                    start++;
-                    col += 2;
-                    continue;
-                }
-                if (source_code[start] == '<' && source_code[start + 1] == '<') {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::LEFT_SHIFT, std::move(source_location));
-                    start++;
-                    col += 2;
-                    continue;
-                }
-                if (source_code[start] == '>' && source_code[start + 1] == '>') {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::RIGHT_SHIFT, std::move(source_location));
-                    start++;
-                    col += 2;
-                    continue;
-                }
-                if (source_code[start] == ':' && source_code[start + 1] == ':') {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 2,
-                        .row = row,
-                        .col = col
-                    };
-                    tokens.emplace_back(Token::NS_SEPARATOR, std::move(source_location));
-                    start++;
-                    col += 2;
-                    continue;
-                } else {
-                    SourceLocation source_location = {
-                        .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1,
-                        .row = row,
-                        .col = col
-                    };
-
-                    switch (source_code[start]) {
-                        case '\n':
-                            col = 1;
-                            row++;
-                            //start++;
-                            continue;
-                        case '+':
-                            tokens.emplace_back(Token::PLUS, std::move(source_location));
-                            break;
-                        case '-':
-                            tokens.emplace_back(Token::MINUS, std::move(source_location));
-                            break;
-                        case '*':
-                            tokens.emplace_back(Token::MUL, std::move(source_location));
-                            break;
-                        case '%':
-                            tokens.emplace_back(Token::PERCENT, std::move(source_location));
-                            break;
-                        case '/':
-                            tokens.emplace_back(Token::DIV, std::move(source_location));
-                            break;
-                        case '(':
-                            tokens.emplace_back(Token::LEFT_CURLY, std::move(source_location));
-                            break;
-                        case ')':
-                            tokens.emplace_back(Token::RIGHT_CURLY, std::move(source_location));
-                            break;
-                        case '[':
-                            tokens.emplace_back(Token::LEFT_SQUAR, std::move(source_location));
-                            break;
-                        case ']':
-                            tokens.emplace_back(Token::RIGHT_SQUAR, std::move(source_location));
-                            break;
-                        case '=':
-                            tokens.emplace_back(Token::EQUAL, std::move(source_location));
-                            break;
-                        case '<':
-                            tokens.emplace_back(Token::LESS, std::move(source_location));
-                            break;
-                        case '>':
-                            tokens.emplace_back(Token::GREATER, std::move(source_location));
-                            break;
-                        case ',':
-                            tokens.emplace_back(Token::COMMA, std::move(source_location));
-                            break;
-                        case ';':
-                            tokens.emplace_back(Token::SEMICOLON, std::move(source_location));
-                            break;
-                        case ':':
-                            tokens.emplace_back(Token::COLON, std::move(source_location));
-                            break;
-                        case '.':
-                            tokens.emplace_back(Token::DOT, std::move(source_location));
-                            break;
-                        case '^':
-                            tokens.emplace_back(Token::CARET, std::move(source_location));
-                            break;
-                        case '!':
-                            tokens.emplace_back(Token::BANG, std::move(source_location));
-                            break;
-                        case '@':
-                            tokens.emplace_back(Token::AT, std::move(source_location));
-                            break;
-                        case '{':
-                            tokens.emplace_back(Token::OPEN_BRACE, std::move(source_location));
-                            break;
-                        case '}':
-                            tokens.emplace_back(Token::CLOSE_BRACE, std::move(source_location));
-                            break;
-                        case '&':
-                            tokens.emplace_back(Token::AND, std::move(source_location));
-                            break;
-                        case '|':
-                            tokens.emplace_back(Token::PIPE, std::move(source_location));
-                            break;
-                        case '~':
-                            tokens.emplace_back(Token::BITNOT, std::move(source_location));
-                            break;
-                        default:
-                            break;
-                    }
-
-                    col++;
-                }
+                SourceLocation source_location = {
+                    .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1, .row = row,
+                    .col = col + 1
+                };
+                tokens.emplace_back(Token::END_OF_FILE, std::move(source_location));
+                return std::move(tokens);
             }
-            SourceLocation source_location = {
-                .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 1, .row = row,
-                .col = col + 1
-            };
-            tokens.emplace_back(Token::END_OF_FILE, std::move(source_location));
-            return std::move(tokens);
-        }
-    };
+        };
+    }
 
     std::vector<Token> lex_file(const std::string &file_path, const std::string &source_code, bool skipComments) {
         Lexer lexer;

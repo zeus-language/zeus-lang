@@ -38,6 +38,7 @@
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/ArrayRepeatInitializer.h"
+#include "ast/BinaryAssignmentExpression.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -609,6 +610,8 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::DestructureTuple *node, LLVMBackendState &llvmState);
 
+    llvm::Value *codegen(ast::BinaryAssignmentExpression *node, LLVMBackendState &llvmState);
+
     void emitLocation(ast::ASTNode *ast, LLVMBackendState &llvmState) {
         if (!llvmState.DBuilder)
             return;
@@ -737,6 +740,9 @@ namespace llvm_backend {
         }
         if (const auto destructuredTuple = dynamic_cast<ast::DestructureTuple *>(node)) {
             return llvm_backend::codegen(destructuredTuple, llvmState);
+        }
+        if (const auto binaryAssign = dynamic_cast<ast::BinaryAssignmentExpression *>(node)) {
+            return llvm_backend::codegen(binaryAssign, llvmState);
         }
 
         // Handle other node types or throw an error
@@ -998,6 +1004,145 @@ namespace llvm_backend {
         llvmState.Builder->SetInsertPoint(endBlock);
 
         return result;
+    }
+
+    llvm::Value *codegen_binexpr(ast::BinaryOperator op, llvm::Value *lhs, llvm::Value *rhs,
+                                 LLVMBackendState &llvmState) {
+        switch (op) {
+            case ast::BinaryOperator::ADD:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAdd(lhs, rhs, "addtmp");
+                } else if (lhs->getType()->isPointerTy() && rhs->getType()->isPointerTy()) {
+                    const auto lhsCast = llvmState.Builder->CreatePtrToInt(
+                        lhs, llvm::Type::getInt64Ty(*llvmState.TheContext),
+                        "ptrtoint_lhs");
+                    const auto rhsCast = llvmState.Builder->CreatePtrToInt(
+                        rhs, llvm::Type::getInt64Ty(*llvmState.TheContext),
+                        "ptrtoint_rhs");
+                    const auto added = llvmState.Builder->CreateAdd(lhsCast, rhsCast, "addtmp");
+                    return llvmState.Builder->CreateIntToPtr(added, lhs->getType(), "inttoptr");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFAdd(lhs, rhs, "faddtmp");
+                }
+                break;
+            case ast::BinaryOperator::SUB:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSub(lhs, rhs, "subtmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFSub(lhs, rhs, "fsubtmp");
+                }
+                break;
+            case ast::BinaryOperator::MUL:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateMul(lhs, rhs, "multmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFMul(lhs, rhs, "fmultmp");
+                }
+                break;
+            case ast::BinaryOperator::DIV:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSDiv(lhs, rhs, "divtmp");
+                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFDiv(lhs, rhs, "fdivtmp");
+                }
+                break;
+            case ast::BinaryOperator::MOD:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateSRem(lhs, rhs, "modtmp");
+                }
+                break;
+            case ast::BinaryOperator::AND:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAnd(lhs, rhs, "andtmp");
+                }
+                break;
+            case ast::BinaryOperator::OR:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateOr(lhs, rhs, "ortmp");
+                }
+                break;
+            case ast::BinaryOperator::XOR:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateXor(lhs, rhs, "xortmp");
+                }
+                break;
+            case ast::BinaryOperator::LEFT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
+                }
+                break;
+            case ast::BinaryOperator::RIGHT_SHIFT:
+                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateAShr(lhs, rhs, "shrtmp");
+                }
+                break;
+            case ast::BinaryOperator::NOT:
+                if (rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateNot(rhs, "nottmp");
+                }
+                break;
+            case ast::BinaryOperator::UNARY_MINUS:
+                if (rhs->getType()->isIntegerTy()) {
+                    return llvmState.Builder->CreateNeg(rhs, "negtmp");
+                }
+                if (rhs->getType()->isFloatingPointTy()) {
+                    return llvmState.Builder->CreateFNeg(rhs, "fnegtmp");
+                }
+                break;
+            case ast::BinaryOperator::INC:
+                if (rhs->getType()->isIntegerTy()) {
+                    const auto value = llvmState.Builder->CreateAdd(rhs, llvm::ConstantInt::get(rhs->getType(), 1),
+                                                                    "inctmp");
+                    return llvmState.Builder->CreateStore(value, getLoadStorePointerOperand(rhs));
+                }
+                break;
+            case ast::BinaryOperator::DEC:
+                if (rhs->getType()->isIntegerTy()) {
+                    const auto value = llvmState.Builder->
+                            CreateAdd(rhs, llvm::ConstantInt::get(rhs->getType(), -1), "dectmp");
+                    return llvmState.Builder->CreateStore(value, getLoadStorePointerOperand(rhs));
+                }
+                break;
+            default:
+                assert(false && "Unsupported binary operator");
+        }
+        assert(false && "Type mismatch in binary expression");
+    }
+
+    static ast::BinaryOperator convert_op(const ast::BinaryAssignmentOperator op) {
+        switch (op) {
+            case ast::BinaryAssignmentOperator::ADD:
+                return ast::BinaryOperator::ADD;
+            case ast::BinaryAssignmentOperator::SUB:
+                return ast::BinaryOperator::SUB;
+            case ast::BinaryAssignmentOperator::MUL:
+                return ast::BinaryOperator::MUL;
+            case ast::BinaryAssignmentOperator::DIV:
+                return ast::BinaryOperator::DIV;
+            case ast::BinaryAssignmentOperator::MOD:
+                return ast::BinaryOperator::MOD;
+            case ast::BinaryAssignmentOperator::AND:
+                return ast::BinaryOperator::AND;
+            case ast::BinaryAssignmentOperator::OR:
+                return ast::BinaryOperator::OR;
+            case ast::BinaryAssignmentOperator::XOR:
+                return ast::BinaryOperator::XOR;
+            case ast::BinaryAssignmentOperator::LEFT_SHIFT:
+                return ast::BinaryOperator::LEFT_SHIFT;
+            case ast::BinaryAssignmentOperator::RIGHT_SHIFT:
+                return ast::BinaryOperator::RIGHT_SHIFT;
+            default:
+                assert(false && "Unsupported binary operator");
+        }
+    }
+
+    llvm::Value *codegen(ast::BinaryAssignmentExpression *node, LLVMBackendState &llvmState) {
+        const auto lhs = codegen_base(node->lhs().value(), llvmState);
+        const auto rhs = codegen_base(node->rhs(), llvmState);
+
+        const auto binaryOperation = codegen_binexpr(convert_op(node->binoperator()), lhs, rhs, llvmState);
+
+        return llvmState.Builder->CreateStore(binaryOperation, getLoadStorePointerOperand(lhs));
     }
 
     llvm::Value *codegen(const ast::FieldAssignment *node, LLVMBackendState &llvmState) {
@@ -2009,97 +2154,14 @@ namespace llvm_backend {
         return condition;
     }
 
+
     llvm::Value *codegen(const ast::BinaryExpression *node, LLVMBackendState &llvmState) {
         if (node->operatorFunction()) {
             return codegenStructOperatorNodeCall(node, llvmState);
         }
         const auto lhs = (node->lhs().has_value()) ? codegen_base(node->lhs().value(), llvmState) : nullptr;
         const auto rhs = codegen_base(node->rhs(), llvmState);
-
-        switch (node->binoperator()) {
-            case ast::BinaryOperator::ADD:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateAdd(lhs, rhs, "addtmp");
-                } else if (lhs->getType()->isPointerTy() && rhs->getType()->isPointerTy()) {
-                    const auto lhsCast = llvmState.Builder->CreatePtrToInt(
-                        lhs, llvm::Type::getInt64Ty(*llvmState.TheContext),
-                        "ptrtoint_lhs");
-                    const auto rhsCast = llvmState.Builder->CreatePtrToInt(
-                        rhs, llvm::Type::getInt64Ty(*llvmState.TheContext),
-                        "ptrtoint_rhs");
-                    const auto added = llvmState.Builder->CreateAdd(lhsCast, rhsCast, "addtmp");
-                    return llvmState.Builder->CreateIntToPtr(added, lhs->getType(), "inttoptr");
-                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
-                    return llvmState.Builder->CreateFAdd(lhs, rhs, "faddtmp");
-                }
-                break;
-            case ast::BinaryOperator::SUB:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateSub(lhs, rhs, "subtmp");
-                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
-                    return llvmState.Builder->CreateFSub(lhs, rhs, "fsubtmp");
-                }
-                break;
-            case ast::BinaryOperator::MUL:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateMul(lhs, rhs, "multmp");
-                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
-                    return llvmState.Builder->CreateFMul(lhs, rhs, "fmultmp");
-                }
-                break;
-            case ast::BinaryOperator::DIV:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateSDiv(lhs, rhs, "divtmp");
-                } else if (lhs->getType()->isFloatingPointTy() && rhs->getType()->isFloatingPointTy()) {
-                    return llvmState.Builder->CreateFDiv(lhs, rhs, "fdivtmp");
-                }
-                break;
-            case ast::BinaryOperator::MOD:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateSRem(lhs, rhs, "modtmp");
-                }
-                break;
-            case ast::BinaryOperator::AND:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateAnd(lhs, rhs, "andtmp");
-                }
-                break;
-            case ast::BinaryOperator::OR:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateOr(lhs, rhs, "ortmp");
-                }
-                break;
-            case ast::BinaryOperator::XOR:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateXor(lhs, rhs, "xortmp");
-                }
-                break;
-            case ast::BinaryOperator::LEFT_SHIFT:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateShl(lhs, rhs, "shltmp");
-                }
-                break;
-            case ast::BinaryOperator::RIGHT_SHIFT:
-                if (lhs->getType()->isIntegerTy() && rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateAShr(lhs, rhs, "shrtmp");
-                }
-                break;
-            case ast::BinaryOperator::NOT:
-                if (rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateNot(rhs, "nottmp");
-                }
-                break;
-            case ast::BinaryOperator::UNARY_MINUS:
-                if (rhs->getType()->isIntegerTy()) {
-                    return llvmState.Builder->CreateNeg(rhs, "negtmp");
-                } else if (rhs->getType()->isFloatingPointTy()) {
-                    return llvmState.Builder->CreateFNeg(rhs, "fnegtmp");
-                }
-                break;
-            default:
-                assert(false && "Unsupported binary operator");
-        }
-        assert(false && "Type mismatch in binary expression");
+        return codegen_binexpr(node->binoperator(), lhs, rhs, llvmState);
     }
 
 

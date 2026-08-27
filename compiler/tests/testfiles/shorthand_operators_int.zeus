@@ -1,0 +1,16 @@
+fn main() : i32 {
+    let mut i = 1;
+    i++;
+    println("i++ = ${i}");
+    i--;
+    println("i-- = ${i}");
+    i+=4;
+    println("i+= ${i}");
+    i-=2;
+    println("i-= ${i}");
+    i*=4;
+    println("i*= ${i}");
+    i/=2;
+    println("i/= ${i}");
+    return 0;
+}

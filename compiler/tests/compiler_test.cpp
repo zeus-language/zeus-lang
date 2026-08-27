@@ -404,7 +404,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "functionpointer","externannotation","stringslice", "convert2string","convertfromstring",
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
-                             "lambda-infer-expression","interface-single","interface-multiple","simple-union"));
+                             "lambda-infer-expression","interface-single","interface-multiple","simple-union",
+                             "shorthand_operators_int","shorthand_operators_double"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
@@ -417,7 +418,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "function-arg-mut","method-arg-mut","method-self-mut","type-not-infered",
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
                              "interpolation-utf8-error","unimplemented-interface","interface-by-value",
-                             "nonexaustive-enum-match","nonexaustive-enum-match2","union-tuple-type", "union-struct-type", "struct-init-error"
+                             "nonexaustive-enum-match","nonexaustive-enum-match2","union-tuple-type",
+                             "union-struct-type", "struct-init-error"
                          ));
 INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                          testing::Values( "arithmetic-bitwise-and-float",
@@ -428,6 +430,8 @@ INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                              "arithmetic-divide-string-compound",
                              "arithmetic-divide-string",
                              "arithmetic-division-by-zero",
+                             "arithmetic-inc-double",
+                             "arithmetic-immutinc-int",
                              "arithmetic-incomplete-and",
                              "arithmetic-incomplete-div",
                              "arithmetic-incomplete-lshift",

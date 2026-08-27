@@ -169,6 +169,17 @@ std::optional<int> mapTokenType(const Token::Type type) {
         case Token::Type::LINE_COMMENT:
         case Token::Type::BLOCK_COMMENT:
             return 15;
+        case Token::PLUS_EQUAL:
+        case Token::INCREMENT:
+        case Token::PLUS:
+        case Token::MINUS:
+        case Token::MINUS_EQUAL:
+        case Token::MULTIPLY_EQUAL:
+        case Token::AND:
+        case Token::DECREMENT:
+        case Token::DIV:
+        case Token::DIV_EQUAL:
+            return 19;
         case Token::Type::ANNOTATION:
             return 20;
         case Token::Type::IDENTIFIER:

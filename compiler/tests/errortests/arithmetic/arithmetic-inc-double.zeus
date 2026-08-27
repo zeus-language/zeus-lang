@@ -1,0 +1,5 @@
+fn main() : i32 {
+    let mut i  = 12.0;
+    i++;
+    return 0;
+}

@@ -1,5 +1,3 @@
-
-
 union Animal {
   Dog(string, double),
   Cat { name: string, weight: double },

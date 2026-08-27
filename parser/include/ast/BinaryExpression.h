@@ -12,7 +12,9 @@
 #include "lexer/Lexer.h"
 
 namespace ast {
-    enum class BinaryOperator { ADD, SUB, MUL, DIV, MOD, POW, AND, OR, LEFT_SHIFT, RIGHT_SHIFT, NOT, UNARY_MINUS, XOR };
+    enum class BinaryOperator {
+        ADD, SUB, MUL, DIV, MOD, POW, AND, OR, LEFT_SHIFT, RIGHT_SHIFT, NOT, UNARY_MINUS, XOR, INC, DEC
+    };
 
     class BinaryExpression final : public OperatorNode {
     private:
@@ -111,5 +113,3 @@ namespace ast {
         }
     };
 } // ast
-
-
