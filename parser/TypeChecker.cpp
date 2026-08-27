@@ -2105,6 +2105,16 @@ namespace types {
                     });
                 }
                 break;
+            case ast::BinaryOperator::INC:
+            case ast::BinaryOperator::DEC:
+                if (node->rhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Binary inc/dec operator requires integer operands, but got '" +
+                        node->rhs()->expressionType().value()->name() + "'."
+                    });
+                }
             case ast::BinaryOperator::XOR:
                 break;
         }

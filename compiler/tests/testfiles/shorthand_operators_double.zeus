@@ -1,0 +1,12 @@
+fn main() : i32 {
+    let mut i = 1.0;
+    i+=4.0;
+    println("i+= ${i}");
+    i-=2.0;
+    println("i-= ${i}");
+    i*=4.0;
+    println("i*= ${i}");
+    i/=2.0;
+    println("i/= ${i}");
+    return 0;
+}

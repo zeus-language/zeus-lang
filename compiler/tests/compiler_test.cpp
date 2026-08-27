@@ -405,7 +405,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "operator_overloading","comparestring","stringinterpolation","global_constants",
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
                              "lambda-infer-expression","interface-single","interface-multiple","simple-union",
-                             "shorthand_operators_int"));
+                             "shorthand_operators_int","shorthand_operators_double"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
@@ -430,6 +430,7 @@ INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                              "arithmetic-divide-string-compound",
                              "arithmetic-divide-string",
                              "arithmetic-division-by-zero",
+                             "arithmetic-inc-double",
                              "arithmetic-incomplete-and",
                              "arithmetic-incomplete-div",
                              "arithmetic-incomplete-lshift",

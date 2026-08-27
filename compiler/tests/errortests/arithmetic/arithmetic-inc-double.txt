@@ -1,0 +1,3 @@
+FILENAME:3:6: error: Binary inc/dec operator requires integer operands, but got 'double'.
+    i++;
+     ^-
