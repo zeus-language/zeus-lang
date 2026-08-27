@@ -10,6 +10,7 @@
 #include "ast/ArrayAssignment.h"
 #include "ast/ArrayInitializer.h"
 #include "ast/ArrayRepeatInitializer.h"
+#include "ast/BinaryAssignmentExpression.h"
 #include "ast/BinaryExpression.h"
 #include "ast/BreakStatement.h"
 #include "ast/Comparisson.h"
@@ -368,6 +369,8 @@ namespace types {
 
     void type_check(ast::DestructureTuple *node, Context &context);
 
+    void type_check_binary_assign(ast::BinaryAssignmentExpression *node, Context &context);
+
 
     void type_check_typedef(ast::TypeDefinition *node, Context &context) {
         auto type = resolveFromRawType(node->getType().get(), context.currentScope, true);
@@ -585,6 +588,9 @@ namespace types {
         if (const auto destructureTuple = dynamic_cast<ast::DestructureTuple *>(node)) {
             return type_check(destructureTuple, context);
         }
+        if (const auto binaryAssign = dynamic_cast<ast::BinaryAssignmentExpression *>(node)) {
+            return type_check_binary_assign(binaryAssign, context);
+        }
 
         DBG_ASSERT(node != nullptr, "Node is null");
 
@@ -648,6 +654,35 @@ namespace types {
             }
         }
     }
+
+    void type_check_binary_assign(ast::BinaryAssignmentExpression *node, Context &context) {
+        const auto lhs = node->lhs().value();
+        type_check_base(lhs, context);
+        type_check_base(node->rhs(), context);
+
+        if (lhs->expressionType() && node->rhs()->expressionType()) {
+            if (lhs->expressionType().value() != node->rhs()->expressionType().value()) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Type mismatch in binary assignment: LHS is of type '" +
+                    lhs->expressionType().value()->name() + "' but RHS is of type '" +
+                    node->rhs()->expressionType().value()->name() + "'."
+                });
+            } else {
+                node->setExpressionType(lhs->expressionType().value());
+            }
+        }
+        // check mutability
+        if (lhs->constant()) {
+            context.messages.insert({
+                parser::OutputType::ERROR,
+                node->expressionToken(),
+                "Cannot assign to constant variable."
+            });
+        }
+    }
+
 
     void type_check(ast::DestructureTuple *node, Context &context) {
         const auto type = context.currentScope->getTypeByName(node->variantName().lexical());
