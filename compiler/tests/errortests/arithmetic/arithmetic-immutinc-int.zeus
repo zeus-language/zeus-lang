@@ -1,0 +1,5 @@
+fn main() : i32 {
+    let i  = 12;
+    i++;
+    return 0;
+}

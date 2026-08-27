@@ -2115,6 +2115,13 @@ namespace types {
                         node->rhs()->expressionType().value()->name() + "'."
                     });
                 }
+                if (node->rhs()->constant()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Cannot apply inc/dec operator to an immutable variable."
+                    });
+                }
             case ast::BinaryOperator::XOR:
                 break;
         }
