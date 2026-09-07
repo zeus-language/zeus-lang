@@ -1697,8 +1697,40 @@ namespace llvm_backend {
             return nullptr;
         }
         size_t arraySize = 0;
+        llvm::Value *endValue;
+
+        auto arrayLLvmType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
+        llvm::Type *arrayElementType;
+
+
+        auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
+
         if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(iterableType.value())) {
             arraySize = arrayType->size();
+            endValue = llvmState.Builder->getInt32(arraySize);
+            arrayElementType = arrayLLvmType->getArrayElementType();
+        } else if (auto sliceType = std::dynamic_pointer_cast<types::SliceType>(iterableType.value())) {
+            const auto dataField = sliceType->field("data");
+            if (const auto arrayDataPtrType = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                arrayElementType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
+                arrayLLvmType = arrayElementType;
+            }
+            const auto sliceLLvmType = resolveLlvmType(sliceType, llvmState);
+            const auto dataLLvmType = resolveLlvmType(dataField->type, llvmState);
+            size_t index = sliceType->getFieldIndexByName("data");
+            arrayAllocation = llvm::getLoadStorePointerOperand(arrayAllocation);
+            auto originalPtr = arrayAllocation;
+
+            arrayAllocation = llvmState.Builder->CreateStructGEP(sliceLLvmType, arrayAllocation, index,
+                                                                 "loop_slice_data_ptr");
+            arrayAllocation = llvmState.Builder->CreateLoad(dataLLvmType,
+                                                            arrayAllocation, "loop_slice_data");
+
+            index = sliceType->getFieldIndexByName("length");
+            endValue = llvmState.Builder->CreateStructGEP(sliceLLvmType, originalPtr, index,
+                                                          "loop_slice_length");
+            endValue = llvmState.Builder->CreateLoad(resolveLlvmType(sliceType->field("length")->type, llvmState),
+                                                     endValue, "loop_slice_length");
         } else {
             assert(false && "Iterable in for loop is not an array");
             return nullptr;
@@ -1707,20 +1739,20 @@ namespace llvm_backend {
         llvm::Value *startValue = llvmState.Builder->getInt32(0);
 
         // load array value
-        const auto arrayType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
-        const auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
 
         if (startValue->getType() != llvmVarType) {
             startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
         } {
             std::vector<llvm::Value *> indices;
-            const auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
-            indices.push_back(zero);
+            if (iterableType.value()->typeKind() == types::TypeKind::ARRAY) {
+                const auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
+                indices.push_back(zero);
+            }
             indices.push_back(Variable);
-            const auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayAllocation, indices,
+            const auto elementPtr = llvmState.Builder->CreateGEP(arrayLLvmType, arrayAllocation, indices,
                                                                  "elem_ptr");
             llvm::Value *loadedValue = llvmState.Builder->CreateLoad(
-                arrayType->getArrayElementType(),
+                arrayElementType,
                 elementPtr,
                 "array_elem");
             if (loadedValue->getType() != llvmVarType) {
@@ -1728,6 +1760,8 @@ namespace llvm_backend {
             }
             if (node->isConstant()) {
                 llvmState.addNamedValue(node->iteratorToken().lexical(), loadedValue);
+            } else {
+                assert(false && "Non-constant iterator variable in for loop is not supported");
             }
         }
 
@@ -1748,7 +1782,6 @@ namespace llvm_backend {
         Variable->addIncoming(startValue, PreheaderBB);
 
         // Compute the end condition.
-        llvm::Value *endValue = llvmState.Builder->getInt32(arraySize);
         if (!endValue) {
             assert(false && "Failed to generate end value for the for loop");
             return nullptr;
@@ -2574,7 +2607,7 @@ namespace llvm_backend {
         if (!functionCall) {
             if (auto functionDefinition = llvmState.findFunction(node->functionName())) {
                 auto functionName = functionDefinition.value()->functionName();
-                auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
+                const auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
                 for (auto &annotation: external) {
                     llvmState.addExternalLibrary(annotation->library());
                     if (annotation->externalName()) {
@@ -2703,6 +2736,31 @@ namespace llvm_backend {
 
                     args.push_back(unionAlloc);
                     continue;
+                } else if (arg->expressionType().value()->typeKind() == types::TypeKind::ARRAY && node->
+                           functionDefinition()) {
+                    const auto funcDef = node->functionDefinition().value();
+                    const auto param = funcDef->getParam(args.size() - (isStructReturn ? 1 : 0));
+                    const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+                    if (param->type.value()->typeKind() == types::TypeKind::SLICE) {
+                        auto sliceType = resolveLlvmType(param->type.value(), llvmState);
+                        auto alloc = llvmState.Builder->CreateAlloca(sliceType, nullptr, "slice_alloca");
+
+                        auto llvmArgType = resolveLlvmType(arg->expressionType().value(), llvmState);
+
+                        const auto indexPointer =
+                                llvmState.Builder->CreateStructGEP(sliceType, alloc, 0, "slice_index");
+                        const auto dataPointer =
+                                llvmState.Builder->CreateStructGEP(sliceType, alloc, 1, "slice_data");
+                        const auto alignment = DL.getPrefTypeAlign(indexPointer->getType());
+
+                        llvmState.Builder->CreateAlignedStore(
+                            llvmState.Builder->getInt64(llvmArgType->getArrayNumElements()), indexPointer, alignment);
+                        llvmState.Builder->CreateAlignedStore(value, dataPointer, alignment);
+
+                        args.push_back(alloc);
+                        continue;
+                    }
                 }
                 args.push_back(value);
             } else {

@@ -327,7 +327,7 @@ namespace types {
 
         [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
 
-        size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
+        [[nodiscard]] size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -343,7 +343,17 @@ namespace types {
     };
 
     class SliceType final : public StructType {
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            if (const auto otherPtrType = dynamic_cast<const ArrayType *>(&other)) {
+                return *this->baseType() == *otherPtrType->baseType();
+            }
+            return StructType::compare(other);
+        }
+
     public:
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const;
+
         explicit SliceType(std::string name, const std::shared_ptr<VariableType> &baseType);
     };
 

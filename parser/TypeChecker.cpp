@@ -1598,6 +1598,12 @@ namespace types {
                                                   node->iteratorToken().lexical(), arrayType->baseType(),
                                                   false
                                               });
+        } else if (const auto sliceType = dynamic_cast<SliceType *>(varType.value().get())) {
+            node->setExpressionType(sliceType->baseType());
+            context.currentScope->addVariable(node->iteratorToken().lexical(), Variable{
+                                                  node->iteratorToken().lexical(), sliceType->baseType(),
+                                                  false
+                                              });
         } else {
             node->setExpressionType(varType.value());
             context.currentScope->addVariable(node->iteratorToken().lexical(), Variable{
