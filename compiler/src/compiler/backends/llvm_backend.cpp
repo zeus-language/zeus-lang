@@ -521,7 +521,8 @@ namespace llvm_backend {
         const auto dataLayout = llvm::DataLayout(context.TheModule.get());
         const auto _struct = llvm::cast<llvm::StructType>(llvmStructType);
         const auto pointerSize = dataLayout.getPointerSize();
-        return _struct->getNumElements() <= 2 || _struct->getScalarSizeInBits() <= pointerSize * 8;
+        return _struct->getNumElements() <= 2 || (
+                   _struct->getScalarSizeInBits() > 0 && _struct->getScalarSizeInBits() <= pointerSize * 8);
     }
 
     llvm::GlobalVariable *getOrCreateGlobalString(const LLVMBackendState &llvmState, const std::string &value,
@@ -1687,7 +1688,9 @@ namespace llvm_backend {
             return nullptr;
         }
 
-        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2);
+        const auto iteratorType = llvmState.Builder->getInt32Ty();
+
+        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(iteratorType, 2);
 
 
         const auto iterableValue = codegen_base(node->range(), llvmState);
@@ -1696,7 +1699,6 @@ namespace llvm_backend {
             assert(false && "Failed to generate iterable value for a for loop");
             return nullptr;
         }
-        size_t arraySize = 0;
         llvm::Value *endValue;
 
         auto arrayLLvmType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
@@ -1706,7 +1708,7 @@ namespace llvm_backend {
         auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
 
         if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(iterableType.value())) {
-            arraySize = arrayType->size();
+            const auto arraySize = arrayType->size();
             endValue = llvmState.Builder->getInt32(arraySize);
             arrayElementType = arrayLLvmType->getArrayElementType();
         } else if (auto sliceType = std::dynamic_pointer_cast<types::SliceType>(iterableType.value())) {
@@ -1740,8 +1742,8 @@ namespace llvm_backend {
 
         // load array value
 
-        if (startValue->getType() != llvmVarType) {
-            startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
+        if (startValue->getType() != iteratorType) {
+            startValue = llvmState.Builder->CreateIntCast(startValue, iteratorType, true, "for_start_cast");
         } {
             std::vector<llvm::Value *> indices;
             if (iterableType.value()->typeKind() == types::TypeKind::ARRAY) {
@@ -1755,9 +1757,7 @@ namespace llvm_backend {
                 arrayElementType,
                 elementPtr,
                 "array_elem");
-            if (loadedValue->getType() != llvmVarType) {
-                loadedValue = llvmState.Builder->CreateIntCast(loadedValue, llvmVarType, true, "for_elem_cast");
-            }
+
             if (node->isConstant()) {
                 llvmState.addNamedValue(node->iteratorToken().lexical(), loadedValue);
             } else {
@@ -1772,11 +1772,11 @@ namespace llvm_backend {
         llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
         llvmState.Builder->SetInsertPoint(LoopBB);
-        codegen_base(node->block(), llvmState);
+        codegen(node->block(), llvmState);
         llvmState.currentBreakBlock.currentLoop = oldCurrentLoop;
         llvmState.currentBreakBlock.afterLoop = oldAfterLoop;
         // Step: increment the loop variable.
-        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
+        const auto stepValue = llvm::ConstantInt::get(iteratorType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
 
         Variable->addIncoming(startValue, PreheaderBB);
@@ -1786,8 +1786,8 @@ namespace llvm_backend {
             assert(false && "Failed to generate end value for the for loop");
             return nullptr;
         }
-        if (endValue->getType() != llvmVarType) {
-            endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
+        if (endValue->getType() != iteratorType) {
+            endValue = llvmState.Builder->CreateIntCast(endValue, iteratorType, true, "for_end_cast");
         }
         llvm::Value *endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
 
@@ -3555,8 +3555,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     llvm::outs() << "Wrote " << objectFileName.string() << "\n";
 
     std::vector<std::string> flags;
+    bool dynamicLinking = true;
     for (const auto &lib: context.linkerFlags) {
         flags.push_back("-l" + lib);
+        if (lib != "c" && lib != "m" && lib != "pthread") {
+            dynamicLinking = false;
+        }
     }
 
 
@@ -3575,10 +3579,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         flags.push_back("-L" + libDir.string());
     }
 
-    if (options.fuseLd) {
-        flags.push_back("-fuse-ld=" + *options.fuseLd);
-    } else if (auto linker = detect_linker()) {
-        flags.push_back("-fuse-ld=" + *linker);
+    if (dynamicLinking) {
+        if (options.fuseLd) {
+            flags.push_back("-fuse-ld=" + *options.fuseLd);
+        } else if (auto linker = detect_linker()) {
+            flags.push_back("-fuse-ld=" + *linker);
+        }
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {

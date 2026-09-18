@@ -242,7 +242,7 @@ types::SliceType::SliceType(std::string name, const std::shared_ptr<VariableType
     std::move(name),
     {
         {
-            .type = std::make_shared<types::IntegerType>("u64", 8, false),
+            .type = std::make_shared<types::IntegerType>("i32", 4, false),
             .name = "length"
         },
         {

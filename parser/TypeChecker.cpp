@@ -2919,6 +2919,15 @@ namespace types {
         }
 
         for (auto &arg: node->args()) {
+            if (!arg.rawType) {
+                context.messages.insert({
+                    parser::OutputType::ERROR,
+                    node->expressionToken(),
+                    "Argument '" + arg.name.lexical() + "' in extern function '" + node->functionName() +
+                    "' must have a type."
+                });
+                continue;
+            }
             arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
             if (!arg.type) {
                 context.messages.insert({

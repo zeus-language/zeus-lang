@@ -1,0 +1,830 @@
+struct Vector2 {
+	x : float,
+	y : float,
+}
+struct Vector3 {
+	x : float,
+	y : float,
+	z : float,
+}
+struct Vector4 {
+	x : float,
+	y : float,
+	z : float,
+	w : float,
+}
+type Quaternion = Vector4;
+struct Matrix {
+	m0 : float,
+	m4 : float,
+	m8 : float,
+	m12 : float,
+	m1 : float,
+	m5 : float,
+	m9 : float,
+	m13 : float,
+	m2 : float,
+	m6 : float,
+	m10 : float,
+	m14 : float,
+	m3 : float,
+	m7 : float,
+	m11 : float,
+	m15 : float,
+}
+struct Color {
+	r : u8,
+	g : u8,
+	b : u8,
+	a : u8,
+}
+struct Rectangle {
+	x : float,
+	y : float,
+	width : float,
+	height : float,
+}
+struct Image {
+	data : * void,
+	width : i32,
+	height : i32,
+	mipmaps : i32,
+	format : i32,
+}
+struct Texture {
+	id : u32,
+	width : i32,
+	height : i32,
+	mipmaps : i32,
+	format : i32,
+}
+type Texture2D = Texture;
+type TextureCubemap = Texture;
+struct RenderTexture {
+	id : u32,
+	texture : Texture,
+	depth : Texture,
+}
+type RenderTexture2D = RenderTexture;
+struct NPatchInfo {
+	source : Rectangle,
+	left : i32,
+	top : i32,
+	right : i32,
+	bottom : i32,
+	layout : i32,
+}
+struct GlyphInfo {
+	value : i32,
+	offsetX : i32,
+	offsetY : i32,
+	advanceX : i32,
+	image : Image,
+}
+struct Font {
+	baseSize : i32,
+	glyphCount : i32,
+	glyphPadding : i32,
+	texture : Texture2D,
+	recs : * Rectangle,
+	glyphs : * GlyphInfo,
+}
+struct Camera3D {
+	position : Vector3,
+	target : Vector3,
+	up : Vector3,
+	fovy : float,
+	projection : i32,
+}
+type Camera = Camera3D;
+struct Camera2D {
+	offset : Vector2,
+	target : Vector2,
+	rotation : float,
+	zoom : float,
+}
+struct Mesh {
+	vertexCount : i32,
+	triangleCount : i32,
+	vertices : * float,
+	texcoords : * float,
+	texcoords2 : * float,
+	normals : * float,
+	tangents : * float,
+	colors : * u8,
+	indices : * u16,
+	animVertices : * float,
+	animNormals : * float,
+	boneIds : * u8,
+	boneWeights : * float,
+	boneMatrices : * Matrix,
+	boneCount : i32,
+	vaoId : u32,
+	vboId : * u32,
+}
+struct Shader {
+	id : u32,
+	locs : * i32,
+}
+struct MaterialMap {
+	texture : Texture2D,
+	color : Color,
+	value : float,
+}
+struct Material {
+	shader : Shader,
+	maps : * MaterialMap,
+	params : [float;4],
+}
+struct Transform {
+	translation : Vector3,
+	rotation : Quaternion,
+	scale : Vector3,
+}
+struct BoneInfo {
+	name : [u8;32],
+	parent : i32,
+}
+struct Model {
+	transform : Matrix,
+	meshCount : i32,
+	materialCount : i32,
+	meshes : * Mesh,
+	materials : * Material,
+	meshMaterial : * i32,
+	boneCount : i32,
+	bones : * BoneInfo,
+	bindPose : * Transform,
+}
+struct ModelAnimation {
+	boneCount : i32,
+	frameCount : i32,
+	bones : * BoneInfo,
+	framePoses : * * Transform,
+	name : [u8;32],
+}
+struct Ray {
+	position : Vector3,
+	direction : Vector3,
+}
+struct RayCollision {
+	hit : bool,
+	distance : float,
+	point : Vector3,
+	normal : Vector3,
+}
+struct BoundingBox {
+	min : Vector3,
+	max : Vector3,
+}
+struct Wave {
+	frameCount : u32,
+	sampleRate : u32,
+	sampleSize : u32,
+	channels : u32,
+	data : * void,
+}
+struct rAudioBuffer {
+}
+struct rAudioProcessor {
+}
+struct AudioStream {
+	buffer : * rAudioBuffer,
+	processor : * rAudioProcessor,
+	sampleRate : u32,
+	sampleSize : u32,
+	channels : u32,
+}
+struct Sound {
+	stream : AudioStream,
+	frameCount : u32,
+}
+struct Music {
+	stream : AudioStream,
+	frameCount : u32,
+	looping : bool,
+	ctxType : i32,
+	ctxData : * void,
+}
+struct VrDeviceInfo {
+	hResolution : i32,
+	vResolution : i32,
+	hScreenSize : float,
+	vScreenSize : float,
+	eyeToScreenDistance : float,
+	lensSeparationDistance : float,
+	interpupillaryDistance : float,
+	lensDistortionValues : [float;4],
+	chromaAbCorrection : [float;4],
+}
+struct VrStereoConfig {
+	projection : [Matrix;2],
+	viewOffset : [Matrix;2],
+	leftLensCenter : [float;2],
+	rightLensCenter : [float;2],
+	leftScreenCenter : [float;2],
+	rightScreenCenter : [float;2],
+	scale : [float;2],
+	scaleIn : [float;2],
+}
+struct FilePathList {
+	capacity : u32,
+	count : u32,
+	paths : * * u8,
+}
+struct AutomationEvent {
+	frame : u32,
+	_type : u32,
+	params : [i32;4],
+}
+struct AutomationEventList {
+	capacity : u32,
+	count : u32,
+	events : * AutomationEvent,
+}
+type LoadFileDataCallback = fn(* u8,* i32) : * u8;
+type SaveFileDataCallback = fn(* u8,* void,i32) : bool;
+type LoadFileTextCallback = fn(* u8) : * u8;
+type SaveFileTextCallback = fn(* u8,* u8) : bool;
+@extern(libname = "raylib")
+extern pub fn InitWindow(width : i32,height : i32,title : * u8) : void;
+extern pub fn CloseWindow() : void;
+extern pub fn WindowShouldClose() : bool;
+extern pub fn IsWindowReady() : bool;
+extern pub fn IsWindowFullscreen() : bool;
+extern pub fn IsWindowHidden() : bool;
+extern pub fn IsWindowMinimized() : bool;
+extern pub fn IsWindowMaximized() : bool;
+extern pub fn IsWindowFocused() : bool;
+extern pub fn IsWindowResized() : bool;
+extern pub fn IsWindowState(flag : u32) : bool;
+extern pub fn SetWindowState(flags : u32) : void;
+extern pub fn ClearWindowState(flags : u32) : void;
+extern pub fn ToggleFullscreen() : void;
+extern pub fn ToggleBorderlessWindowed() : void;
+extern pub fn MaximizeWindow() : void;
+extern pub fn MinimizeWindow() : void;
+extern pub fn RestoreWindow() : void;
+extern pub fn SetWindowIcon(image : Image) : void;
+extern pub fn SetWindowIcons(images : * Image,count : i32) : void;
+extern pub fn SetWindowTitle(title : * u8) : void;
+extern pub fn SetWindowPosition(x : i32,y : i32) : void;
+extern pub fn SetWindowMonitor(monitor : i32) : void;
+extern pub fn SetWindowMinSize(width : i32,height : i32) : void;
+extern pub fn SetWindowMaxSize(width : i32,height : i32) : void;
+extern pub fn SetWindowSize(width : i32,height : i32) : void;
+extern pub fn SetWindowOpacity(opacity : float) : void;
+extern pub fn SetWindowFocused() : void;
+extern pub fn GetWindowHandle() : * void;
+extern pub fn GetScreenWidth() : i32;
+extern pub fn GetScreenHeight() : i32;
+extern pub fn GetRenderWidth() : i32;
+extern pub fn GetRenderHeight() : i32;
+extern pub fn GetMonitorCount() : i32;
+extern pub fn GetCurrentMonitor() : i32;
+extern pub fn GetMonitorPosition(monitor : i32) : Vector2;
+extern pub fn GetMonitorWidth(monitor : i32) : i32;
+extern pub fn GetMonitorHeight(monitor : i32) : i32;
+extern pub fn GetMonitorPhysicalWidth(monitor : i32) : i32;
+extern pub fn GetMonitorPhysicalHeight(monitor : i32) : i32;
+extern pub fn GetMonitorRefreshRate(monitor : i32) : i32;
+extern pub fn GetWindowPosition() : Vector2;
+extern pub fn GetWindowScaleDPI() : Vector2;
+extern pub fn GetMonitorName(monitor : i32) : * u8;
+extern pub fn SetClipboardText(text : * u8) : void;
+extern pub fn GetClipboardText() : * u8;
+extern pub fn GetClipboardImage() : Image;
+extern pub fn EnableEventWaiting() : void;
+extern pub fn DisableEventWaiting() : void;
+extern pub fn ShowCursor() : void;
+extern pub fn HideCursor() : void;
+extern pub fn IsCursorHidden() : bool;
+extern pub fn EnableCursor() : void;
+extern pub fn DisableCursor() : void;
+extern pub fn IsCursorOnScreen() : bool;
+extern pub fn ClearBackground(color : Color) : void;
+extern pub fn BeginDrawing() : void;
+extern pub fn EndDrawing() : void;
+extern pub fn BeginMode2D(camera : Camera2D) : void;
+extern pub fn EndMode2D() : void;
+extern pub fn BeginMode3D(camera : Camera3D) : void;
+extern pub fn EndMode3D() : void;
+extern pub fn BeginTextureMode(target : RenderTexture2D) : void;
+extern pub fn EndTextureMode() : void;
+extern pub fn BeginShaderMode(shader : Shader) : void;
+extern pub fn EndShaderMode() : void;
+extern pub fn BeginBlendMode(mode : i32) : void;
+extern pub fn EndBlendMode() : void;
+extern pub fn BeginScissorMode(x : i32,y : i32,width : i32,height : i32) : void;
+extern pub fn EndScissorMode() : void;
+extern pub fn BeginVrStereoMode(config : VrStereoConfig) : void;
+extern pub fn EndVrStereoMode() : void;
+extern pub fn LoadVrStereoConfig(device : VrDeviceInfo) : VrStereoConfig;
+extern pub fn UnloadVrStereoConfig(config : VrStereoConfig) : void;
+extern pub fn LoadShader(vsFileName : * u8,fsFileName : * u8) : Shader;
+extern pub fn LoadShaderFromMemory(vsCode : * u8,fsCode : * u8) : Shader;
+extern pub fn IsShaderValid(shader : Shader) : bool;
+extern pub fn GetShaderLocation(shader : Shader,uniformName : * u8) : i32;
+extern pub fn GetShaderLocationAttrib(shader : Shader,attribName : * u8) : i32;
+extern pub fn SetShaderValue(shader : Shader,locIndex : i32,value : * void,uniformType : i32) : void;
+extern pub fn SetShaderValueV(shader : Shader,locIndex : i32,value : * void,uniformType : i32,count : i32) : void;
+extern pub fn SetShaderValueMatrix(shader : Shader,locIndex : i32,mat : Matrix) : void;
+extern pub fn SetShaderValueTexture(shader : Shader,locIndex : i32,texture : Texture2D) : void;
+extern pub fn UnloadShader(shader : Shader) : void;
+extern pub fn GetScreenToWorldRay(position : Vector2,camera : Camera) : Ray;
+extern pub fn GetScreenToWorldRayEx(position : Vector2,camera : Camera,width : i32,height : i32) : Ray;
+extern pub fn GetWorldToScreen(position : Vector3,camera : Camera) : Vector2;
+extern pub fn GetWorldToScreenEx(position : Vector3,camera : Camera,width : i32,height : i32) : Vector2;
+extern pub fn GetWorldToScreen2D(position : Vector2,camera : Camera2D) : Vector2;
+extern pub fn GetScreenToWorld2D(position : Vector2,camera : Camera2D) : Vector2;
+extern pub fn GetCameraMatrix(camera : Camera) : Matrix;
+extern pub fn GetCameraMatrix2D(camera : Camera2D) : Matrix;
+extern pub fn SetTargetFPS(fps : i32) : void;
+extern pub fn GetFrameTime() : float;
+extern pub fn GetTime() : double;
+extern pub fn GetFPS() : i32;
+extern pub fn SwapScreenBuffer() : void;
+extern pub fn PollInputEvents() : void;
+extern pub fn WaitTime(seconds : double) : void;
+extern pub fn SetRandomSeed(seed : u32) : void;
+extern pub fn GetRandomValue(min : i32,max : i32) : i32;
+extern pub fn LoadRandomSequence(count : u32,min : i32,max : i32) : * i32;
+extern pub fn UnloadRandomSequence(sequence : * i32) : void;
+extern pub fn TakeScreenshot(fileName : * u8) : void;
+extern pub fn SetConfigFlags(flags : u32) : void;
+extern pub fn OpenURL(url : * u8) : void;
+extern pub fn TraceLog(logLevel : i32,text : * u8) : void;
+extern pub fn SetTraceLogLevel(logLevel : i32) : void;
+extern pub fn MemAlloc(size : u32) : * void;
+extern pub fn MemRealloc(ptr : * void,size : u32) : * void;
+extern pub fn MemFree(ptr : * void) : void;
+extern pub fn SetLoadFileDataCallback(callback : LoadFileDataCallback) : void;
+extern pub fn SetSaveFileDataCallback(callback : SaveFileDataCallback) : void;
+extern pub fn SetLoadFileTextCallback(callback : LoadFileTextCallback) : void;
+extern pub fn SetSaveFileTextCallback(callback : SaveFileTextCallback) : void;
+extern pub fn LoadFileData(fileName : * u8,dataSize : * i32) : * u8;
+extern pub fn UnloadFileData(data : * u8) : void;
+extern pub fn SaveFileData(fileName : * u8,data : * void,dataSize : i32) : bool;
+extern pub fn ExportDataAsCode(data : * u8,dataSize : i32,fileName : * u8) : bool;
+extern pub fn LoadFileText(fileName : * u8) : * u8;
+extern pub fn UnloadFileText(text : * u8) : void;
+extern pub fn SaveFileText(fileName : * u8,text : * u8) : bool;
+extern pub fn FileExists(fileName : * u8) : bool;
+extern pub fn DirectoryExists(dirPath : * u8) : bool;
+extern pub fn IsFileExtension(fileName : * u8,ext : * u8) : bool;
+extern pub fn GetFileLength(fileName : * u8) : i32;
+extern pub fn GetFileExtension(fileName : * u8) : * u8;
+extern pub fn GetFileName(filePath : * u8) : * u8;
+extern pub fn GetFileNameWithoutExt(filePath : * u8) : * u8;
+extern pub fn GetDirectoryPath(filePath : * u8) : * u8;
+extern pub fn GetPrevDirectoryPath(dirPath : * u8) : * u8;
+extern pub fn GetWorkingDirectory() : * u8;
+extern pub fn GetApplicationDirectory() : * u8;
+extern pub fn MakeDirectory(dirPath : * u8) : i32;
+extern pub fn ChangeDirectory(dir : * u8) : bool;
+extern pub fn IsPathFile(path : * u8) : bool;
+extern pub fn IsFileNameValid(fileName : * u8) : bool;
+extern pub fn LoadDirectoryFiles(dirPath : * u8) : FilePathList;
+extern pub fn LoadDirectoryFilesEx(basePath : * u8,filter : * u8,scanSubdirs : bool) : FilePathList;
+extern pub fn UnloadDirectoryFiles(files : FilePathList) : void;
+extern pub fn IsFileDropped() : bool;
+extern pub fn LoadDroppedFiles() : FilePathList;
+extern pub fn UnloadDroppedFiles(files : FilePathList) : void;
+extern pub fn GetFileModTime(fileName : * u8) : i64;
+extern pub fn CompressData(data : * u8,dataSize : i32,compDataSize : * i32) : * u8;
+extern pub fn DecompressData(compData : * u8,compDataSize : i32,dataSize : * i32) : * u8;
+extern pub fn EncodeDataBase64(data : * u8,dataSize : i32,outputSize : * i32) : * u8;
+extern pub fn DecodeDataBase64(data : * u8,outputSize : * i32) : * u8;
+extern pub fn ComputeCRC32(data : * u8,dataSize : i32) : u32;
+extern pub fn ComputeMD5(data : * u8,dataSize : i32) : * u32;
+extern pub fn ComputeSHA1(data : * u8,dataSize : i32) : * u32;
+extern pub fn LoadAutomationEventList(fileName : * u8) : AutomationEventList;
+extern pub fn UnloadAutomationEventList(list : AutomationEventList) : void;
+extern pub fn ExportAutomationEventList(list : AutomationEventList,fileName : * u8) : bool;
+extern pub fn SetAutomationEventList(list : * AutomationEventList) : void;
+extern pub fn SetAutomationEventBaseFrame(frame : i32) : void;
+extern pub fn StartAutomationEventRecording() : void;
+extern pub fn StopAutomationEventRecording() : void;
+extern pub fn PlayAutomationEvent(event : AutomationEvent) : void;
+extern pub fn IsKeyPressed(key : i32) : bool;
+extern pub fn IsKeyPressedRepeat(key : i32) : bool;
+extern pub fn IsKeyDown(key : i32) : bool;
+extern pub fn IsKeyReleased(key : i32) : bool;
+extern pub fn IsKeyUp(key : i32) : bool;
+extern pub fn GetKeyPressed() : i32;
+extern pub fn GetCharPressed() : i32;
+extern pub fn SetExitKey(key : i32) : void;
+extern pub fn IsGamepadAvailable(gamepad : i32) : bool;
+extern pub fn GetGamepadName(gamepad : i32) : * u8;
+extern pub fn IsGamepadButtonPressed(gamepad : i32,button : i32) : bool;
+extern pub fn IsGamepadButtonDown(gamepad : i32,button : i32) : bool;
+extern pub fn IsGamepadButtonReleased(gamepad : i32,button : i32) : bool;
+extern pub fn IsGamepadButtonUp(gamepad : i32,button : i32) : bool;
+extern pub fn GetGamepadButtonPressed() : i32;
+extern pub fn GetGamepadAxisCount(gamepad : i32) : i32;
+extern pub fn GetGamepadAxisMovement(gamepad : i32,axis : i32) : float;
+extern pub fn SetGamepadMappings(mappings : * u8) : i32;
+extern pub fn SetGamepadVibration(gamepad : i32,leftMotor : float,rightMotor : float,duration : float) : void;
+extern pub fn IsMouseButtonPressed(button : i32) : bool;
+extern pub fn IsMouseButtonDown(button : i32) : bool;
+extern pub fn IsMouseButtonReleased(button : i32) : bool;
+extern pub fn IsMouseButtonUp(button : i32) : bool;
+extern pub fn GetMouseX() : i32;
+extern pub fn GetMouseY() : i32;
+extern pub fn GetMousePosition() : Vector2;
+extern pub fn GetMouseDelta() : Vector2;
+extern pub fn SetMousePosition(x : i32,y : i32) : void;
+extern pub fn SetMouseOffset(offsetX : i32,offsetY : i32) : void;
+extern pub fn SetMouseScale(scaleX : float,scaleY : float) : void;
+extern pub fn GetMouseWheelMove() : float;
+extern pub fn GetMouseWheelMoveV() : Vector2;
+extern pub fn SetMouseCursor(cursor : i32) : void;
+extern pub fn GetTouchX() : i32;
+extern pub fn GetTouchY() : i32;
+extern pub fn GetTouchPosition(index : i32) : Vector2;
+extern pub fn GetTouchPointId(index : i32) : i32;
+extern pub fn GetTouchPointCount() : i32;
+extern pub fn SetGesturesEnabled(flags : u32) : void;
+extern pub fn IsGestureDetected(gesture : u32) : bool;
+extern pub fn GetGestureDetected() : i32;
+extern pub fn GetGestureHoldDuration() : float;
+extern pub fn GetGestureDragVector() : Vector2;
+extern pub fn GetGestureDragAngle() : float;
+extern pub fn GetGesturePinchVector() : Vector2;
+extern pub fn GetGesturePinchAngle() : float;
+extern pub fn UpdateCamera(camera : * Camera,mode : i32) : void;
+extern pub fn UpdateCameraPro(camera : * Camera,movement : Vector3,rotation : Vector3,zoom : float) : void;
+extern pub fn SetShapesTexture(texture : Texture2D,source : Rectangle) : void;
+extern pub fn GetShapesTexture() : Texture2D;
+extern pub fn GetShapesTextureRectangle() : Rectangle;
+extern pub fn DrawPixel(posX : i32,posY : i32,color : Color) : void;
+extern pub fn DrawPixelV(position : Vector2,color : Color) : void;
+extern pub fn DrawLine(startPosX : i32,startPosY : i32,endPosX : i32,endPosY : i32,color : Color) : void;
+extern pub fn DrawLineV(startPos : Vector2,endPos : Vector2,color : Color) : void;
+extern pub fn DrawLineEx(startPos : Vector2,endPos : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawLineStrip(points : * Vector2,pointCount : i32,color : Color) : void;
+extern pub fn DrawLineBezier(startPos : Vector2,endPos : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawCircle(centerX : i32,centerY : i32,radius : float,color : Color) : void;
+extern pub fn DrawCircleSector(center : Vector2,radius : float,startAngle : float,endAngle : float,segments : i32,color : Color) : void;
+extern pub fn DrawCircleSectorLines(center : Vector2,radius : float,startAngle : float,endAngle : float,segments : i32,color : Color) : void;
+extern pub fn DrawCircleGradient(centerX : i32,centerY : i32,radius : float,inner : Color,outer : Color) : void;
+extern pub fn DrawCircleV(center : Vector2,radius : float,color : Color) : void;
+extern pub fn DrawCircleLines(centerX : i32,centerY : i32,radius : float,color : Color) : void;
+extern pub fn DrawCircleLinesV(center : Vector2,radius : float,color : Color) : void;
+extern pub fn DrawEllipse(centerX : i32,centerY : i32,radiusH : float,radiusV : float,color : Color) : void;
+extern pub fn DrawEllipseLines(centerX : i32,centerY : i32,radiusH : float,radiusV : float,color : Color) : void;
+extern pub fn DrawRing(center : Vector2,innerRadius : float,outerRadius : float,startAngle : float,endAngle : float,segments : i32,color : Color) : void;
+extern pub fn DrawRingLines(center : Vector2,innerRadius : float,outerRadius : float,startAngle : float,endAngle : float,segments : i32,color : Color) : void;
+extern pub fn DrawRectangle(posX : i32,posY : i32,width : i32,height : i32,color : Color) : void;
+extern pub fn DrawRectangleV(position : Vector2,size : Vector2,color : Color) : void;
+extern pub fn DrawRectangleRec(rec : Rectangle,color : Color) : void;
+extern pub fn DrawRectanglePro(rec : Rectangle,origin : Vector2,rotation : float,color : Color) : void;
+extern pub fn DrawRectangleGradientV(posX : i32,posY : i32,width : i32,height : i32,top : Color,bottom : Color) : void;
+extern pub fn DrawRectangleGradientH(posX : i32,posY : i32,width : i32,height : i32,left : Color,right : Color) : void;
+extern pub fn DrawRectangleGradientEx(rec : Rectangle,topLeft : Color,bottomLeft : Color,topRight : Color,bottomRight : Color) : void;
+extern pub fn DrawRectangleLines(posX : i32,posY : i32,width : i32,height : i32,color : Color) : void;
+extern pub fn DrawRectangleLinesEx(rec : Rectangle,lineThick : float,color : Color) : void;
+extern pub fn DrawRectangleRounded(rec : Rectangle,roundness : float,segments : i32,color : Color) : void;
+extern pub fn DrawRectangleRoundedLines(rec : Rectangle,roundness : float,segments : i32,color : Color) : void;
+extern pub fn DrawRectangleRoundedLinesEx(rec : Rectangle,roundness : float,segments : i32,lineThick : float,color : Color) : void;
+extern pub fn DrawTriangle(v1 : Vector2,v2 : Vector2,v3 : Vector2,color : Color) : void;
+extern pub fn DrawTriangleLines(v1 : Vector2,v2 : Vector2,v3 : Vector2,color : Color) : void;
+extern pub fn DrawTriangleFan(points : * Vector2,pointCount : i32,color : Color) : void;
+extern pub fn DrawTriangleStrip(points : * Vector2,pointCount : i32,color : Color) : void;
+extern pub fn DrawPoly(center : Vector2,sides : i32,radius : float,rotation : float,color : Color) : void;
+extern pub fn DrawPolyLines(center : Vector2,sides : i32,radius : float,rotation : float,color : Color) : void;
+extern pub fn DrawPolyLinesEx(center : Vector2,sides : i32,radius : float,rotation : float,lineThick : float,color : Color) : void;
+extern pub fn DrawSplineLinear(points : * Vector2,pointCount : i32,thick : float,color : Color) : void;
+extern pub fn DrawSplineBasis(points : * Vector2,pointCount : i32,thick : float,color : Color) : void;
+extern pub fn DrawSplineCatmullRom(points : * Vector2,pointCount : i32,thick : float,color : Color) : void;
+extern pub fn DrawSplineBezierQuadratic(points : * Vector2,pointCount : i32,thick : float,color : Color) : void;
+extern pub fn DrawSplineBezierCubic(points : * Vector2,pointCount : i32,thick : float,color : Color) : void;
+extern pub fn DrawSplineSegmentLinear(p1 : Vector2,p2 : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawSplineSegmentBasis(p1 : Vector2,p2 : Vector2,p3 : Vector2,p4 : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawSplineSegmentCatmullRom(p1 : Vector2,p2 : Vector2,p3 : Vector2,p4 : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawSplineSegmentBezierQuadratic(p1 : Vector2,c2 : Vector2,p3 : Vector2,thick : float,color : Color) : void;
+extern pub fn DrawSplineSegmentBezierCubic(p1 : Vector2,c2 : Vector2,c3 : Vector2,p4 : Vector2,thick : float,color : Color) : void;
+extern pub fn GetSplinePointLinear(startPos : Vector2,endPos : Vector2,t : float) : Vector2;
+extern pub fn GetSplinePointBasis(p1 : Vector2,p2 : Vector2,p3 : Vector2,p4 : Vector2,t : float) : Vector2;
+extern pub fn GetSplinePointCatmullRom(p1 : Vector2,p2 : Vector2,p3 : Vector2,p4 : Vector2,t : float) : Vector2;
+extern pub fn GetSplinePointBezierQuad(p1 : Vector2,c2 : Vector2,p3 : Vector2,t : float) : Vector2;
+extern pub fn GetSplinePointBezierCubic(p1 : Vector2,c2 : Vector2,c3 : Vector2,p4 : Vector2,t : float) : Vector2;
+extern pub fn CheckCollisionRecs(rec1 : Rectangle,rec2 : Rectangle) : bool;
+extern pub fn CheckCollisionCircles(center1 : Vector2,radius1 : float,center2 : Vector2,radius2 : float) : bool;
+extern pub fn CheckCollisionCircleRec(center : Vector2,radius : float,rec : Rectangle) : bool;
+extern pub fn CheckCollisionCircleLine(center : Vector2,radius : float,p1 : Vector2,p2 : Vector2) : bool;
+extern pub fn CheckCollisionPointRec(point : Vector2,rec : Rectangle) : bool;
+extern pub fn CheckCollisionPointCircle(point : Vector2,center : Vector2,radius : float) : bool;
+extern pub fn CheckCollisionPointTriangle(point : Vector2,p1 : Vector2,p2 : Vector2,p3 : Vector2) : bool;
+extern pub fn CheckCollisionPointLine(point : Vector2,p1 : Vector2,p2 : Vector2,threshold : i32) : bool;
+extern pub fn CheckCollisionPointPoly(point : Vector2,points : * Vector2,pointCount : i32) : bool;
+extern pub fn CheckCollisionLines(startPos1 : Vector2,endPos1 : Vector2,startPos2 : Vector2,endPos2 : Vector2,collisionPoint : * Vector2) : bool;
+extern pub fn GetCollisionRec(rec1 : Rectangle,rec2 : Rectangle) : Rectangle;
+extern pub fn LoadImage(fileName : * u8) : Image;
+extern pub fn LoadImageRaw(fileName : * u8,width : i32,height : i32,format : i32,headerSize : i32) : Image;
+extern pub fn LoadImageAnim(fileName : * u8,frames : * i32) : Image;
+extern pub fn LoadImageAnimFromMemory(fileType : * u8,fileData : * u8,dataSize : i32,frames : * i32) : Image;
+extern pub fn LoadImageFromMemory(fileType : * u8,fileData : * u8,dataSize : i32) : Image;
+extern pub fn LoadImageFromTexture(texture : Texture2D) : Image;
+extern pub fn LoadImageFromScreen() : Image;
+extern pub fn IsImageValid(image : Image) : bool;
+extern pub fn UnloadImage(image : Image) : void;
+extern pub fn ExportImage(image : Image,fileName : * u8) : bool;
+extern pub fn ExportImageToMemory(image : Image,fileType : * u8,fileSize : * i32) : * u8;
+extern pub fn ExportImageAsCode(image : Image,fileName : * u8) : bool;
+extern pub fn GenImageColor(width : i32,height : i32,color : Color) : Image;
+extern pub fn GenImageGradientLinear(width : i32,height : i32,direction : i32,start : Color,end : Color) : Image;
+extern pub fn GenImageGradientRadial(width : i32,height : i32,density : float,inner : Color,outer : Color) : Image;
+extern pub fn GenImageGradientSquare(width : i32,height : i32,density : float,inner : Color,outer : Color) : Image;
+extern pub fn GenImageChecked(width : i32,height : i32,checksX : i32,checksY : i32,col1 : Color,col2 : Color) : Image;
+extern pub fn GenImageWhiteNoise(width : i32,height : i32,factor : float) : Image;
+extern pub fn GenImagePerlinNoise(width : i32,height : i32,offsetX : i32,offsetY : i32,scale : float) : Image;
+extern pub fn GenImageCellular(width : i32,height : i32,tileSize : i32) : Image;
+extern pub fn GenImageText(width : i32,height : i32,text : * u8) : Image;
+extern pub fn ImageCopy(image : Image) : Image;
+extern pub fn ImageFromImage(image : Image,rec : Rectangle) : Image;
+extern pub fn ImageFromChannel(image : Image,selectedChannel : i32) : Image;
+extern pub fn ImageText(text : * u8,fontSize : i32,color : Color) : Image;
+extern pub fn ImageTextEx(font : Font,text : * u8,fontSize : float,spacing : float,tint : Color) : Image;
+extern pub fn ImageFormat(image : * Image,newFormat : i32) : void;
+extern pub fn ImageToPOT(image : * Image,fill : Color) : void;
+extern pub fn ImageCrop(image : * Image,crop : Rectangle) : void;
+extern pub fn ImageAlphaCrop(image : * Image,threshold : float) : void;
+extern pub fn ImageAlphaClear(image : * Image,color : Color,threshold : float) : void;
+extern pub fn ImageAlphaMask(image : * Image,alphaMask : Image) : void;
+extern pub fn ImageAlphaPremultiply(image : * Image) : void;
+extern pub fn ImageBlurGaussian(image : * Image,blurSize : i32) : void;
+extern pub fn ImageKernelConvolution(image : * Image,kernel : * float,kernelSize : i32) : void;
+extern pub fn ImageResize(image : * Image,newWidth : i32,newHeight : i32) : void;
+extern pub fn ImageResizeNN(image : * Image,newWidth : i32,newHeight : i32) : void;
+extern pub fn ImageResizeCanvas(image : * Image,newWidth : i32,newHeight : i32,offsetX : i32,offsetY : i32,fill : Color) : void;
+extern pub fn ImageMipmaps(image : * Image) : void;
+extern pub fn ImageDither(image : * Image,rBpp : i32,gBpp : i32,bBpp : i32,aBpp : i32) : void;
+extern pub fn ImageFlipVertical(image : * Image) : void;
+extern pub fn ImageFlipHorizontal(image : * Image) : void;
+extern pub fn ImageRotate(image : * Image,degrees : i32) : void;
+extern pub fn ImageRotateCW(image : * Image) : void;
+extern pub fn ImageRotateCCW(image : * Image) : void;
+extern pub fn ImageColorTint(image : * Image,color : Color) : void;
+extern pub fn ImageColorInvert(image : * Image) : void;
+extern pub fn ImageColorGrayscale(image : * Image) : void;
+extern pub fn ImageColorContrast(image : * Image,contrast : float) : void;
+extern pub fn ImageColorBrightness(image : * Image,brightness : i32) : void;
+extern pub fn ImageColorReplace(image : * Image,color : Color,replace : Color) : void;
+extern pub fn LoadImageColors(image : Image) : * Color;
+extern pub fn LoadImagePalette(image : Image,maxPaletteSize : i32,colorCount : * i32) : * Color;
+extern pub fn UnloadImageColors(colors : * Color) : void;
+extern pub fn UnloadImagePalette(colors : * Color) : void;
+extern pub fn GetImageAlphaBorder(image : Image,threshold : float) : Rectangle;
+extern pub fn GetImageColor(image : Image,x : i32,y : i32) : Color;
+extern pub fn ImageClearBackground(dst : * Image,color : Color) : void;
+extern pub fn ImageDrawPixel(dst : * Image,posX : i32,posY : i32,color : Color) : void;
+extern pub fn ImageDrawPixelV(dst : * Image,position : Vector2,color : Color) : void;
+extern pub fn ImageDrawLine(dst : * Image,startPosX : i32,startPosY : i32,endPosX : i32,endPosY : i32,color : Color) : void;
+extern pub fn ImageDrawLineV(dst : * Image,start : Vector2,end : Vector2,color : Color) : void;
+extern pub fn ImageDrawLineEx(dst : * Image,start : Vector2,end : Vector2,thick : i32,color : Color) : void;
+extern pub fn ImageDrawCircle(dst : * Image,centerX : i32,centerY : i32,radius : i32,color : Color) : void;
+extern pub fn ImageDrawCircleV(dst : * Image,center : Vector2,radius : i32,color : Color) : void;
+extern pub fn ImageDrawCircleLines(dst : * Image,centerX : i32,centerY : i32,radius : i32,color : Color) : void;
+extern pub fn ImageDrawCircleLinesV(dst : * Image,center : Vector2,radius : i32,color : Color) : void;
+extern pub fn ImageDrawRectangle(dst : * Image,posX : i32,posY : i32,width : i32,height : i32,color : Color) : void;
+extern pub fn ImageDrawRectangleV(dst : * Image,position : Vector2,size : Vector2,color : Color) : void;
+extern pub fn ImageDrawRectangleRec(dst : * Image,rec : Rectangle,color : Color) : void;
+extern pub fn ImageDrawRectangleLines(dst : * Image,rec : Rectangle,thick : i32,color : Color) : void;
+extern pub fn ImageDrawTriangle(dst : * Image,v1 : Vector2,v2 : Vector2,v3 : Vector2,color : Color) : void;
+extern pub fn ImageDrawTriangleEx(dst : * Image,v1 : Vector2,v2 : Vector2,v3 : Vector2,c1 : Color,c2 : Color,c3 : Color) : void;
+extern pub fn ImageDrawTriangleLines(dst : * Image,v1 : Vector2,v2 : Vector2,v3 : Vector2,color : Color) : void;
+extern pub fn ImageDrawTriangleFan(dst : * Image,points : * Vector2,pointCount : i32,color : Color) : void;
+extern pub fn ImageDrawTriangleStrip(dst : * Image,points : * Vector2,pointCount : i32,color : Color) : void;
+extern pub fn ImageDraw(dst : * Image,src : Image,srcRec : Rectangle,dstRec : Rectangle,tint : Color) : void;
+extern pub fn ImageDrawText(dst : * Image,text : * u8,posX : i32,posY : i32,fontSize : i32,color : Color) : void;
+extern pub fn ImageDrawTextEx(dst : * Image,font : Font,text : * u8,position : Vector2,fontSize : float,spacing : float,tint : Color) : void;
+extern pub fn LoadTexture(fileName : * u8) : Texture2D;
+extern pub fn LoadTextureFromImage(image : Image) : Texture2D;
+extern pub fn LoadTextureCubemap(image : Image,layout : i32) : TextureCubemap;
+extern pub fn LoadRenderTexture(width : i32,height : i32) : RenderTexture2D;
+extern pub fn IsTextureValid(texture : Texture2D) : bool;
+extern pub fn UnloadTexture(texture : Texture2D) : void;
+extern pub fn IsRenderTextureValid(target : RenderTexture2D) : bool;
+extern pub fn UnloadRenderTexture(target : RenderTexture2D) : void;
+extern pub fn UpdateTexture(texture : Texture2D,pixels : * void) : void;
+extern pub fn UpdateTextureRec(texture : Texture2D,rec : Rectangle,pixels : * void) : void;
+extern pub fn GenTextureMipmaps(texture : * Texture2D) : void;
+extern pub fn SetTextureFilter(texture : Texture2D,filter : i32) : void;
+extern pub fn SetTextureWrap(texture : Texture2D,wrap : i32) : void;
+extern pub fn DrawTexture(texture : Texture2D,posX : i32,posY : i32,tint : Color) : void;
+extern pub fn DrawTextureV(texture : Texture2D,position : Vector2,tint : Color) : void;
+extern pub fn DrawTextureEx(texture : Texture2D,position : Vector2,rotation : float,scale : float,tint : Color) : void;
+extern pub fn DrawTextureRec(texture : Texture2D,source : Rectangle,position : Vector2,tint : Color) : void;
+extern pub fn DrawTexturePro(texture : Texture2D,source : Rectangle,dest : Rectangle,origin : Vector2,rotation : float,tint : Color) : void;
+extern pub fn DrawTextureNPatch(texture : Texture2D,nPatchInfo : NPatchInfo,dest : Rectangle,origin : Vector2,rotation : float,tint : Color) : void;
+extern pub fn ColorIsEqual(col1 : Color,col2 : Color) : bool;
+extern pub fn Fade(color : Color,alpha : float) : Color;
+extern pub fn ColorToInt(color : Color) : i32;
+extern pub fn ColorNormalize(color : Color) : Vector4;
+extern pub fn ColorFromNormalized(normalized : Vector4) : Color;
+extern pub fn ColorToHSV(color : Color) : Vector3;
+extern pub fn ColorFromHSV(hue : float,saturation : float,value : float) : Color;
+extern pub fn ColorTint(color : Color,tint : Color) : Color;
+extern pub fn ColorBrightness(color : Color,factor : float) : Color;
+extern pub fn ColorContrast(color : Color,contrast : float) : Color;
+extern pub fn ColorAlpha(color : Color,alpha : float) : Color;
+extern pub fn ColorAlphaBlend(dst : Color,src : Color,tint : Color) : Color;
+extern pub fn ColorLerp(color1 : Color,color2 : Color,factor : float) : Color;
+extern pub fn GetColor(hexValue : u32) : Color;
+extern pub fn GetPixelColor(srcPtr : * void,format : i32) : Color;
+extern pub fn SetPixelColor(dstPtr : * void,color : Color,format : i32) : void;
+extern pub fn GetPixelDataSize(width : i32,height : i32,format : i32) : i32;
+extern pub fn GetFontDefault() : Font;
+extern pub fn LoadFont(fileName : * u8) : Font;
+extern pub fn LoadFontEx(fileName : * u8,fontSize : i32,codepoints : * i32,codepointCount : i32) : Font;
+extern pub fn LoadFontFromImage(image : Image,key : Color,firstChar : i32) : Font;
+extern pub fn LoadFontFromMemory(fileType : * u8,fileData : * u8,dataSize : i32,fontSize : i32,codepoints : * i32,codepointCount : i32) : Font;
+extern pub fn IsFontValid(font : Font) : bool;
+extern pub fn LoadFontData(fileData : * u8,dataSize : i32,fontSize : i32,codepoints : * i32,codepointCount : i32,_type : i32) : * GlyphInfo;
+extern pub fn GenImageFontAtlas(glyphs : * GlyphInfo,glyphRecs : * * Rectangle,glyphCount : i32,fontSize : i32,padding : i32,packMethod : i32) : Image;
+extern pub fn UnloadFontData(glyphs : * GlyphInfo,glyphCount : i32) : void;
+extern pub fn UnloadFont(font : Font) : void;
+extern pub fn ExportFontAsCode(font : Font,fileName : * u8) : bool;
+extern pub fn DrawFPS(posX : i32,posY : i32) : void;
+extern pub fn DrawText(text : * u8,posX : i32,posY : i32,fontSize : i32,color : Color) : void;
+extern pub fn DrawTextEx(font : Font,text : * u8,position : Vector2,fontSize : float,spacing : float,tint : Color) : void;
+extern pub fn DrawTextPro(font : Font,text : * u8,position : Vector2,origin : Vector2,rotation : float,fontSize : float,spacing : float,tint : Color) : void;
+extern pub fn DrawTextCodepoint(font : Font,codepoint : i32,position : Vector2,fontSize : float,tint : Color) : void;
+extern pub fn DrawTextCodepoints(font : Font,codepoints : * i32,codepointCount : i32,position : Vector2,fontSize : float,spacing : float,tint : Color) : void;
+extern pub fn SetTextLineSpacing(spacing : i32) : void;
+extern pub fn MeasureText(text : * u8,fontSize : i32) : i32;
+extern pub fn MeasureTextEx(font : Font,text : * u8,fontSize : float,spacing : float) : Vector2;
+extern pub fn GetGlyphIndex(font : Font,codepoint : i32) : i32;
+extern pub fn GetGlyphInfo(font : Font,codepoint : i32) : GlyphInfo;
+extern pub fn GetGlyphAtlasRec(font : Font,codepoint : i32) : Rectangle;
+extern pub fn LoadUTF8(codepoints : * i32,length : i32) : * u8;
+extern pub fn UnloadUTF8(text : * u8) : void;
+extern pub fn LoadCodepoints(text : * u8,count : * i32) : * i32;
+extern pub fn UnloadCodepoints(codepoints : * i32) : void;
+extern pub fn GetCodepointCount(text : * u8) : i32;
+extern pub fn GetCodepoint(text : * u8,codepointSize : * i32) : i32;
+extern pub fn GetCodepointNext(text : * u8,codepointSize : * i32) : i32;
+extern pub fn GetCodepointPrevious(text : * u8,codepointSize : * i32) : i32;
+extern pub fn CodepointToUTF8(codepoint : i32,utf8Size : * i32) : * u8;
+extern pub fn TextCopy(dst : * u8,src : * u8) : i32;
+extern pub fn TextIsEqual(text1 : * u8,text2 : * u8) : bool;
+extern pub fn TextLength(text : * u8) : u32;
+extern pub fn TextFormat(text : * u8) : * u8;
+extern pub fn TextSubtext(text : * u8,position : i32,length : i32) : * u8;
+extern pub fn TextReplace(text : * u8,replace : * u8,by : * u8) : * u8;
+extern pub fn TextInsert(text : * u8,insert : * u8,position : i32) : * u8;
+extern pub fn TextJoin(textList : * * u8,count : i32,delimiter : * u8) : * u8;
+extern pub fn TextSplit(text : * u8,delimiter : u8,count : * i32) : * * u8;
+extern pub fn TextAppend(text : * u8,append : * u8,position : * i32) : void;
+extern pub fn TextFindIndex(text : * u8,find : * u8) : i32;
+extern pub fn TextToUpper(text : * u8) : * u8;
+extern pub fn TextToLower(text : * u8) : * u8;
+extern pub fn TextToPascal(text : * u8) : * u8;
+extern pub fn TextToSnake(text : * u8) : * u8;
+extern pub fn TextToCamel(text : * u8) : * u8;
+extern pub fn TextToInteger(text : * u8) : i32;
+extern pub fn TextToFloat(text : * u8) : float;
+extern pub fn DrawLine3D(startPos : Vector3,endPos : Vector3,color : Color) : void;
+extern pub fn DrawPoint3D(position : Vector3,color : Color) : void;
+extern pub fn DrawCircle3D(center : Vector3,radius : float,rotationAxis : Vector3,rotationAngle : float,color : Color) : void;
+extern pub fn DrawTriangle3D(v1 : Vector3,v2 : Vector3,v3 : Vector3,color : Color) : void;
+extern pub fn DrawTriangleStrip3D(points : * Vector3,pointCount : i32,color : Color) : void;
+extern pub fn DrawCube(position : Vector3,width : float,height : float,length : float,color : Color) : void;
+extern pub fn DrawCubeV(position : Vector3,size : Vector3,color : Color) : void;
+extern pub fn DrawCubeWires(position : Vector3,width : float,height : float,length : float,color : Color) : void;
+extern pub fn DrawCubeWiresV(position : Vector3,size : Vector3,color : Color) : void;
+extern pub fn DrawSphere(centerPos : Vector3,radius : float,color : Color) : void;
+extern pub fn DrawSphereEx(centerPos : Vector3,radius : float,rings : i32,slices : i32,color : Color) : void;
+extern pub fn DrawSphereWires(centerPos : Vector3,radius : float,rings : i32,slices : i32,color : Color) : void;
+extern pub fn DrawCylinder(position : Vector3,radiusTop : float,radiusBottom : float,height : float,slices : i32,color : Color) : void;
+extern pub fn DrawCylinderEx(startPos : Vector3,endPos : Vector3,startRadius : float,endRadius : float,sides : i32,color : Color) : void;
+extern pub fn DrawCylinderWires(position : Vector3,radiusTop : float,radiusBottom : float,height : float,slices : i32,color : Color) : void;
+extern pub fn DrawCylinderWiresEx(startPos : Vector3,endPos : Vector3,startRadius : float,endRadius : float,sides : i32,color : Color) : void;
+extern pub fn DrawCapsule(startPos : Vector3,endPos : Vector3,radius : float,slices : i32,rings : i32,color : Color) : void;
+extern pub fn DrawCapsuleWires(startPos : Vector3,endPos : Vector3,radius : float,slices : i32,rings : i32,color : Color) : void;
+extern pub fn DrawPlane(centerPos : Vector3,size : Vector2,color : Color) : void;
+extern pub fn DrawRay(ray : Ray,color : Color) : void;
+extern pub fn DrawGrid(slices : i32,spacing : float) : void;
+extern pub fn LoadModel(fileName : * u8) : Model;
+extern pub fn LoadModelFromMesh(mesh : Mesh) : Model;
+extern pub fn IsModelValid(model : Model) : bool;
+extern pub fn UnloadModel(model : Model) : void;
+extern pub fn GetModelBoundingBox(model : Model) : BoundingBox;
+extern pub fn DrawModel(model : Model,position : Vector3,scale : float,tint : Color) : void;
+extern pub fn DrawModelEx(model : Model,position : Vector3,rotationAxis : Vector3,rotationAngle : float,scale : Vector3,tint : Color) : void;
+extern pub fn DrawModelWires(model : Model,position : Vector3,scale : float,tint : Color) : void;
+extern pub fn DrawModelWiresEx(model : Model,position : Vector3,rotationAxis : Vector3,rotationAngle : float,scale : Vector3,tint : Color) : void;
+extern pub fn DrawModelPoints(model : Model,position : Vector3,scale : float,tint : Color) : void;
+extern pub fn DrawModelPointsEx(model : Model,position : Vector3,rotationAxis : Vector3,rotationAngle : float,scale : Vector3,tint : Color) : void;
+extern pub fn DrawBoundingBox(box : BoundingBox,color : Color) : void;
+extern pub fn DrawBillboard(camera : Camera,texture : Texture2D,position : Vector3,scale : float,tint : Color) : void;
+extern pub fn DrawBillboardRec(camera : Camera,texture : Texture2D,source : Rectangle,position : Vector3,size : Vector2,tint : Color) : void;
+extern pub fn DrawBillboardPro(camera : Camera,texture : Texture2D,source : Rectangle,position : Vector3,up : Vector3,size : Vector2,origin : Vector2,rotation : float,tint : Color) : void;
+extern pub fn UploadMesh(mesh : * Mesh,dynamic : bool) : void;
+extern pub fn UpdateMeshBuffer(mesh : Mesh,index : i32,data : * void,dataSize : i32,offset : i32) : void;
+extern pub fn UnloadMesh(mesh : Mesh) : void;
+extern pub fn DrawMesh(mesh : Mesh,material : Material,transform : Matrix) : void;
+extern pub fn DrawMeshInstanced(mesh : Mesh,material : Material,transforms : * Matrix,instances : i32) : void;
+extern pub fn GetMeshBoundingBox(mesh : Mesh) : BoundingBox;
+extern pub fn GenMeshTangents(mesh : * Mesh) : void;
+extern pub fn ExportMesh(mesh : Mesh,fileName : * u8) : bool;
+extern pub fn ExportMeshAsCode(mesh : Mesh,fileName : * u8) : bool;
+extern pub fn GenMeshPoly(sides : i32,radius : float) : Mesh;
+extern pub fn GenMeshPlane(width : float,length : float,resX : i32,resZ : i32) : Mesh;
+extern pub fn GenMeshCube(width : float,height : float,length : float) : Mesh;
+extern pub fn GenMeshSphere(radius : float,rings : i32,slices : i32) : Mesh;
+extern pub fn GenMeshHemiSphere(radius : float,rings : i32,slices : i32) : Mesh;
+extern pub fn GenMeshCylinder(radius : float,height : float,slices : i32) : Mesh;
+extern pub fn GenMeshCone(radius : float,height : float,slices : i32) : Mesh;
+extern pub fn GenMeshTorus(radius : float,size : float,radSeg : i32,sides : i32) : Mesh;
+extern pub fn GenMeshKnot(radius : float,size : float,radSeg : i32,sides : i32) : Mesh;
+extern pub fn GenMeshHeightmap(heightmap : Image,size : Vector3) : Mesh;
+extern pub fn GenMeshCubicmap(cubicmap : Image,cubeSize : Vector3) : Mesh;
+extern pub fn LoadMaterials(fileName : * u8,materialCount : * i32) : * Material;
+extern pub fn LoadMaterialDefault() : Material;
+extern pub fn IsMaterialValid(material : Material) : bool;
+extern pub fn UnloadMaterial(material : Material) : void;
+extern pub fn SetMaterialTexture(material : * Material,mapType : i32,texture : Texture2D) : void;
+extern pub fn SetModelMeshMaterial(model : * Model,meshId : i32,materialId : i32) : void;
+extern pub fn LoadModelAnimations(fileName : * u8,animCount : * i32) : * ModelAnimation;
+extern pub fn UpdateModelAnimation(model : Model,anim : ModelAnimation,frame : i32) : void;
+extern pub fn UpdateModelAnimationBones(model : Model,anim : ModelAnimation,frame : i32) : void;
+extern pub fn UnloadModelAnimation(anim : ModelAnimation) : void;
+extern pub fn UnloadModelAnimations(animations : * ModelAnimation,animCount : i32) : void;
+extern pub fn IsModelAnimationValid(model : Model,anim : ModelAnimation) : bool;
+extern pub fn CheckCollisionSpheres(center1 : Vector3,radius1 : float,center2 : Vector3,radius2 : float) : bool;
+extern pub fn CheckCollisionBoxes(box1 : BoundingBox,box2 : BoundingBox) : bool;
+extern pub fn CheckCollisionBoxSphere(box : BoundingBox,center : Vector3,radius : float) : bool;
+extern pub fn GetRayCollisionSphere(ray : Ray,center : Vector3,radius : float) : RayCollision;
+extern pub fn GetRayCollisionBox(ray : Ray,box : BoundingBox) : RayCollision;
+extern pub fn GetRayCollisionMesh(ray : Ray,mesh : Mesh,transform : Matrix) : RayCollision;
+extern pub fn GetRayCollisionTriangle(ray : Ray,p1 : Vector3,p2 : Vector3,p3 : Vector3) : RayCollision;
+extern pub fn GetRayCollisionQuad(ray : Ray,p1 : Vector3,p2 : Vector3,p3 : Vector3,p4 : Vector3) : RayCollision;
+type AudioCallback = fn(* void,u32) : void;
+extern pub fn InitAudioDevice() : void;
+extern pub fn CloseAudioDevice() : void;
+extern pub fn IsAudioDeviceReady() : bool;
+extern pub fn SetMasterVolume(volume : float) : void;
+extern pub fn GetMasterVolume() : float;
+extern pub fn LoadWave(fileName : * u8) : Wave;
+extern pub fn LoadWaveFromMemory(fileType : * u8,fileData : * u8,dataSize : i32) : Wave;
+extern pub fn IsWaveValid(wave : Wave) : bool;
+extern pub fn LoadSound(fileName : * u8) : Sound;
+extern pub fn LoadSoundFromWave(wave : Wave) : Sound;
+extern pub fn LoadSoundAlias(source : Sound) : Sound;
+extern pub fn IsSoundValid(sound : Sound) : bool;
+extern pub fn UpdateSound(sound : Sound,data : * void,sampleCount : i32) : void;
+extern pub fn UnloadWave(wave : Wave) : void;
+extern pub fn UnloadSound(sound : Sound) : void;
+extern pub fn UnloadSoundAlias(alias : Sound) : void;
+extern pub fn ExportWave(wave : Wave,fileName : * u8) : bool;
+extern pub fn ExportWaveAsCode(wave : Wave,fileName : * u8) : bool;
+extern pub fn PlaySound(sound : Sound) : void;
+extern pub fn StopSound(sound : Sound) : void;
+extern pub fn PauseSound(sound : Sound) : void;
+extern pub fn ResumeSound(sound : Sound) : void;
+extern pub fn IsSoundPlaying(sound : Sound) : bool;
+extern pub fn SetSoundVolume(sound : Sound,volume : float) : void;
+extern pub fn SetSoundPitch(sound : Sound,pitch : float) : void;
+extern pub fn SetSoundPan(sound : Sound,pan : float) : void;
+extern pub fn WaveCopy(wave : Wave) : Wave;
+extern pub fn WaveCrop(wave : * Wave,initFrame : i32,finalFrame : i32) : void;
+extern pub fn WaveFormat(wave : * Wave,sampleRate : i32,sampleSize : i32,channels : i32) : void;
+extern pub fn LoadWaveSamples(wave : Wave) : * float;
+extern pub fn UnloadWaveSamples(samples : * float) : void;
+extern pub fn LoadMusicStream(fileName : * u8) : Music;
+extern pub fn LoadMusicStreamFromMemory(fileType : * u8,data : * u8,dataSize : i32) : Music;
+extern pub fn IsMusicValid(music : Music) : bool;
+extern pub fn UnloadMusicStream(music : Music) : void;
+extern pub fn PlayMusicStream(music : Music) : void;
+extern pub fn IsMusicStreamPlaying(music : Music) : bool;
+extern pub fn UpdateMusicStream(music : Music) : void;
+extern pub fn StopMusicStream(music : Music) : void;
+extern pub fn PauseMusicStream(music : Music) : void;
+extern pub fn ResumeMusicStream(music : Music) : void;
+extern pub fn SeekMusicStream(music : Music,position : float) : void;
+extern pub fn SetMusicVolume(music : Music,volume : float) : void;
+extern pub fn SetMusicPitch(music : Music,pitch : float) : void;
+extern pub fn SetMusicPan(music : Music,pan : float) : void;
+extern pub fn GetMusicTimeLength(music : Music) : float;
+extern pub fn GetMusicTimePlayed(music : Music) : float;
+extern pub fn LoadAudioStream(sampleRate : u32,sampleSize : u32,channels : u32) : AudioStream;
+extern pub fn IsAudioStreamValid(stream : AudioStream) : bool;
+extern pub fn UnloadAudioStream(stream : AudioStream) : void;
+extern pub fn UpdateAudioStream(stream : AudioStream,data : * void,frameCount : i32) : void;
+extern pub fn IsAudioStreamProcessed(stream : AudioStream) : bool;
+extern pub fn PlayAudioStream(stream : AudioStream) : void;
+extern pub fn PauseAudioStream(stream : AudioStream) : void;
+extern pub fn ResumeAudioStream(stream : AudioStream) : void;
+extern pub fn IsAudioStreamPlaying(stream : AudioStream) : bool;
+extern pub fn StopAudioStream(stream : AudioStream) : void;
+extern pub fn SetAudioStreamVolume(stream : AudioStream,volume : float) : void;
+extern pub fn SetAudioStreamPitch(stream : AudioStream,pitch : float) : void;
+extern pub fn SetAudioStreamPan(stream : AudioStream,pan : float) : void;
+extern pub fn SetAudioStreamBufferSizeDefault(size : i32) : void;
+extern pub fn SetAudioStreamCallback(stream : AudioStream,callback : AudioCallback) : void;
+extern pub fn AttachAudioStreamProcessor(stream : AudioStream,processor : AudioCallback) : void;
+extern pub fn DetachAudioStreamProcessor(stream : AudioStream,processor : AudioCallback) : void;
+extern pub fn AttachAudioMixedProcessor(processor : AudioCallback) : void;
+extern pub fn DetachAudioMixedProcessor(processor : AudioCallback) : void;

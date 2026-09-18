@@ -1,0 +1,1478 @@
+type Sint8 = i8;
+type Uint8 = u8;
+type Sint16 = i16;
+type Uint16 = u16;
+type Sint32 = i32;
+type Uint32 = u32;
+type Sint64 = i64;
+type Uint64 = u64;
+type size_t = u64;
+enum SDL_bool {
+    True,
+    False
+}
+extern pub fn SDL_malloc(size : size_t) : * void;
+extern pub fn SDL_calloc(nmemb : size_t,size : size_t) : * void;
+extern pub fn SDL_realloc(mem : * void,size : size_t) : * void;
+extern pub fn SDL_free(mem : * void) : void;
+type SDL_malloc_func = fn(size_t) : * void;
+type SDL_calloc_func = fn(size_t,size_t) : * void;
+type SDL_realloc_func = fn(* void,size_t) : * void;
+type SDL_free_func = fn(* void) : void;
+extern pub fn SDL_GetOriginalMemoryFunctions(malloc_func : * SDL_malloc_func,calloc_func : * SDL_calloc_func,realloc_func : * SDL_realloc_func,free_func : * SDL_free_func) : void;
+extern pub fn SDL_GetMemoryFunctions(malloc_func : * SDL_malloc_func,calloc_func : * SDL_calloc_func,realloc_func : * SDL_realloc_func,free_func : * SDL_free_func) : void;
+extern pub fn SDL_SetMemoryFunctions(malloc_func : SDL_malloc_func,calloc_func : SDL_calloc_func,realloc_func : SDL_realloc_func,free_func : SDL_free_func) : i32;
+extern pub fn SDL_GetNumAllocations() : i32;
+extern pub fn SDL_getenv(name : * u8) : * u8;
+extern pub fn SDL_setenv(name : * u8,value : * u8,overwrite : i32) : i32;
+type SDL_CompareCallback = fn(* void,* void) : i32;
+extern pub fn SDL_qsort(base : * void,nmemb : size_t,size : size_t,compare : SDL_CompareCallback) : void;
+extern pub fn SDL_bsearch(key : * void,base : * void,nmemb : size_t,size : size_t,compare : SDL_CompareCallback) : * void;
+extern pub fn SDL_abs(x : i32) : i32;
+extern pub fn SDL_isalpha(x : i32) : i32;
+extern pub fn SDL_isalnum(x : i32) : i32;
+extern pub fn SDL_isblank(x : i32) : i32;
+extern pub fn SDL_iscntrl(x : i32) : i32;
+extern pub fn SDL_isdigit(x : i32) : i32;
+extern pub fn SDL_isxdigit(x : i32) : i32;
+extern pub fn SDL_ispunct(x : i32) : i32;
+extern pub fn SDL_isspace(x : i32) : i32;
+extern pub fn SDL_isupper(x : i32) : i32;
+extern pub fn SDL_islower(x : i32) : i32;
+extern pub fn SDL_isprint(x : i32) : i32;
+extern pub fn SDL_isgraph(x : i32) : i32;
+extern pub fn SDL_toupper(x : i32) : i32;
+extern pub fn SDL_tolower(x : i32) : i32;
+extern pub fn SDL_crc16(crc : Uint16,data : * void,len : size_t) : Uint16;
+extern pub fn SDL_crc32(crc : Uint32,data : * void,len : size_t) : Uint32;
+extern pub fn SDL_memset(dst : * void,c : i32,len : size_t) : * void;
+extern pub fn SDL_memset4(dst : * void,val : Uint32,dwords : size_t) : void;
+extern pub fn SDL_memcpy(dst : * void,src : * void,len : size_t) : * void;
+extern pub fn SDL_memmove(dst : * void,src : * void,len : size_t) : * void;
+extern pub fn SDL_memcmp(s1 : * void,s2 : * void,len : size_t) : i32;
+
+extern pub fn SDL_strlen(str : * u8) : size_t;
+extern pub fn SDL_strlcpy(dst : * u8,src : * u8,maxlen : size_t) : size_t;
+extern pub fn SDL_utf8strlcpy(dst : * u8,src : * u8,dst_bytes : size_t) : size_t;
+extern pub fn SDL_strlcat(dst : * u8,src : * u8,maxlen : size_t) : size_t;
+extern pub fn SDL_strdup(str : * u8) : * u8;
+extern pub fn SDL_strrev(str : * u8) : * u8;
+extern pub fn SDL_strupr(str : * u8) : * u8;
+extern pub fn SDL_strlwr(str : * u8) : * u8;
+extern pub fn SDL_strchr(str : * u8,c : i32) : * u8;
+extern pub fn SDL_strrchr(str : * u8,c : i32) : * u8;
+extern pub fn SDL_strstr(haystack : * u8,needle : * u8) : * u8;
+extern pub fn SDL_strcasestr(haystack : * u8,needle : * u8) : * u8;
+extern pub fn SDL_strtokr(s1 : * u8,s2 : * u8,saveptr : * * u8) : * u8;
+extern pub fn SDL_utf8strlen(str : * u8) : size_t;
+extern pub fn SDL_utf8strnlen(str : * u8,bytes : size_t) : size_t;
+extern pub fn SDL_itoa(value : i32,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_uitoa(value : u32,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_ltoa(value : i64,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_ultoa(value : u64,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_lltoa(value : Sint64,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_ulltoa(value : Uint64,str : * u8,radix : i32) : * u8;
+extern pub fn SDL_atoi(str : * u8) : i32;
+extern pub fn SDL_atof(str : * u8) : double;
+extern pub fn SDL_strtol(str : * u8,endp : * * u8,base : i32) : i64;
+extern pub fn SDL_strtoul(str : * u8,endp : * * u8,base : i32) : u64;
+extern pub fn SDL_strtoll(str : * u8,endp : * * u8,base : i32) : Sint64;
+extern pub fn SDL_strtoull(str : * u8,endp : * * u8,base : i32) : Uint64;
+extern pub fn SDL_strtod(str : * u8,endp : * * u8) : double;
+extern pub fn SDL_strcmp(str1 : * u8,str2 : * u8) : i32;
+extern pub fn SDL_strncmp(str1 : * u8,str2 : * u8,maxlen : size_t) : i32;
+extern pub fn SDL_strcasecmp(str1 : * u8,str2 : * u8) : i32;
+extern pub fn SDL_strncasecmp(str1 : * u8,str2 : * u8,len : size_t) : i32;
+extern pub fn SDL_sscanf(text : * u8,fmt : * u8) : i32;
+extern pub fn SDL_snprintf(text : * u8,maxlen : size_t,fmt : * u8) : i32;
+extern pub fn SDL_asprintf(strp : * * u8,fmt : * u8) : i32;
+extern pub fn SDL_acos(x : double) : double;
+extern pub fn SDL_acosf(x : float) : float;
+extern pub fn SDL_asin(x : double) : double;
+extern pub fn SDL_asinf(x : float) : float;
+extern pub fn SDL_atan(x : double) : double;
+extern pub fn SDL_atanf(x : float) : float;
+extern pub fn SDL_atan2(y : double,x : double) : double;
+extern pub fn SDL_atan2f(y : float,x : float) : float;
+extern pub fn SDL_ceil(x : double) : double;
+extern pub fn SDL_ceilf(x : float) : float;
+extern pub fn SDL_copysign(x : double,y : double) : double;
+extern pub fn SDL_copysignf(x : float,y : float) : float;
+extern pub fn SDL_cos(x : double) : double;
+extern pub fn SDL_cosf(x : float) : float;
+extern pub fn SDL_exp(x : double) : double;
+extern pub fn SDL_expf(x : float) : float;
+extern pub fn SDL_fabs(x : double) : double;
+extern pub fn SDL_fabsf(x : float) : float;
+extern pub fn SDL_floor(x : double) : double;
+extern pub fn SDL_floorf(x : float) : float;
+extern pub fn SDL_trunc(x : double) : double;
+extern pub fn SDL_truncf(x : float) : float;
+extern pub fn SDL_fmod(x : double,y : double) : double;
+extern pub fn SDL_fmodf(x : float,y : float) : float;
+extern pub fn SDL_log(x : double) : double;
+extern pub fn SDL_logf(x : float) : float;
+extern pub fn SDL_log10(x : double) : double;
+extern pub fn SDL_log10f(x : float) : float;
+extern pub fn SDL_pow(x : double,y : double) : double;
+extern pub fn SDL_powf(x : float,y : float) : float;
+extern pub fn SDL_round(x : double) : double;
+extern pub fn SDL_roundf(x : float) : float;
+extern pub fn SDL_lround(x : double) : i64;
+extern pub fn SDL_lroundf(x : float) : i64;
+extern pub fn SDL_scalbn(x : double,n : i32) : double;
+extern pub fn SDL_scalbnf(x : float,n : i32) : float;
+extern pub fn SDL_sin(x : double) : double;
+extern pub fn SDL_sinf(x : float) : float;
+extern pub fn SDL_sqrt(x : double) : double;
+extern pub fn SDL_sqrtf(x : float) : float;
+extern pub fn SDL_tan(x : double) : double;
+extern pub fn SDL_tanf(x : float) : float;
+extern type SDL_iconv_t;
+extern pub fn SDL_iconv_open(tocode : * u8,fromcode : * u8) : SDL_iconv_t;
+extern pub fn SDL_iconv_close(cd : SDL_iconv_t) : i32;
+extern pub fn SDL_iconv(cd : SDL_iconv_t,inbuf : * * u8,inbytesleft : * size_t,outbuf : * * u8,outbytesleft : * size_t) : size_t;
+extern pub fn SDL_iconv_string(tocode : * u8,fromcode : * u8,inbuf : * u8,inbytesleft : size_t) : * u8;
+extern pub fn SDL_memcpy4(dst : * void,src : * void,dwords : size_t) : * void;
+extern pub fn SDL_size_mul_overflow(a : size_t,b : size_t,ret : * size_t) : i32;
+extern pub fn SDL_size_add_overflow(a : size_t,b : size_t,ret : * size_t) : i32;
+type SDL_main_func = fn(i32,**u8) : i32;
+extern pub fn SDL_main(argc : i32,argv : **u8) : i32;
+extern pub fn SDL_SetMainReady() : void;
+struct SDL_AssertData {
+	always_ignore : i32,
+	trigger_count : u32,
+	condition : * u8,
+	filename : * u8,
+	linenum : i32,
+	function : * u8,
+	next : * void,
+}
+//extern pub fn SDL_ReportAssertion( : * SDL_AssertData, : * u8, : * u8, : i32) : SDL_AssertState;
+
+extern pub fn SDL_ResetAssertionReport() : void;
+type SDL_SpinLock = i32;
+extern pub fn SDL_AtomicTryLock(lock : * SDL_SpinLock) : SDL_bool;
+extern pub fn SDL_AtomicLock(lock : * SDL_SpinLock) : void;
+extern pub fn SDL_AtomicUnlock(lock : * SDL_SpinLock) : void;
+extern pub fn SDL_MemoryBarrierReleaseFunction() : void;
+extern pub fn SDL_MemoryBarrierAcquireFunction() : void;
+struct SDL_atomic_t {
+	value : i32,
+}
+extern pub fn SDL_AtomicCAS(a : * SDL_atomic_t,oldval : i32,newval : i32) : SDL_bool;
+extern pub fn SDL_AtomicSet(a : * SDL_atomic_t,v : i32) : i32;
+extern pub fn SDL_AtomicGet(a : * SDL_atomic_t) : i32;
+extern pub fn SDL_AtomicAdd(a : * SDL_atomic_t,v : i32) : i32;
+extern pub fn SDL_AtomicCASPtr(a : * * void,oldval : * void,newval : * void) : SDL_bool;
+extern pub fn SDL_AtomicSetPtr(a : * * void,v : * void) : * void;
+extern pub fn SDL_AtomicGetPtr(a : * * void) : * void;
+extern pub fn SDL_SetError(fmt : * u8) : i32;
+extern pub fn SDL_GetError() : * u8;
+extern pub fn SDL_GetErrorMsg(errstr : * u8,maxlen : i32) : * u8;
+extern pub fn SDL_ClearError() : void;
+extern pub fn SDL_Error(code : SDL_errorcode) : i32;
+extern pub fn SDL_SwapFloat(x : float) : float;
+struct SDL_mutex {
+}
+extern pub fn SDL_CreateMutex() : * SDL_mutex;
+extern pub fn SDL_LockMutex(mutex : * SDL_mutex) : i32;
+extern pub fn SDL_TryLockMutex(mutex : * SDL_mutex) : i32;
+extern pub fn SDL_UnlockMutex(mutex : * SDL_mutex) : i32;
+extern pub fn SDL_DestroyMutex(mutex : * SDL_mutex) : void;
+struct SDL_semaphore {
+}
+extern pub fn SDL_CreateSemaphore(initial_value : Uint32) : * SDL_sem;
+extern pub fn SDL_DestroySemaphore(sem : * SDL_sem) : void;
+extern pub fn SDL_SemWait(sem : * SDL_sem) : i32;
+extern pub fn SDL_SemTryWait(sem : * SDL_sem) : i32;
+extern pub fn SDL_SemWaitTimeout(sem : * SDL_sem,timeout : Uint32) : i32;
+extern pub fn SDL_SemPost(sem : * SDL_sem) : i32;
+extern pub fn SDL_SemValue(sem : * SDL_sem) : Uint32;
+struct SDL_cond {
+}
+extern pub fn SDL_CreateCond() : * SDL_cond;
+extern pub fn SDL_DestroyCond(cond : * SDL_cond) : void;
+extern pub fn SDL_CondSignal(cond : * SDL_cond) : i32;
+extern pub fn SDL_CondBroadcast(cond : * SDL_cond) : i32;
+extern pub fn SDL_CondWait(cond : * SDL_cond,mutex : * SDL_mutex) : i32;
+extern pub fn SDL_CondWaitTimeout(cond : * SDL_cond,mutex : * SDL_mutex,ms : Uint32) : i32;
+struct SDL_Thread {
+}
+type SDL_threadID = u64;
+type SDL_TLSID = u32;
+type SDL_ThreadFunction = fn(* void) : i32;
+extern pub fn SDL_CreateThread(_fn : SDL_ThreadFunction,name : * u8,data : * void) : * SDL_Thread;
+extern pub fn SDL_CreateThreadWithStackSize(_fn : SDL_ThreadFunction,name : * u8,stacksize : const size_t,data : * void) : * SDL_Thread;
+extern pub fn SDL_GetThreadName(thread : * SDL_Thread) : * u8;
+extern pub fn SDL_ThreadID() : SDL_threadID;
+extern pub fn SDL_GetThreadID(thread : * SDL_Thread) : SDL_threadID;
+extern pub fn SDL_SetThreadPriority(priority : SDL_ThreadPriority) : i32;
+extern pub fn SDL_WaitThread(thread : * SDL_Thread,status : * i32) : void;
+extern pub fn SDL_DetachThread(thread : * SDL_Thread) : void;
+extern pub fn SDL_TLSCreate() : SDL_TLSID;
+extern pub fn SDL_TLSGet(id : SDL_TLSID) : * void;
+type SDL_TLSDestructorCallback = fn(* void) : void;
+extern pub fn SDL_TLSSet(id : SDL_TLSID,value : * void,destructor : SDL_TLSDestructorCallback) : i32;
+extern pub fn SDL_TLSCleanup() : void;
+struct SDL_RWops {
+	size : fn(* struct SDL_RWops) : Sint64,
+	seek : fn(* struct SDL_RWops,Sint64,i32) : Sint64,
+	read : fn(* struct SDL_RWops,* void,size_t,size_t) : size_t,
+	write : fn(* struct SDL_RWops,* void,size_t,size_t) : size_t,
+	close : fn(* struct SDL_RWops) : i32,
+	type : Uint32,
+	union (unnamed at /usr/include/SDL2/SDL_rwops.h:96:5) : union SDL_RWops::(unnamed at /usr/include/SDL2/SDL_rwops.h:96:5),
+	hidden : union (unnamed union at /usr/include/SDL2/SDL_rwops.h:96:5),
+}
+extern pub fn SDL_RWFromFile(file : * u8,mode : * u8) : * SDL_RWops;
+extern pub fn SDL_RWFromFP(fp : * FILE,autoclose : SDL_bool) : * SDL_RWops;
+extern pub fn SDL_RWFromMem(mem : * void,size : i32) : * SDL_RWops;
+extern pub fn SDL_RWFromConstMem(mem : * void,size : i32) : * SDL_RWops;
+extern pub fn SDL_AllocRW() : * SDL_RWops;
+extern pub fn SDL_FreeRW(area : * SDL_RWops) : void;
+extern pub fn SDL_RWsize(context : * SDL_RWops) : Sint64;
+extern pub fn SDL_RWseek(context : * SDL_RWops,offset : Sint64,whence : i32) : Sint64;
+extern pub fn SDL_RWtell(context : * SDL_RWops) : Sint64;
+extern pub fn SDL_RWread(context : * SDL_RWops,ptr : * void,size : size_t,maxnum : size_t) : size_t;
+extern pub fn SDL_RWwrite(context : * SDL_RWops,ptr : * void,size : size_t,num : size_t) : size_t;
+extern pub fn SDL_RWclose(context : * SDL_RWops) : i32;
+extern pub fn SDL_LoadFile_RW(src : * SDL_RWops,datasize : * size_t,freesrc : i32) : * void;
+extern pub fn SDL_LoadFile(file : * u8,datasize : * size_t) : * void;
+extern pub fn SDL_ReadU8(src : * SDL_RWops) : Uint8;
+extern pub fn SDL_ReadLE16(src : * SDL_RWops) : Uint16;
+extern pub fn SDL_ReadBE16(src : * SDL_RWops) : Uint16;
+extern pub fn SDL_ReadLE32(src : * SDL_RWops) : Uint32;
+extern pub fn SDL_ReadBE32(src : * SDL_RWops) : Uint32;
+extern pub fn SDL_ReadLE64(src : * SDL_RWops) : Uint64;
+extern pub fn SDL_ReadBE64(src : * SDL_RWops) : Uint64;
+extern pub fn SDL_WriteU8(dst : * SDL_RWops,value : Uint8) : size_t;
+extern pub fn SDL_WriteLE16(dst : * SDL_RWops,value : Uint16) : size_t;
+extern pub fn SDL_WriteBE16(dst : * SDL_RWops,value : Uint16) : size_t;
+extern pub fn SDL_WriteLE32(dst : * SDL_RWops,value : Uint32) : size_t;
+extern pub fn SDL_WriteBE32(dst : * SDL_RWops,value : Uint32) : size_t;
+extern pub fn SDL_WriteLE64(dst : * SDL_RWops,value : Uint64) : size_t;
+extern pub fn SDL_WriteBE64(dst : * SDL_RWops,value : Uint64) : size_t;
+type SDL_AudioFormat = Uint16;
+type SDL_AudioCallback = fn(* void,* Uint8,i32) : void;
+struct SDL_AudioSpec {
+	freq : i32,
+	format : SDL_AudioFormat,
+	channels : Uint8,
+	silence : Uint8,
+	samples : Uint16,
+	padding : Uint16,
+	size : Uint32,
+	callback : SDL_AudioCallback,
+	userdata : * void,
+}
+struct SDL_AudioCVT {
+}
+type SDL_AudioFilter = fn(* struct SDL_AudioCVT,SDL_AudioFormat) : void;
+struct SDL_AudioCVT {
+	packed : invalid,
+	needed : i32,
+	src_format : SDL_AudioFormat,
+	dst_format : SDL_AudioFormat,
+	rate_incr : double,
+	buf : * Uint8,
+	len : i32,
+	len_cvt : i32,
+	len_mult : i32,
+	len_ratio : double,
+	filters : SDL_AudioFilter[10],
+	filter_index : i32,
+}
+extern pub fn SDL_GetNumAudioDrivers() : i32;
+extern pub fn SDL_GetAudioDriver(index : i32) : * u8;
+extern pub fn SDL_AudioInit(driver_name : * u8) : i32;
+extern pub fn SDL_AudioQuit() : void;
+extern pub fn SDL_GetCurrentAudioDriver() : * u8;
+extern pub fn SDL_OpenAudio(desired : * SDL_AudioSpec,obtained : * SDL_AudioSpec) : i32;
+type SDL_AudioDeviceID = Uint32;
+extern pub fn SDL_GetNumAudioDevices(iscapture : i32) : i32;
+extern pub fn SDL_GetAudioDeviceName(index : i32,iscapture : i32) : * u8;
+extern pub fn SDL_GetAudioDeviceSpec(index : i32,iscapture : i32,spec : * SDL_AudioSpec) : i32;
+extern pub fn SDL_GetDefaultAudioInfo(name : * * u8,spec : * SDL_AudioSpec,iscapture : i32) : i32;
+extern pub fn SDL_OpenAudioDevice(device : * u8,iscapture : i32,desired : * const SDL_AudioSpec,obtained : * SDL_AudioSpec,allowed_changes : i32) : SDL_AudioDeviceID;
+extern pub fn SDL_GetAudioStatus() : SDL_AudioStatus;
+extern pub fn SDL_GetAudioDeviceStatus(dev : SDL_AudioDeviceID) : SDL_AudioStatus;
+extern pub fn SDL_PauseAudio(pause_on : i32) : void;
+extern pub fn SDL_PauseAudioDevice(dev : SDL_AudioDeviceID,pause_on : i32) : void;
+extern pub fn SDL_LoadWAV_RW(src : * SDL_RWops,freesrc : i32,spec : * SDL_AudioSpec,audio_buf : * * Uint8,audio_len : * Uint32) : * SDL_AudioSpec;
+extern pub fn SDL_FreeWAV(audio_buf : * Uint8) : void;
+extern pub fn SDL_BuildAudioCVT(cvt : * SDL_AudioCVT,src_format : SDL_AudioFormat,src_channels : Uint8,src_rate : i32,dst_format : SDL_AudioFormat,dst_channels : Uint8,dst_rate : i32) : i32;
+extern pub fn SDL_ConvertAudio(cvt : * SDL_AudioCVT) : i32;
+struct _SDL_AudioStream {
+}
+extern pub fn SDL_NewAudioStream(src_format : const SDL_AudioFormat,src_channels : const Uint8,src_rate : i32,dst_format : const SDL_AudioFormat,dst_channels : const Uint8,dst_rate : i32) : * SDL_AudioStream;
+extern pub fn SDL_AudioStreamPut(stream : * SDL_AudioStream,buf : * void,len : i32) : i32;
+extern pub fn SDL_AudioStreamGet(stream : * SDL_AudioStream,buf : * void,len : i32) : i32;
+extern pub fn SDL_AudioStreamAvailable(stream : * SDL_AudioStream) : i32;
+extern pub fn SDL_AudioStreamFlush(stream : * SDL_AudioStream) : i32;
+extern pub fn SDL_AudioStreamClear(stream : * SDL_AudioStream) : void;
+extern pub fn SDL_FreeAudioStream(stream : * SDL_AudioStream) : void;
+extern pub fn SDL_MixAudio(dst : * Uint8,src : * const Uint8,len : Uint32,volume : i32) : void;
+extern pub fn SDL_MixAudioFormat(dst : * Uint8,src : * const Uint8,format : SDL_AudioFormat,len : Uint32,volume : i32) : void;
+extern pub fn SDL_QueueAudio(dev : SDL_AudioDeviceID,data : * void,len : Uint32) : i32;
+extern pub fn SDL_DequeueAudio(dev : SDL_AudioDeviceID,data : * void,len : Uint32) : Uint32;
+extern pub fn SDL_GetQueuedAudioSize(dev : SDL_AudioDeviceID) : Uint32;
+extern pub fn SDL_ClearQueuedAudio(dev : SDL_AudioDeviceID) : void;
+extern pub fn SDL_LockAudio() : void;
+extern pub fn SDL_LockAudioDevice(dev : SDL_AudioDeviceID) : void;
+extern pub fn SDL_UnlockAudio() : void;
+extern pub fn SDL_UnlockAudioDevice(dev : SDL_AudioDeviceID) : void;
+extern pub fn SDL_CloseAudio() : void;
+extern pub fn SDL_CloseAudioDevice(dev : SDL_AudioDeviceID) : void;
+extern pub fn SDL_SetClipboardText(text : * u8) : i32;
+extern pub fn SDL_GetClipboardText() : * u8;
+extern pub fn SDL_HasClipboardText() : SDL_bool;
+extern pub fn SDL_SetPrimarySelectionText(text : * u8) : i32;
+extern pub fn SDL_GetPrimarySelectionText() : * u8;
+extern pub fn SDL_HasPrimarySelectionText() : SDL_bool;
+extern pub fn SDL_GetCPUCount() : i32;
+extern pub fn SDL_GetCPUCacheLineSize() : i32;
+extern pub fn SDL_HasRDTSC() : SDL_bool;
+extern pub fn SDL_HasAltiVec() : SDL_bool;
+extern pub fn SDL_HasMMX() : SDL_bool;
+extern pub fn SDL_Has3DNow() : SDL_bool;
+extern pub fn SDL_HasSSE() : SDL_bool;
+extern pub fn SDL_HasSSE2() : SDL_bool;
+extern pub fn SDL_HasSSE3() : SDL_bool;
+extern pub fn SDL_HasSSE41() : SDL_bool;
+extern pub fn SDL_HasSSE42() : SDL_bool;
+extern pub fn SDL_HasAVX() : SDL_bool;
+extern pub fn SDL_HasAVX2() : SDL_bool;
+extern pub fn SDL_HasAVX512F() : SDL_bool;
+extern pub fn SDL_HasARMSIMD() : SDL_bool;
+extern pub fn SDL_HasNEON() : SDL_bool;
+extern pub fn SDL_HasLSX() : SDL_bool;
+extern pub fn SDL_HasLASX() : SDL_bool;
+extern pub fn SDL_GetSystemRAM() : i32;
+extern pub fn SDL_SIMDGetAlignment() : size_t;
+extern pub fn SDL_SIMDAlloc(len : const size_t) : * void;
+extern pub fn SDL_SIMDRealloc(mem : * void,len : const size_t) : * void;
+extern pub fn SDL_SIMDFree(ptr : * void) : void;
+struct SDL_Color {
+	r : Uint8,
+	g : Uint8,
+	b : Uint8,
+	a : Uint8,
+}
+struct SDL_Palette {
+	ncolors : i32,
+	colors : * SDL_Color,
+	version : Uint32,
+	refcount : i32,
+}
+struct SDL_PixelFormat {
+	format : Uint32,
+	palette : * SDL_Palette,
+	BitsPerPixel : Uint8,
+	BytesPerPixel : Uint8,
+	padding : Uint8[2],
+	Rmask : Uint32,
+	Gmask : Uint32,
+	Bmask : Uint32,
+	Amask : Uint32,
+	Rloss : Uint8,
+	Gloss : Uint8,
+	Bloss : Uint8,
+	Aloss : Uint8,
+	Rshift : Uint8,
+	Gshift : Uint8,
+	Bshift : Uint8,
+	Ashift : Uint8,
+	refcount : i32,
+	next : * struct SDL_PixelFormat,
+}
+extern pub fn SDL_GetPixelFormatName(format : Uint32) : * u8;
+extern pub fn SDL_PixelFormatEnumToMasks(format : Uint32,bpp : * i32,Rmask : * Uint32,Gmask : * Uint32,Bmask : * Uint32,Amask : * Uint32) : SDL_bool;
+extern pub fn SDL_MasksToPixelFormatEnum(bpp : i32,Rmask : Uint32,Gmask : Uint32,Bmask : Uint32,Amask : Uint32) : Uint32;
+extern pub fn SDL_AllocFormat(pixel_format : Uint32) : * SDL_PixelFormat;
+extern pub fn SDL_FreeFormat(format : * SDL_PixelFormat) : void;
+extern pub fn SDL_AllocPalette(ncolors : i32) : * SDL_Palette;
+extern pub fn SDL_SetPixelFormatPalette(format : * SDL_PixelFormat,palette : * SDL_Palette) : i32;
+extern pub fn SDL_SetPaletteColors(palette : * SDL_Palette,colors : * const SDL_Color,firstcolor : i32,ncolors : i32) : i32;
+extern pub fn SDL_FreePalette(palette : * SDL_Palette) : void;
+extern pub fn SDL_MapRGB(format : * const SDL_PixelFormat,r : Uint8,g : Uint8,b : Uint8) : Uint32;
+extern pub fn SDL_MapRGBA(format : * const SDL_PixelFormat,r : Uint8,g : Uint8,b : Uint8,a : Uint8) : Uint32;
+extern pub fn SDL_GetRGB(pixel : Uint32,format : * const SDL_PixelFormat,r : * Uint8,g : * Uint8,b : * Uint8) : void;
+extern pub fn SDL_GetRGBA(pixel : Uint32,format : * const SDL_PixelFormat,r : * Uint8,g : * Uint8,b : * Uint8,a : * Uint8) : void;
+extern pub fn SDL_CalculateGammaRamp(gamma : float,ramp : * Uint16) : void;
+struct SDL_Point {
+	x : i32,
+	y : i32,
+}
+struct SDL_FPoint {
+	x : float,
+	y : float,
+}
+struct SDL_Rect {
+	x : i32,
+	y : i32,
+	w : i32,
+	h : i32,
+}
+struct SDL_FRect {
+	x : float,
+	y : float,
+	w : float,
+	h : float,
+}
+extern pub fn SDL_PointInRect(p : * const SDL_Point,r : * const SDL_Rect) : SDL_bool;
+extern pub fn SDL_RectEmpty(r : * const SDL_Rect) : SDL_bool;
+extern pub fn SDL_RectEquals(a : * const SDL_Rect,b : * const SDL_Rect) : SDL_bool;
+extern pub fn SDL_HasIntersection(A : * const SDL_Rect,B : * const SDL_Rect) : SDL_bool;
+extern pub fn SDL_IntersectRect(A : * const SDL_Rect,B : * const SDL_Rect,result : * SDL_Rect) : SDL_bool;
+extern pub fn SDL_UnionRect(A : * const SDL_Rect,B : * const SDL_Rect,result : * SDL_Rect) : void;
+extern pub fn SDL_EnclosePoints(points : * const SDL_Point,count : i32,clip : * const SDL_Rect,result : * SDL_Rect) : SDL_bool;
+extern pub fn SDL_IntersectRectAndLine(rect : * const SDL_Rect,X1 : * i32,Y1 : * i32,X2 : * i32,Y2 : * i32) : SDL_bool;
+extern pub fn SDL_PointInFRect(p : * const SDL_FPoint,r : * const SDL_FRect) : SDL_bool;
+extern pub fn SDL_FRectEmpty(r : * const SDL_FRect) : SDL_bool;
+extern pub fn SDL_FRectEqualsEpsilon(a : * const SDL_FRect,b : * const SDL_FRect,epsilon : float) : SDL_bool;
+extern pub fn SDL_FRectEquals(a : * const SDL_FRect,b : * const SDL_FRect) : SDL_bool;
+extern pub fn SDL_HasIntersectionF(A : * const SDL_FRect,B : * const SDL_FRect) : SDL_bool;
+extern pub fn SDL_IntersectFRect(A : * const SDL_FRect,B : * const SDL_FRect,result : * SDL_FRect) : SDL_bool;
+extern pub fn SDL_UnionFRect(A : * const SDL_FRect,B : * const SDL_FRect,result : * SDL_FRect) : void;
+extern pub fn SDL_EncloseFPoints(points : * const SDL_FPoint,count : i32,clip : * const SDL_FRect,result : * SDL_FRect) : SDL_bool;
+extern pub fn SDL_IntersectFRectAndLine(rect : * const SDL_FRect,X1 : * float,Y1 : * float,X2 : * float,Y2 : * float) : SDL_bool;
+extern pub fn SDL_ComposeCustomBlendMode(srcColorFactor : SDL_BlendFactor,dstColorFactor : SDL_BlendFactor,colorOperation : SDL_BlendOperation,srcAlphaFactor : SDL_BlendFactor,dstAlphaFactor : SDL_BlendFactor,alphaOperation : SDL_BlendOperation) : SDL_BlendMode;
+struct SDL_BlitMap {
+}
+struct SDL_Surface {
+	flags : Uint32,
+	format : * SDL_PixelFormat,
+	w : i32,
+	h : i32,
+	pitch : i32,
+	pixels : * void,
+	userdata : * void,
+	locked : i32,
+	list_blitmap : * void,
+	clip_rect : SDL_Rect,
+	map : * SDL_BlitMap,
+	refcount : i32,
+}
+type SDL_blit = fn(* struct SDL_Surface,* SDL_Rect,* struct SDL_Surface,* SDL_Rect) : i32;
+extern pub fn SDL_CreateRGBSurface(flags : Uint32,width : i32,height : i32,depth : i32,Rmask : Uint32,Gmask : Uint32,Bmask : Uint32,Amask : Uint32) : * SDL_Surface;
+extern pub fn SDL_CreateRGBSurfaceWithFormat(flags : Uint32,width : i32,height : i32,depth : i32,format : Uint32) : * SDL_Surface;
+extern pub fn SDL_CreateRGBSurfaceFrom(pixels : * void,width : i32,height : i32,depth : i32,pitch : i32,Rmask : Uint32,Gmask : Uint32,Bmask : Uint32,Amask : Uint32) : * SDL_Surface;
+extern pub fn SDL_CreateRGBSurfaceWithFormatFrom(pixels : * void,width : i32,height : i32,depth : i32,pitch : i32,format : Uint32) : * SDL_Surface;
+extern pub fn SDL_FreeSurface(surface : * SDL_Surface) : void;
+extern pub fn SDL_SetSurfacePalette(surface : * SDL_Surface,palette : * SDL_Palette) : i32;
+extern pub fn SDL_LockSurface(surface : * SDL_Surface) : i32;
+extern pub fn SDL_UnlockSurface(surface : * SDL_Surface) : void;
+extern pub fn SDL_LoadBMP_RW(src : * SDL_RWops,freesrc : i32) : * SDL_Surface;
+extern pub fn SDL_SaveBMP_RW(surface : * SDL_Surface,dst : * SDL_RWops,freedst : i32) : i32;
+extern pub fn SDL_SetSurfaceRLE(surface : * SDL_Surface,flag : i32) : i32;
+extern pub fn SDL_HasSurfaceRLE(surface : * SDL_Surface) : SDL_bool;
+extern pub fn SDL_SetColorKey(surface : * SDL_Surface,flag : i32,key : Uint32) : i32;
+extern pub fn SDL_HasColorKey(surface : * SDL_Surface) : SDL_bool;
+extern pub fn SDL_GetColorKey(surface : * SDL_Surface,key : * Uint32) : i32;
+extern pub fn SDL_SetSurfaceColorMod(surface : * SDL_Surface,r : Uint8,g : Uint8,b : Uint8) : i32;
+extern pub fn SDL_GetSurfaceColorMod(surface : * SDL_Surface,r : * Uint8,g : * Uint8,b : * Uint8) : i32;
+extern pub fn SDL_SetSurfaceAlphaMod(surface : * SDL_Surface,alpha : Uint8) : i32;
+extern pub fn SDL_GetSurfaceAlphaMod(surface : * SDL_Surface,alpha : * Uint8) : i32;
+extern pub fn SDL_SetSurfaceBlendMode(surface : * SDL_Surface,blendMode : SDL_BlendMode) : i32;
+extern pub fn SDL_GetSurfaceBlendMode(surface : * SDL_Surface,blendMode : * SDL_BlendMode) : i32;
+extern pub fn SDL_SetClipRect(surface : * SDL_Surface,rect : * const SDL_Rect) : SDL_bool;
+extern pub fn SDL_GetClipRect(surface : * SDL_Surface,rect : * SDL_Rect) : void;
+extern pub fn SDL_DuplicateSurface(surface : * SDL_Surface) : * SDL_Surface;
+extern pub fn SDL_ConvertSurface(src : * SDL_Surface,fmt : * const SDL_PixelFormat,flags : Uint32) : * SDL_Surface;
+extern pub fn SDL_ConvertSurfaceFormat(src : * SDL_Surface,pixel_format : Uint32,flags : Uint32) : * SDL_Surface;
+extern pub fn SDL_ConvertPixels(width : i32,height : i32,src_format : Uint32,src : * void,src_pitch : i32,dst_format : Uint32,dst : * void,dst_pitch : i32) : i32;
+extern pub fn SDL_PremultiplyAlpha(width : i32,height : i32,src_format : Uint32,src : * void,src_pitch : i32,dst_format : Uint32,dst : * void,dst_pitch : i32) : i32;
+extern pub fn SDL_FillRect(dst : * SDL_Surface,rect : * const SDL_Rect,color : Uint32) : i32;
+extern pub fn SDL_FillRects(dst : * SDL_Surface,rects : * const SDL_Rect,count : i32,color : Uint32) : i32;
+extern pub fn SDL_UpperBlit(src : * SDL_Surface,srcrect : * const SDL_Rect,dst : * SDL_Surface,dstrect : * SDL_Rect) : i32;
+extern pub fn SDL_LowerBlit(src : * SDL_Surface,srcrect : * SDL_Rect,dst : * SDL_Surface,dstrect : * SDL_Rect) : i32;
+extern pub fn SDL_SoftStretch(src : * SDL_Surface,srcrect : * const SDL_Rect,dst : * SDL_Surface,dstrect : * const SDL_Rect) : i32;
+extern pub fn SDL_SoftStretchLinear(src : * SDL_Surface,srcrect : * const SDL_Rect,dst : * SDL_Surface,dstrect : * const SDL_Rect) : i32;
+extern pub fn SDL_UpperBlitScaled(src : * SDL_Surface,srcrect : * const SDL_Rect,dst : * SDL_Surface,dstrect : * SDL_Rect) : i32;
+extern pub fn SDL_LowerBlitScaled(src : * SDL_Surface,srcrect : * SDL_Rect,dst : * SDL_Surface,dstrect : * SDL_Rect) : i32;
+extern pub fn SDL_SetYUVConversionMode(mode : SDL_YUV_CONVERSION_MODE) : void;
+extern pub fn SDL_GetYUVConversionMode() : SDL_YUV_CONVERSION_MODE;
+extern pub fn SDL_GetYUVConversionModeForResolution(width : i32,height : i32) : SDL_YUV_CONVERSION_MODE;
+struct SDL_DisplayMode {
+	format : Uint32,
+	w : i32,
+	h : i32,
+	refresh_rate : i32,
+	driverdata : * void,
+}
+struct SDL_Window {
+}
+type SDL_GLContext = * void;
+extern pub fn SDL_GetNumVideoDrivers() : i32;
+extern pub fn SDL_GetVideoDriver(index : i32) : * u8;
+extern pub fn SDL_VideoInit(driver_name : * u8) : i32;
+extern pub fn SDL_VideoQuit() : void;
+extern pub fn SDL_GetCurrentVideoDriver() : * u8;
+extern pub fn SDL_GetNumVideoDisplays() : i32;
+extern pub fn SDL_GetDisplayName(displayIndex : i32) : * u8;
+extern pub fn SDL_GetDisplayBounds(displayIndex : i32,rect : * SDL_Rect) : i32;
+extern pub fn SDL_GetDisplayUsableBounds(displayIndex : i32,rect : * SDL_Rect) : i32;
+extern pub fn SDL_GetDisplayDPI(displayIndex : i32,ddpi : * float,hdpi : * float,vdpi : * float) : i32;
+extern pub fn SDL_GetDisplayOrientation(displayIndex : i32) : SDL_DisplayOrientation;
+extern pub fn SDL_GetNumDisplayModes(displayIndex : i32) : i32;
+extern pub fn SDL_GetDisplayMode(displayIndex : i32,modeIndex : i32,mode : * SDL_DisplayMode) : i32;
+extern pub fn SDL_GetDesktopDisplayMode(displayIndex : i32,mode : * SDL_DisplayMode) : i32;
+extern pub fn SDL_GetCurrentDisplayMode(displayIndex : i32,mode : * SDL_DisplayMode) : i32;
+extern pub fn SDL_GetClosestDisplayMode(displayIndex : i32,mode : * const SDL_DisplayMode,closest : * SDL_DisplayMode) : * SDL_DisplayMode;
+extern pub fn SDL_GetPointDisplayIndex(point : * const SDL_Point) : i32;
+extern pub fn SDL_GetRectDisplayIndex(rect : * const SDL_Rect) : i32;
+extern pub fn SDL_GetWindowDisplayIndex(window : * SDL_Window) : i32;
+extern pub fn SDL_SetWindowDisplayMode(window : * SDL_Window,mode : * const SDL_DisplayMode) : i32;
+extern pub fn SDL_GetWindowDisplayMode(window : * SDL_Window,mode : * SDL_DisplayMode) : i32;
+extern pub fn SDL_GetWindowICCProfile(window : * SDL_Window,size : * size_t) : * void;
+extern pub fn SDL_GetWindowPixelFormat(window : * SDL_Window) : Uint32;
+extern pub fn SDL_CreateWindow(title : * u8,x : i32,y : i32,w : i32,h : i32,flags : Uint32) : * SDL_Window;
+extern pub fn SDL_CreateWindowFrom(data : * void) : * SDL_Window;
+extern pub fn SDL_GetWindowID(window : * SDL_Window) : Uint32;
+extern pub fn SDL_GetWindowFromID(id : Uint32) : * SDL_Window;
+extern pub fn SDL_GetWindowFlags(window : * SDL_Window) : Uint32;
+extern pub fn SDL_SetWindowTitle(window : * SDL_Window,title : * u8) : void;
+extern pub fn SDL_GetWindowTitle(window : * SDL_Window) : * u8;
+extern pub fn SDL_SetWindowIcon(window : * SDL_Window,icon : * SDL_Surface) : void;
+extern pub fn SDL_SetWindowData(window : * SDL_Window,name : * u8,userdata : * void) : * void;
+extern pub fn SDL_GetWindowData(window : * SDL_Window,name : * u8) : * void;
+extern pub fn SDL_SetWindowPosition(window : * SDL_Window,x : i32,y : i32) : void;
+extern pub fn SDL_GetWindowPosition(window : * SDL_Window,x : * i32,y : * i32) : void;
+extern pub fn SDL_SetWindowSize(window : * SDL_Window,w : i32,h : i32) : void;
+extern pub fn SDL_GetWindowSize(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_GetWindowBordersSize(window : * SDL_Window,top : * i32,left : * i32,bottom : * i32,right : * i32) : i32;
+extern pub fn SDL_GetWindowSizeInPixels(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_SetWindowMinimumSize(window : * SDL_Window,min_w : i32,min_h : i32) : void;
+extern pub fn SDL_GetWindowMinimumSize(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_SetWindowMaximumSize(window : * SDL_Window,max_w : i32,max_h : i32) : void;
+extern pub fn SDL_GetWindowMaximumSize(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_SetWindowBordered(window : * SDL_Window,bordered : SDL_bool) : void;
+extern pub fn SDL_SetWindowResizable(window : * SDL_Window,resizable : SDL_bool) : void;
+extern pub fn SDL_SetWindowAlwaysOnTop(window : * SDL_Window,on_top : SDL_bool) : void;
+extern pub fn SDL_ShowWindow(window : * SDL_Window) : void;
+extern pub fn SDL_HideWindow(window : * SDL_Window) : void;
+extern pub fn SDL_RaiseWindow(window : * SDL_Window) : void;
+extern pub fn SDL_MaximizeWindow(window : * SDL_Window) : void;
+extern pub fn SDL_MinimizeWindow(window : * SDL_Window) : void;
+extern pub fn SDL_RestoreWindow(window : * SDL_Window) : void;
+extern pub fn SDL_SetWindowFullscreen(window : * SDL_Window,flags : Uint32) : i32;
+extern pub fn SDL_HasWindowSurface(window : * SDL_Window) : SDL_bool;
+extern pub fn SDL_GetWindowSurface(window : * SDL_Window) : * SDL_Surface;
+extern pub fn SDL_UpdateWindowSurface(window : * SDL_Window) : i32;
+extern pub fn SDL_UpdateWindowSurfaceRects(window : * SDL_Window,rects : * const SDL_Rect,numrects : i32) : i32;
+extern pub fn SDL_DestroyWindowSurface(window : * SDL_Window) : i32;
+extern pub fn SDL_SetWindowGrab(window : * SDL_Window,grabbed : SDL_bool) : void;
+extern pub fn SDL_SetWindowKeyboardGrab(window : * SDL_Window,grabbed : SDL_bool) : void;
+extern pub fn SDL_SetWindowMouseGrab(window : * SDL_Window,grabbed : SDL_bool) : void;
+extern pub fn SDL_GetWindowGrab(window : * SDL_Window) : SDL_bool;
+extern pub fn SDL_GetWindowKeyboardGrab(window : * SDL_Window) : SDL_bool;
+extern pub fn SDL_GetWindowMouseGrab(window : * SDL_Window) : SDL_bool;
+extern pub fn SDL_GetGrabbedWindow() : * SDL_Window;
+extern pub fn SDL_SetWindowMouseRect(window : * SDL_Window,rect : * const SDL_Rect) : i32;
+extern pub fn SDL_GetWindowMouseRect(window : * SDL_Window) : * const SDL_Rect;
+extern pub fn SDL_SetWindowBrightness(window : * SDL_Window,brightness : float) : i32;
+extern pub fn SDL_GetWindowBrightness(window : * SDL_Window) : float;
+extern pub fn SDL_SetWindowOpacity(window : * SDL_Window,opacity : float) : i32;
+extern pub fn SDL_GetWindowOpacity(window : * SDL_Window,out_opacity : * float) : i32;
+extern pub fn SDL_SetWindowModalFor(modal_window : * SDL_Window,parent_window : * SDL_Window) : i32;
+extern pub fn SDL_SetWindowInputFocus(window : * SDL_Window) : i32;
+extern pub fn SDL_SetWindowGammaRamp(window : * SDL_Window,red : * const Uint16,green : * const Uint16,blue : * const Uint16) : i32;
+extern pub fn SDL_GetWindowGammaRamp(window : * SDL_Window,red : * Uint16,green : * Uint16,blue : * Uint16) : i32;
+type SDL_HitTest = fn(* SDL_Window,* const SDL_Point,* void) : SDL_HitTestResult;
+extern pub fn SDL_SetWindowHitTest(window : * SDL_Window,callback : SDL_HitTest,callback_data : * void) : i32;
+extern pub fn SDL_FlashWindow(window : * SDL_Window,operation : SDL_FlashOperation) : i32;
+extern pub fn SDL_DestroyWindow(window : * SDL_Window) : void;
+extern pub fn SDL_IsScreenSaverEnabled() : SDL_bool;
+extern pub fn SDL_EnableScreenSaver() : void;
+extern pub fn SDL_DisableScreenSaver() : void;
+extern pub fn SDL_GL_LoadLibrary(path : * u8) : i32;
+extern pub fn SDL_GL_GetProcAddress(proc : * u8) : * void;
+extern pub fn SDL_GL_UnloadLibrary() : void;
+extern pub fn SDL_GL_ExtensionSupported(extension : * u8) : SDL_bool;
+extern pub fn SDL_GL_ResetAttributes() : void;
+extern pub fn SDL_GL_SetAttribute(attr : SDL_GLattr,value : i32) : i32;
+extern pub fn SDL_GL_GetAttribute(attr : SDL_GLattr,value : * i32) : i32;
+extern pub fn SDL_GL_CreateContext(window : * SDL_Window) : SDL_GLContext;
+extern pub fn SDL_GL_MakeCurrent(window : * SDL_Window,context : SDL_GLContext) : i32;
+extern pub fn SDL_GL_GetCurrentWindow() : * SDL_Window;
+extern pub fn SDL_GL_GetCurrentContext() : SDL_GLContext;
+extern pub fn SDL_GL_GetDrawableSize(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_GL_SetSwapInterval(interval : i32) : i32;
+extern pub fn SDL_GL_GetSwapInterval() : i32;
+extern pub fn SDL_GL_SwapWindow(window : * SDL_Window) : void;
+extern pub fn SDL_GL_DeleteContext(context : SDL_GLContext) : void;
+type SDL_Keycode = Sint32;
+struct SDL_Keysym {
+	scancode : SDL_Scancode,
+	sym : SDL_Keycode,
+	mod : Uint16,
+	unused : Uint32,
+}
+extern pub fn SDL_GetKeyboardFocus() : * SDL_Window;
+extern pub fn SDL_GetKeyboardState(numkeys : * i32) : * const Uint8;
+extern pub fn SDL_ResetKeyboard() : void;
+extern pub fn SDL_GetModState() : SDL_Keymod;
+extern pub fn SDL_SetModState(modstate : SDL_Keymod) : void;
+extern pub fn SDL_GetKeyFromScancode(scancode : SDL_Scancode) : SDL_Keycode;
+extern pub fn SDL_GetScancodeFromKey(key : SDL_Keycode) : SDL_Scancode;
+extern pub fn SDL_GetScancodeName(scancode : SDL_Scancode) : * u8;
+extern pub fn SDL_GetScancodeFromName(name : * u8) : SDL_Scancode;
+extern pub fn SDL_GetKeyName(key : SDL_Keycode) : * u8;
+extern pub fn SDL_GetKeyFromName(name : * u8) : SDL_Keycode;
+extern pub fn SDL_StartTextInput() : void;
+extern pub fn SDL_IsTextInputActive() : SDL_bool;
+extern pub fn SDL_StopTextInput() : void;
+extern pub fn SDL_ClearComposition() : void;
+extern pub fn SDL_IsTextInputShown() : SDL_bool;
+extern pub fn SDL_SetTextInputRect(rect : * const SDL_Rect) : void;
+extern pub fn SDL_HasScreenKeyboardSupport() : SDL_bool;
+extern pub fn SDL_IsScreenKeyboardShown(window : * SDL_Window) : SDL_bool;
+struct SDL_Cursor {
+}
+extern pub fn SDL_GetMouseFocus() : * SDL_Window;
+extern pub fn SDL_GetMouseState(x : * i32,y : * i32) : Uint32;
+extern pub fn SDL_GetGlobalMouseState(x : * i32,y : * i32) : Uint32;
+extern pub fn SDL_GetRelativeMouseState(x : * i32,y : * i32) : Uint32;
+extern pub fn SDL_WarpMouseInWindow(window : * SDL_Window,x : i32,y : i32) : void;
+extern pub fn SDL_WarpMouseGlobal(x : i32,y : i32) : i32;
+extern pub fn SDL_SetRelativeMouseMode(enabled : SDL_bool) : i32;
+extern pub fn SDL_CaptureMouse(enabled : SDL_bool) : i32;
+extern pub fn SDL_GetRelativeMouseMode() : SDL_bool;
+extern pub fn SDL_CreateCursor(data : * const Uint8,mask : * const Uint8,w : i32,h : i32,hot_x : i32,hot_y : i32) : * SDL_Cursor;
+extern pub fn SDL_CreateColorCursor(surface : * SDL_Surface,hot_x : i32,hot_y : i32) : * SDL_Cursor;
+extern pub fn SDL_CreateSystemCursor(id : SDL_SystemCursor) : * SDL_Cursor;
+extern pub fn SDL_SetCursor(cursor : * SDL_Cursor) : void;
+extern pub fn SDL_GetCursor() : * SDL_Cursor;
+extern pub fn SDL_GetDefaultCursor() : * SDL_Cursor;
+extern pub fn SDL_FreeCursor(cursor : * SDL_Cursor) : void;
+extern pub fn SDL_ShowCursor(toggle : i32) : i32;
+struct SDL_GUID {
+	data : Uint8[16],
+}
+extern pub fn SDL_GUIDToString(guid : SDL_GUID,pszGUID : * u8,cbGUID : i32) : void;
+extern pub fn SDL_GUIDFromString(pchGUID : * u8) : SDL_GUID;
+struct _SDL_Joystick {
+}
+type SDL_JoystickGUID = SDL_GUID;
+type SDL_JoystickID = Sint32;
+extern pub fn SDL_LockJoysticks() : void;
+extern pub fn SDL_UnlockJoysticks() : void;
+extern pub fn SDL_NumJoysticks() : i32;
+extern pub fn SDL_JoystickNameForIndex(device_index : i32) : * u8;
+extern pub fn SDL_JoystickPathForIndex(device_index : i32) : * u8;
+extern pub fn SDL_JoystickGetDevicePlayerIndex(device_index : i32) : i32;
+extern pub fn SDL_JoystickGetDeviceGUID(device_index : i32) : SDL_JoystickGUID;
+extern pub fn SDL_JoystickGetDeviceVendor(device_index : i32) : Uint16;
+extern pub fn SDL_JoystickGetDeviceProduct(device_index : i32) : Uint16;
+extern pub fn SDL_JoystickGetDeviceProductVersion(device_index : i32) : Uint16;
+extern pub fn SDL_JoystickGetDeviceType(device_index : i32) : SDL_JoystickType;
+extern pub fn SDL_JoystickGetDeviceInstanceID(device_index : i32) : SDL_JoystickID;
+extern pub fn SDL_JoystickOpen(device_index : i32) : * SDL_Joystick;
+extern pub fn SDL_JoystickFromInstanceID(instance_id : SDL_JoystickID) : * SDL_Joystick;
+extern pub fn SDL_JoystickFromPlayerIndex(player_index : i32) : * SDL_Joystick;
+extern pub fn SDL_JoystickAttachVirtual(type : SDL_JoystickType,naxes : i32,nbuttons : i32,nhats : i32) : i32;
+struct SDL_VirtualJoystickDesc {
+	version : Uint16,
+	type : Uint16,
+	naxes : Uint16,
+	nbuttons : Uint16,
+	nhats : Uint16,
+	vendor_id : Uint16,
+	product_id : Uint16,
+	padding : Uint16,
+	button_mask : Uint32,
+	axis_mask : Uint32,
+	name : * u8,
+	userdata : * void,
+	Update : fn(* void) : void,
+	SetPlayerIndex : fn(* void,i32) : void,
+	Rumble : fn(* void,Uint16,Uint16) : i32,
+	RumbleTriggers : fn(* void,Uint16,Uint16) : i32,
+	SetLED : fn(* void,Uint8,Uint8,Uint8) : i32,
+	SendEffect : fn(* void,* void,i32) : i32,
+}
+extern pub fn SDL_JoystickAttachVirtualEx(desc : * const SDL_VirtualJoystickDesc) : i32;
+extern pub fn SDL_JoystickDetachVirtual(device_index : i32) : i32;
+extern pub fn SDL_JoystickIsVirtual(device_index : i32) : SDL_bool;
+extern pub fn SDL_JoystickSetVirtualAxis(joystick : * SDL_Joystick,axis : i32,value : Sint16) : i32;
+extern pub fn SDL_JoystickSetVirtualButton(joystick : * SDL_Joystick,button : i32,value : Uint8) : i32;
+extern pub fn SDL_JoystickSetVirtualHat(joystick : * SDL_Joystick,hat : i32,value : Uint8) : i32;
+extern pub fn SDL_JoystickName(joystick : * SDL_Joystick) : * u8;
+extern pub fn SDL_JoystickPath(joystick : * SDL_Joystick) : * u8;
+extern pub fn SDL_JoystickGetPlayerIndex(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_JoystickSetPlayerIndex(joystick : * SDL_Joystick,player_index : i32) : void;
+extern pub fn SDL_JoystickGetGUID(joystick : * SDL_Joystick) : SDL_JoystickGUID;
+extern pub fn SDL_JoystickGetVendor(joystick : * SDL_Joystick) : Uint16;
+extern pub fn SDL_JoystickGetProduct(joystick : * SDL_Joystick) : Uint16;
+extern pub fn SDL_JoystickGetProductVersion(joystick : * SDL_Joystick) : Uint16;
+extern pub fn SDL_JoystickGetFirmwareVersion(joystick : * SDL_Joystick) : Uint16;
+extern pub fn SDL_JoystickGetSerial(joystick : * SDL_Joystick) : * u8;
+extern pub fn SDL_JoystickGetType(joystick : * SDL_Joystick) : SDL_JoystickType;
+extern pub fn SDL_JoystickGetGUIDString(guid : SDL_JoystickGUID,pszGUID : * u8,cbGUID : i32) : void;
+extern pub fn SDL_JoystickGetGUIDFromString(pchGUID : * u8) : SDL_JoystickGUID;
+extern pub fn SDL_GetJoystickGUIDInfo(guid : SDL_JoystickGUID,vendor : * Uint16,product : * Uint16,version : * Uint16,crc16 : * Uint16) : void;
+extern pub fn SDL_JoystickGetAttached(joystick : * SDL_Joystick) : SDL_bool;
+extern pub fn SDL_JoystickInstanceID(joystick : * SDL_Joystick) : SDL_JoystickID;
+extern pub fn SDL_JoystickNumAxes(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_JoystickNumBalls(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_JoystickNumHats(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_JoystickNumButtons(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_JoystickUpdate() : void;
+extern pub fn SDL_JoystickEventState(state : i32) : i32;
+extern pub fn SDL_JoystickGetAxis(joystick : * SDL_Joystick,axis : i32) : Sint16;
+extern pub fn SDL_JoystickGetAxisInitialState(joystick : * SDL_Joystick,axis : i32,state : * Sint16) : SDL_bool;
+extern pub fn SDL_JoystickGetHat(joystick : * SDL_Joystick,hat : i32) : Uint8;
+extern pub fn SDL_JoystickGetBall(joystick : * SDL_Joystick,ball : i32,dx : * i32,dy : * i32) : i32;
+extern pub fn SDL_JoystickGetButton(joystick : * SDL_Joystick,button : i32) : Uint8;
+extern pub fn SDL_JoystickRumble(joystick : * SDL_Joystick,low_frequency_rumble : Uint16,high_frequency_rumble : Uint16,duration_ms : Uint32) : i32;
+extern pub fn SDL_JoystickRumbleTriggers(joystick : * SDL_Joystick,left_rumble : Uint16,right_rumble : Uint16,duration_ms : Uint32) : i32;
+extern pub fn SDL_JoystickHasLED(joystick : * SDL_Joystick) : SDL_bool;
+extern pub fn SDL_JoystickHasRumble(joystick : * SDL_Joystick) : SDL_bool;
+extern pub fn SDL_JoystickHasRumbleTriggers(joystick : * SDL_Joystick) : SDL_bool;
+extern pub fn SDL_JoystickSetLED(joystick : * SDL_Joystick,red : Uint8,green : Uint8,blue : Uint8) : i32;
+extern pub fn SDL_JoystickSendEffect(joystick : * SDL_Joystick,data : * void,size : i32) : i32;
+extern pub fn SDL_JoystickClose(joystick : * SDL_Joystick) : void;
+extern pub fn SDL_JoystickCurrentPowerLevel(joystick : * SDL_Joystick) : SDL_JoystickPowerLevel;
+struct _SDL_Sensor {
+}
+type SDL_SensorID = Sint32;
+extern pub fn SDL_LockSensors() : void;
+extern pub fn SDL_UnlockSensors() : void;
+extern pub fn SDL_NumSensors() : i32;
+extern pub fn SDL_SensorGetDeviceName(device_index : i32) : * u8;
+extern pub fn SDL_SensorGetDeviceType(device_index : i32) : SDL_SensorType;
+extern pub fn SDL_SensorGetDeviceNonPortableType(device_index : i32) : i32;
+extern pub fn SDL_SensorGetDeviceInstanceID(device_index : i32) : SDL_SensorID;
+extern pub fn SDL_SensorOpen(device_index : i32) : * SDL_Sensor;
+extern pub fn SDL_SensorFromInstanceID(instance_id : SDL_SensorID) : * SDL_Sensor;
+extern pub fn SDL_SensorGetName(sensor : * SDL_Sensor) : * u8;
+extern pub fn SDL_SensorGetType(sensor : * SDL_Sensor) : SDL_SensorType;
+extern pub fn SDL_SensorGetNonPortableType(sensor : * SDL_Sensor) : i32;
+extern pub fn SDL_SensorGetInstanceID(sensor : * SDL_Sensor) : SDL_SensorID;
+extern pub fn SDL_SensorGetData(sensor : * SDL_Sensor,data : * float,num_values : i32) : i32;
+extern pub fn SDL_SensorGetDataWithTimestamp(sensor : * SDL_Sensor,timestamp : * Uint64,data : * float,num_values : i32) : i32;
+extern pub fn SDL_SensorClose(sensor : * SDL_Sensor) : void;
+extern pub fn SDL_SensorUpdate() : void;
+struct _SDL_GameController {
+}
+struct SDL_GameControllerButtonBind {
+	bindType : SDL_GameControllerBindType,
+	union (unnamed at /usr/include/SDL2/SDL_gamecontroller.h:96:5) : union SDL_GameControllerButtonBind::(unnamed at /usr/include/SDL2/SDL_gamecontroller.h:96:5),
+	value : union (unnamed union at /usr/include/SDL2/SDL_gamecontroller.h:96:5),
+}
+extern pub fn SDL_GameControllerAddMappingsFromRW(rw : * SDL_RWops,freerw : i32) : i32;
+extern pub fn SDL_GameControllerAddMapping(mappingString : * u8) : i32;
+extern pub fn SDL_GameControllerNumMappings() : i32;
+extern pub fn SDL_GameControllerMappingForIndex(mapping_index : i32) : * u8;
+extern pub fn SDL_GameControllerMappingForGUID(guid : SDL_JoystickGUID) : * u8;
+extern pub fn SDL_GameControllerMapping(gamecontroller : * SDL_GameController) : * u8;
+extern pub fn SDL_IsGameController(joystick_index : i32) : SDL_bool;
+extern pub fn SDL_GameControllerNameForIndex(joystick_index : i32) : * u8;
+extern pub fn SDL_GameControllerPathForIndex(joystick_index : i32) : * u8;
+extern pub fn SDL_GameControllerTypeForIndex(joystick_index : i32) : SDL_GameControllerType;
+extern pub fn SDL_GameControllerMappingForDeviceIndex(joystick_index : i32) : * u8;
+extern pub fn SDL_GameControllerOpen(joystick_index : i32) : * SDL_GameController;
+extern pub fn SDL_GameControllerFromInstanceID(joyid : SDL_JoystickID) : * SDL_GameController;
+extern pub fn SDL_GameControllerFromPlayerIndex(player_index : i32) : * SDL_GameController;
+extern pub fn SDL_GameControllerName(gamecontroller : * SDL_GameController) : * u8;
+extern pub fn SDL_GameControllerPath(gamecontroller : * SDL_GameController) : * u8;
+extern pub fn SDL_GameControllerGetType(gamecontroller : * SDL_GameController) : SDL_GameControllerType;
+extern pub fn SDL_GameControllerGetPlayerIndex(gamecontroller : * SDL_GameController) : i32;
+extern pub fn SDL_GameControllerSetPlayerIndex(gamecontroller : * SDL_GameController,player_index : i32) : void;
+extern pub fn SDL_GameControllerGetVendor(gamecontroller : * SDL_GameController) : Uint16;
+extern pub fn SDL_GameControllerGetProduct(gamecontroller : * SDL_GameController) : Uint16;
+extern pub fn SDL_GameControllerGetProductVersion(gamecontroller : * SDL_GameController) : Uint16;
+extern pub fn SDL_GameControllerGetFirmwareVersion(gamecontroller : * SDL_GameController) : Uint16;
+extern pub fn SDL_GameControllerGetSerial(gamecontroller : * SDL_GameController) : * u8;
+extern pub fn SDL_GameControllerGetSteamHandle(gamecontroller : * SDL_GameController) : Uint64;
+extern pub fn SDL_GameControllerGetAttached(gamecontroller : * SDL_GameController) : SDL_bool;
+extern pub fn SDL_GameControllerGetJoystick(gamecontroller : * SDL_GameController) : * SDL_Joystick;
+extern pub fn SDL_GameControllerEventState(state : i32) : i32;
+extern pub fn SDL_GameControllerUpdate() : void;
+extern pub fn SDL_GameControllerGetAxisFromString(str : * u8) : SDL_GameControllerAxis;
+extern pub fn SDL_GameControllerGetStringForAxis(axis : SDL_GameControllerAxis) : * u8;
+extern pub fn SDL_GameControllerGetBindForAxis(gamecontroller : * SDL_GameController,axis : SDL_GameControllerAxis) : SDL_GameControllerButtonBind;
+extern pub fn SDL_GameControllerHasAxis(gamecontroller : * SDL_GameController,axis : SDL_GameControllerAxis) : SDL_bool;
+extern pub fn SDL_GameControllerGetAxis(gamecontroller : * SDL_GameController,axis : SDL_GameControllerAxis) : Sint16;
+extern pub fn SDL_GameControllerGetButtonFromString(str : * u8) : SDL_GameControllerButton;
+extern pub fn SDL_GameControllerGetStringForButton(button : SDL_GameControllerButton) : * u8;
+extern pub fn SDL_GameControllerGetBindForButton(gamecontroller : * SDL_GameController,button : SDL_GameControllerButton) : SDL_GameControllerButtonBind;
+extern pub fn SDL_GameControllerHasButton(gamecontroller : * SDL_GameController,button : SDL_GameControllerButton) : SDL_bool;
+extern pub fn SDL_GameControllerGetButton(gamecontroller : * SDL_GameController,button : SDL_GameControllerButton) : Uint8;
+extern pub fn SDL_GameControllerGetNumTouchpads(gamecontroller : * SDL_GameController) : i32;
+extern pub fn SDL_GameControllerGetNumTouchpadFingers(gamecontroller : * SDL_GameController,touchpad : i32) : i32;
+extern pub fn SDL_GameControllerGetTouchpadFinger(gamecontroller : * SDL_GameController,touchpad : i32,finger : i32,state : * Uint8,x : * float,y : * float,pressure : * float) : i32;
+extern pub fn SDL_GameControllerHasSensor(gamecontroller : * SDL_GameController,type : SDL_SensorType) : SDL_bool;
+extern pub fn SDL_GameControllerSetSensorEnabled(gamecontroller : * SDL_GameController,type : SDL_SensorType,enabled : SDL_bool) : i32;
+extern pub fn SDL_GameControllerIsSensorEnabled(gamecontroller : * SDL_GameController,type : SDL_SensorType) : SDL_bool;
+extern pub fn SDL_GameControllerGetSensorDataRate(gamecontroller : * SDL_GameController,type : SDL_SensorType) : float;
+extern pub fn SDL_GameControllerGetSensorData(gamecontroller : * SDL_GameController,type : SDL_SensorType,data : * float,num_values : i32) : i32;
+extern pub fn SDL_GameControllerGetSensorDataWithTimestamp(gamecontroller : * SDL_GameController,type : SDL_SensorType,timestamp : * Uint64,data : * float,num_values : i32) : i32;
+extern pub fn SDL_GameControllerRumble(gamecontroller : * SDL_GameController,low_frequency_rumble : Uint16,high_frequency_rumble : Uint16,duration_ms : Uint32) : i32;
+extern pub fn SDL_GameControllerRumbleTriggers(gamecontroller : * SDL_GameController,left_rumble : Uint16,right_rumble : Uint16,duration_ms : Uint32) : i32;
+extern pub fn SDL_GameControllerHasLED(gamecontroller : * SDL_GameController) : SDL_bool;
+extern pub fn SDL_GameControllerHasRumble(gamecontroller : * SDL_GameController) : SDL_bool;
+extern pub fn SDL_GameControllerHasRumbleTriggers(gamecontroller : * SDL_GameController) : SDL_bool;
+extern pub fn SDL_GameControllerSetLED(gamecontroller : * SDL_GameController,red : Uint8,green : Uint8,blue : Uint8) : i32;
+extern pub fn SDL_GameControllerSendEffect(gamecontroller : * SDL_GameController,data : * void,size : i32) : i32;
+extern pub fn SDL_GameControllerClose(gamecontroller : * SDL_GameController) : void;
+extern pub fn SDL_GameControllerGetAppleSFSymbolsNameForButton(gamecontroller : * SDL_GameController,button : SDL_GameControllerButton) : * u8;
+extern pub fn SDL_GameControllerGetAppleSFSymbolsNameForAxis(gamecontroller : * SDL_GameController,axis : SDL_GameControllerAxis) : * u8;
+type SDL_TouchID = Sint64;
+type SDL_FingerID = Sint64;
+struct SDL_Finger {
+	id : SDL_FingerID,
+	x : float,
+	y : float,
+	pressure : float,
+}
+extern pub fn SDL_GetNumTouchDevices() : i32;
+extern pub fn SDL_GetTouchDevice(index : i32) : SDL_TouchID;
+extern pub fn SDL_GetTouchName(index : i32) : * u8;
+extern pub fn SDL_GetTouchDeviceType(touchID : SDL_TouchID) : SDL_TouchDeviceType;
+extern pub fn SDL_GetNumTouchFingers(touchID : SDL_TouchID) : i32;
+extern pub fn SDL_GetTouchFinger(touchID : SDL_TouchID,index : i32) : * SDL_Finger;
+type SDL_GestureID = Sint64;
+extern pub fn SDL_RecordGesture(touchId : SDL_TouchID) : i32;
+extern pub fn SDL_SaveAllDollarTemplates(dst : * SDL_RWops) : i32;
+extern pub fn SDL_SaveDollarTemplate(gestureId : SDL_GestureID,dst : * SDL_RWops) : i32;
+extern pub fn SDL_LoadDollarTemplates(touchId : SDL_TouchID,src : * SDL_RWops) : i32;
+struct SDL_CommonEvent {
+	type : Uint32,
+	timestamp : Uint32,
+}
+struct SDL_DisplayEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	display : Uint32,
+	event : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	data1 : Sint32,
+}
+struct SDL_WindowEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	event : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	data1 : Sint32,
+	data2 : Sint32,
+}
+struct SDL_KeyboardEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	state : Uint8,
+	repeat : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	keysym : SDL_Keysym,
+}
+struct SDL_TextEditingEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	text : char[32],
+	start : Sint32,
+	length : Sint32,
+}
+struct SDL_TextEditingExtEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	text : * u8,
+	start : Sint32,
+	length : Sint32,
+}
+struct SDL_TextInputEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	text : char[32],
+}
+struct SDL_MouseMotionEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	which : Uint32,
+	state : Uint32,
+	x : Sint32,
+	y : Sint32,
+	xrel : Sint32,
+	yrel : Sint32,
+}
+struct SDL_MouseButtonEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	which : Uint32,
+	button : Uint8,
+	state : Uint8,
+	clicks : Uint8,
+	padding1 : Uint8,
+	x : Sint32,
+	y : Sint32,
+}
+struct SDL_MouseWheelEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	which : Uint32,
+	x : Sint32,
+	y : Sint32,
+	direction : Uint32,
+	preciseX : float,
+	preciseY : float,
+	mouseX : Sint32,
+	mouseY : Sint32,
+}
+struct SDL_JoyAxisEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	axis : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	value : Sint16,
+	padding4 : Uint16,
+}
+struct SDL_JoyBallEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	ball : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	xrel : Sint16,
+	yrel : Sint16,
+}
+struct SDL_JoyHatEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	hat : Uint8,
+	value : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+}
+struct SDL_JoyButtonEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	button : Uint8,
+	state : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+}
+struct SDL_JoyDeviceEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : Sint32,
+}
+struct SDL_JoyBatteryEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	level : SDL_JoystickPowerLevel,
+}
+struct SDL_ControllerAxisEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	axis : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+	value : Sint16,
+	padding4 : Uint16,
+}
+struct SDL_ControllerButtonEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	button : Uint8,
+	state : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+}
+struct SDL_ControllerDeviceEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : Sint32,
+}
+struct SDL_ControllerTouchpadEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	touchpad : Sint32,
+	finger : Sint32,
+	x : float,
+	y : float,
+	pressure : float,
+}
+struct SDL_ControllerSensorEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : SDL_JoystickID,
+	sensor : Sint32,
+	data : float[3],
+	timestamp_us : Uint64,
+}
+struct SDL_AudioDeviceEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : Uint32,
+	iscapture : Uint8,
+	padding1 : Uint8,
+	padding2 : Uint8,
+	padding3 : Uint8,
+}
+struct SDL_TouchFingerEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	touchId : SDL_TouchID,
+	fingerId : SDL_FingerID,
+	x : float,
+	y : float,
+	dx : float,
+	dy : float,
+	pressure : float,
+	windowID : Uint32,
+}
+struct SDL_MultiGestureEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	touchId : SDL_TouchID,
+	dTheta : float,
+	dDist : float,
+	x : float,
+	y : float,
+	numFingers : Uint16,
+	padding : Uint16,
+}
+struct SDL_DollarGestureEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	touchId : SDL_TouchID,
+	gestureId : SDL_GestureID,
+	numFingers : Uint32,
+	error : float,
+	x : float,
+	y : float,
+}
+struct SDL_DropEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	file : * u8,
+	windowID : Uint32,
+}
+struct SDL_SensorEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	which : Sint32,
+	data : float[6],
+	timestamp_us : Uint64,
+}
+struct SDL_QuitEvent {
+	type : Uint32,
+	timestamp : Uint32,
+}
+struct SDL_UserEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	windowID : Uint32,
+	code : Sint32,
+	data1 : * void,
+	data2 : * void,
+}
+struct SDL_SysWMmsg {
+}
+struct SDL_SysWMEvent {
+	type : Uint32,
+	timestamp : Uint32,
+	msg : * SDL_SysWMmsg,
+}
+type SDL_Event = union SDL_Event;
+extern pub fn SDL_PumpEvents() : void;
+extern pub fn SDL_PeepEvents(events : * SDL_Event,numevents : i32,action : SDL_eventaction,minType : Uint32,maxType : Uint32) : i32;
+extern pub fn SDL_HasEvent(type : Uint32) : SDL_bool;
+extern pub fn SDL_HasEvents(minType : Uint32,maxType : Uint32) : SDL_bool;
+extern pub fn SDL_FlushEvent(type : Uint32) : void;
+extern pub fn SDL_FlushEvents(minType : Uint32,maxType : Uint32) : void;
+extern pub fn SDL_PollEvent(event : * SDL_Event) : i32;
+extern pub fn SDL_WaitEvent(event : * SDL_Event) : i32;
+extern pub fn SDL_WaitEventTimeout(event : * SDL_Event,timeout : i32) : i32;
+extern pub fn SDL_PushEvent(event : * SDL_Event) : i32;
+type SDL_EventFilter = fn(* void,* SDL_Event) : i32;
+extern pub fn SDL_SetEventFilter(filter : SDL_EventFilter,userdata : * void) : void;
+extern pub fn SDL_GetEventFilter(filter : * SDL_EventFilter,userdata : * * void) : SDL_bool;
+extern pub fn SDL_AddEventWatch(filter : SDL_EventFilter,userdata : * void) : void;
+extern pub fn SDL_DelEventWatch(filter : SDL_EventFilter,userdata : * void) : void;
+extern pub fn SDL_FilterEvents(filter : SDL_EventFilter,userdata : * void) : void;
+extern pub fn SDL_EventState(type : Uint32,state : i32) : Uint8;
+extern pub fn SDL_RegisterEvents(numevents : i32) : Uint32;
+extern pub fn SDL_GetBasePath() : * u8;
+extern pub fn SDL_GetPrefPath(org : * u8,app : * u8) : * u8;
+struct _SDL_Haptic {
+}
+struct SDL_HapticDirection {
+	type : Uint8,
+	dir : Sint32[3],
+}
+struct SDL_HapticConstant {
+	type : Uint16,
+	direction : SDL_HapticDirection,
+	length : Uint32,
+	delay : Uint16,
+	button : Uint16,
+	interval : Uint16,
+	level : Sint16,
+	attack_length : Uint16,
+	attack_level : Uint16,
+	fade_length : Uint16,
+	fade_level : Uint16,
+}
+struct SDL_HapticPeriodic {
+	type : Uint16,
+	direction : SDL_HapticDirection,
+	length : Uint32,
+	delay : Uint16,
+	button : Uint16,
+	interval : Uint16,
+	period : Uint16,
+	magnitude : Sint16,
+	offset : Sint16,
+	phase : Uint16,
+	attack_length : Uint16,
+	attack_level : Uint16,
+	fade_length : Uint16,
+	fade_level : Uint16,
+}
+struct SDL_HapticCondition {
+	type : Uint16,
+	direction : SDL_HapticDirection,
+	length : Uint32,
+	delay : Uint16,
+	button : Uint16,
+	interval : Uint16,
+	right_sat : Uint16[3],
+	left_sat : Uint16[3],
+	right_coeff : Sint16[3],
+	left_coeff : Sint16[3],
+	deadband : Uint16[3],
+	center : Sint16[3],
+}
+struct SDL_HapticRamp {
+	type : Uint16,
+	direction : SDL_HapticDirection,
+	length : Uint32,
+	delay : Uint16,
+	button : Uint16,
+	interval : Uint16,
+	start : Sint16,
+	end : Sint16,
+	attack_length : Uint16,
+	attack_level : Uint16,
+	fade_length : Uint16,
+	fade_level : Uint16,
+}
+struct SDL_HapticLeftRight {
+	type : Uint16,
+	length : Uint32,
+	large_magnitude : Uint16,
+	small_magnitude : Uint16,
+}
+struct SDL_HapticCustom {
+	type : Uint16,
+	direction : SDL_HapticDirection,
+	length : Uint32,
+	delay : Uint16,
+	button : Uint16,
+	interval : Uint16,
+	channels : Uint8,
+	period : Uint16,
+	samples : Uint16,
+	data : * Uint16,
+	attack_length : Uint16,
+	attack_level : Uint16,
+	fade_length : Uint16,
+	fade_level : Uint16,
+}
+type SDL_HapticEffect = union SDL_HapticEffect;
+extern pub fn SDL_NumHaptics() : i32;
+extern pub fn SDL_HapticName(device_index : i32) : * u8;
+extern pub fn SDL_HapticOpen(device_index : i32) : * SDL_Haptic;
+extern pub fn SDL_HapticOpened(device_index : i32) : i32;
+extern pub fn SDL_HapticIndex(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_MouseIsHaptic() : i32;
+extern pub fn SDL_HapticOpenFromMouse() : * SDL_Haptic;
+extern pub fn SDL_JoystickIsHaptic(joystick : * SDL_Joystick) : i32;
+extern pub fn SDL_HapticOpenFromJoystick(joystick : * SDL_Joystick) : * SDL_Haptic;
+extern pub fn SDL_HapticClose(haptic : * SDL_Haptic) : void;
+extern pub fn SDL_HapticNumEffects(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticNumEffectsPlaying(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticQuery(haptic : * SDL_Haptic) : u32;
+extern pub fn SDL_HapticNumAxes(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticEffectSupported(haptic : * SDL_Haptic,effect : * SDL_HapticEffect) : i32;
+extern pub fn SDL_HapticNewEffect(haptic : * SDL_Haptic,effect : * SDL_HapticEffect) : i32;
+extern pub fn SDL_HapticUpdateEffect(haptic : * SDL_Haptic,effect : i32,data : * SDL_HapticEffect) : i32;
+extern pub fn SDL_HapticRunEffect(haptic : * SDL_Haptic,effect : i32,iterations : Uint32) : i32;
+extern pub fn SDL_HapticStopEffect(haptic : * SDL_Haptic,effect : i32) : i32;
+extern pub fn SDL_HapticDestroyEffect(haptic : * SDL_Haptic,effect : i32) : void;
+extern pub fn SDL_HapticGetEffectStatus(haptic : * SDL_Haptic,effect : i32) : i32;
+extern pub fn SDL_HapticSetGain(haptic : * SDL_Haptic,gain : i32) : i32;
+extern pub fn SDL_HapticSetAutocenter(haptic : * SDL_Haptic,autocenter : i32) : i32;
+extern pub fn SDL_HapticPause(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticUnpause(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticStopAll(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticRumbleSupported(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticRumbleInit(haptic : * SDL_Haptic) : i32;
+extern pub fn SDL_HapticRumblePlay(haptic : * SDL_Haptic,strength : float,length : Uint32) : i32;
+extern pub fn SDL_HapticRumbleStop(haptic : * SDL_Haptic) : i32;
+struct SDL_hid_device_ {
+}
+struct SDL_hid_device_info {
+	path : * u8,
+	vendor_id : u16,
+	product_id : u16,
+	serial_number : * wchar_t,
+	release_number : u16,
+	manufacturer_string : * wchar_t,
+	product_string : * wchar_t,
+	usage_page : u16,
+	usage : u16,
+	interface_number : i32,
+	interface_class : i32,
+	interface_subclass : i32,
+	interface_protocol : i32,
+	next : * struct SDL_hid_device_info,
+}
+extern pub fn SDL_hid_init() : i32;
+extern pub fn SDL_hid_exit() : i32;
+extern pub fn SDL_hid_device_change_count() : Uint32;
+extern pub fn SDL_hid_enumerate(vendor_id : u16,product_id : u16) : * SDL_hid_device_info;
+extern pub fn SDL_hid_free_enumeration(devs : * SDL_hid_device_info) : void;
+extern pub fn SDL_hid_open(vendor_id : u16,product_id : u16,serial_number : * const wchar_t) : * SDL_hid_device;
+extern pub fn SDL_hid_open_path(path : * u8,bExclusive : i32) : * SDL_hid_device;
+extern pub fn SDL_hid_write(dev : * SDL_hid_device,data : * u8,length : size_t) : i32;
+extern pub fn SDL_hid_read_timeout(dev : * SDL_hid_device,data : * u8,length : size_t,milliseconds : i32) : i32;
+extern pub fn SDL_hid_read(dev : * SDL_hid_device,data : * u8,length : size_t) : i32;
+extern pub fn SDL_hid_set_nonblocking(dev : * SDL_hid_device,nonblock : i32) : i32;
+extern pub fn SDL_hid_send_feature_report(dev : * SDL_hid_device,data : * u8,length : size_t) : i32;
+extern pub fn SDL_hid_get_feature_report(dev : * SDL_hid_device,data : * u8,length : size_t) : i32;
+extern pub fn SDL_hid_close(dev : * SDL_hid_device) : void;
+extern pub fn SDL_hid_get_manufacturer_string(dev : * SDL_hid_device,string : * wchar_t,maxlen : size_t) : i32;
+extern pub fn SDL_hid_get_product_string(dev : * SDL_hid_device,string : * wchar_t,maxlen : size_t) : i32;
+extern pub fn SDL_hid_get_serial_number_string(dev : * SDL_hid_device,string : * wchar_t,maxlen : size_t) : i32;
+extern pub fn SDL_hid_get_indexed_string(dev : * SDL_hid_device,string_index : i32,string : * wchar_t,maxlen : size_t) : i32;
+extern pub fn SDL_hid_ble_scan(active : SDL_bool) : void;
+extern pub fn SDL_SetHintWithPriority(name : * u8,value : * u8,priority : SDL_HintPriority) : SDL_bool;
+extern pub fn SDL_SetHint(name : * u8,value : * u8) : SDL_bool;
+extern pub fn SDL_ResetHint(name : * u8) : SDL_bool;
+extern pub fn SDL_ResetHints() : void;
+extern pub fn SDL_GetHint(name : * u8) : * u8;
+extern pub fn SDL_GetHintBoolean(name : * u8,default_value : SDL_bool) : SDL_bool;
+type SDL_HintCallback = fn(* void,* u8,* u8,* u8) : void;
+extern pub fn SDL_AddHintCallback(name : * u8,callback : SDL_HintCallback,userdata : * void) : void;
+extern pub fn SDL_DelHintCallback(name : * u8,callback : SDL_HintCallback,userdata : * void) : void;
+extern pub fn SDL_ClearHints() : void;
+extern pub fn SDL_LoadObject(sofile : * u8) : * void;
+extern pub fn SDL_LoadFunction(handle : * void,name : * u8) : * void;
+extern pub fn SDL_UnloadObject(handle : * void) : void;
+extern pub fn SDL_LogSetAllPriority(priority : SDL_LogPriority) : void;
+extern pub fn SDL_LogSetPriority(category : i32,priority : SDL_LogPriority) : void;
+extern pub fn SDL_LogGetPriority(category : i32) : SDL_LogPriority;
+extern pub fn SDL_LogResetPriorities() : void;
+extern pub fn SDL_Log(fmt : * u8) : void;
+extern pub fn SDL_LogVerbose(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogDebug(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogInfo(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogWarn(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogError(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogCritical(category : i32,fmt : * u8) : void;
+extern pub fn SDL_LogMessage(category : i32,priority : SDL_LogPriority,fmt : * u8) : void;
+extern pub fn SDL_LogMessageV(category : i32,priority : SDL_LogPriority,fmt : * u8,ap : va_list) : void;
+type SDL_LogOutputFunction = fn(* void,i32,SDL_LogPriority,* u8) : void;
+extern pub fn SDL_LogGetOutputFunction(callback : * SDL_LogOutputFunction,userdata : * * void) : void;
+extern pub fn SDL_LogSetOutputFunction(callback : SDL_LogOutputFunction,userdata : * void) : void;
+struct SDL_MessageBoxButtonData {
+	flags : Uint32,
+	buttonid : i32,
+	text : * u8,
+}
+struct SDL_MessageBoxColor {
+	r : Uint8,
+	g : Uint8,
+	b : Uint8,
+}
+struct SDL_MessageBoxColorScheme {
+	colors : SDL_MessageBoxColor[5],
+}
+struct SDL_MessageBoxData {
+	flags : Uint32,
+	window : * SDL_Window,
+	title : * u8,
+	message : * u8,
+	numbuttons : i32,
+	buttons : * const SDL_MessageBoxButtonData,
+	colorScheme : * const SDL_MessageBoxColorScheme,
+}
+extern pub fn SDL_ShowMessageBox(messageboxdata : * const SDL_MessageBoxData,buttonid : * i32) : i32;
+extern pub fn SDL_ShowSimpleMessageBox(flags : Uint32,title : * u8,message : * u8,window : * SDL_Window) : i32;
+type SDL_MetalView = * void;
+extern pub fn SDL_Metal_CreateView(window : * SDL_Window) : SDL_MetalView;
+extern pub fn SDL_Metal_DestroyView(view : SDL_MetalView) : void;
+extern pub fn SDL_Metal_GetLayer(view : SDL_MetalView) : * void;
+extern pub fn SDL_Metal_GetDrawableSize(window : * SDL_Window,w : * i32,h : * i32) : void;
+extern pub fn SDL_GetPowerInfo(seconds : * i32,percent : * i32) : SDL_PowerState;
+struct SDL_RendererInfo {
+	name : * u8,
+	flags : Uint32,
+	num_texture_formats : Uint32,
+	texture_formats : Uint32[16],
+	max_texture_width : i32,
+	max_texture_height : i32,
+}
+struct SDL_Vertex {
+	position : SDL_FPoint,
+	color : SDL_Color,
+	tex_coord : SDL_FPoint,
+}
+struct SDL_Renderer {
+}
+struct SDL_Texture {
+}
+extern pub fn SDL_GetNumRenderDrivers() : i32;
+extern pub fn SDL_GetRenderDriverInfo(index : i32,info : * SDL_RendererInfo) : i32;
+extern pub fn SDL_CreateWindowAndRenderer(width : i32,height : i32,window_flags : Uint32,window : * * SDL_Window,renderer : * * SDL_Renderer) : i32;
+extern pub fn SDL_CreateRenderer(window : * SDL_Window,index : i32,flags : Uint32) : * SDL_Renderer;
+extern pub fn SDL_CreateSoftwareRenderer(surface : * SDL_Surface) : * SDL_Renderer;
+extern pub fn SDL_GetRenderer(window : * SDL_Window) : * SDL_Renderer;
+extern pub fn SDL_RenderGetWindow(renderer : * SDL_Renderer) : * SDL_Window;
+extern pub fn SDL_GetRendererInfo(renderer : * SDL_Renderer,info : * SDL_RendererInfo) : i32;
+extern pub fn SDL_GetRendererOutputSize(renderer : * SDL_Renderer,w : * i32,h : * i32) : i32;
+extern pub fn SDL_CreateTexture(renderer : * SDL_Renderer,format : Uint32,access : i32,w : i32,h : i32) : * SDL_Texture;
+extern pub fn SDL_CreateTextureFromSurface(renderer : * SDL_Renderer,surface : * SDL_Surface) : * SDL_Texture;
+extern pub fn SDL_QueryTexture(texture : * SDL_Texture,format : * Uint32,access : * i32,w : * i32,h : * i32) : i32;
+extern pub fn SDL_SetTextureColorMod(texture : * SDL_Texture,r : Uint8,g : Uint8,b : Uint8) : i32;
+extern pub fn SDL_GetTextureColorMod(texture : * SDL_Texture,r : * Uint8,g : * Uint8,b : * Uint8) : i32;
+extern pub fn SDL_SetTextureAlphaMod(texture : * SDL_Texture,alpha : Uint8) : i32;
+extern pub fn SDL_GetTextureAlphaMod(texture : * SDL_Texture,alpha : * Uint8) : i32;
+extern pub fn SDL_SetTextureBlendMode(texture : * SDL_Texture,blendMode : SDL_BlendMode) : i32;
+extern pub fn SDL_GetTextureBlendMode(texture : * SDL_Texture,blendMode : * SDL_BlendMode) : i32;
+extern pub fn SDL_SetTextureScaleMode(texture : * SDL_Texture,scaleMode : SDL_ScaleMode) : i32;
+extern pub fn SDL_GetTextureScaleMode(texture : * SDL_Texture,scaleMode : * SDL_ScaleMode) : i32;
+extern pub fn SDL_SetTextureUserData(texture : * SDL_Texture,userdata : * void) : i32;
+extern pub fn SDL_GetTextureUserData(texture : * SDL_Texture) : * void;
+extern pub fn SDL_UpdateTexture(texture : * SDL_Texture,rect : * const SDL_Rect,pixels : * void,pitch : i32) : i32;
+extern pub fn SDL_UpdateYUVTexture(texture : * SDL_Texture,rect : * const SDL_Rect,Yplane : * const Uint8,Ypitch : i32,Uplane : * const Uint8,Upitch : i32,Vplane : * const Uint8,Vpitch : i32) : i32;
+extern pub fn SDL_UpdateNVTexture(texture : * SDL_Texture,rect : * const SDL_Rect,Yplane : * const Uint8,Ypitch : i32,UVplane : * const Uint8,UVpitch : i32) : i32;
+extern pub fn SDL_LockTexture(texture : * SDL_Texture,rect : * const SDL_Rect,pixels : * * void,pitch : * i32) : i32;
+extern pub fn SDL_LockTextureToSurface(texture : * SDL_Texture,rect : * const SDL_Rect,surface : * * SDL_Surface) : i32;
+extern pub fn SDL_UnlockTexture(texture : * SDL_Texture) : void;
+extern pub fn SDL_RenderTargetSupported(renderer : * SDL_Renderer) : SDL_bool;
+extern pub fn SDL_SetRenderTarget(renderer : * SDL_Renderer,texture : * SDL_Texture) : i32;
+extern pub fn SDL_GetRenderTarget(renderer : * SDL_Renderer) : * SDL_Texture;
+extern pub fn SDL_RenderSetLogicalSize(renderer : * SDL_Renderer,w : i32,h : i32) : i32;
+extern pub fn SDL_RenderGetLogicalSize(renderer : * SDL_Renderer,w : * i32,h : * i32) : void;
+extern pub fn SDL_RenderSetIntegerScale(renderer : * SDL_Renderer,enable : SDL_bool) : i32;
+extern pub fn SDL_RenderGetIntegerScale(renderer : * SDL_Renderer) : SDL_bool;
+extern pub fn SDL_RenderSetViewport(renderer : * SDL_Renderer,rect : * const SDL_Rect) : i32;
+extern pub fn SDL_RenderGetViewport(renderer : * SDL_Renderer,rect : * SDL_Rect) : void;
+extern pub fn SDL_RenderSetClipRect(renderer : * SDL_Renderer,rect : * const SDL_Rect) : i32;
+extern pub fn SDL_RenderGetClipRect(renderer : * SDL_Renderer,rect : * SDL_Rect) : void;
+extern pub fn SDL_RenderIsClipEnabled(renderer : * SDL_Renderer) : SDL_bool;
+extern pub fn SDL_RenderSetScale(renderer : * SDL_Renderer,scaleX : float,scaleY : float) : i32;
+extern pub fn SDL_RenderGetScale(renderer : * SDL_Renderer,scaleX : * float,scaleY : * float) : void;
+extern pub fn SDL_RenderWindowToLogical(renderer : * SDL_Renderer,windowX : i32,windowY : i32,logicalX : * float,logicalY : * float) : void;
+extern pub fn SDL_RenderLogicalToWindow(renderer : * SDL_Renderer,logicalX : float,logicalY : float,windowX : * i32,windowY : * i32) : void;
+extern pub fn SDL_SetRenderDrawColor(renderer : * SDL_Renderer,r : Uint8,g : Uint8,b : Uint8,a : Uint8) : i32;
+extern pub fn SDL_GetRenderDrawColor(renderer : * SDL_Renderer,r : * Uint8,g : * Uint8,b : * Uint8,a : * Uint8) : i32;
+extern pub fn SDL_SetRenderDrawBlendMode(renderer : * SDL_Renderer,blendMode : SDL_BlendMode) : i32;
+extern pub fn SDL_GetRenderDrawBlendMode(renderer : * SDL_Renderer,blendMode : * SDL_BlendMode) : i32;
+extern pub fn SDL_RenderClear(renderer : * SDL_Renderer) : i32;
+extern pub fn SDL_RenderDrawPoint(renderer : * SDL_Renderer,x : i32,y : i32) : i32;
+extern pub fn SDL_RenderDrawPoints(renderer : * SDL_Renderer,points : * const SDL_Point,count : i32) : i32;
+extern pub fn SDL_RenderDrawLine(renderer : * SDL_Renderer,x1 : i32,y1 : i32,x2 : i32,y2 : i32) : i32;
+extern pub fn SDL_RenderDrawLines(renderer : * SDL_Renderer,points : * const SDL_Point,count : i32) : i32;
+extern pub fn SDL_RenderDrawRect(renderer : * SDL_Renderer,rect : * const SDL_Rect) : i32;
+extern pub fn SDL_RenderDrawRects(renderer : * SDL_Renderer,rects : * const SDL_Rect,count : i32) : i32;
+extern pub fn SDL_RenderFillRect(renderer : * SDL_Renderer,rect : * const SDL_Rect) : i32;
+extern pub fn SDL_RenderFillRects(renderer : * SDL_Renderer,rects : * const SDL_Rect,count : i32) : i32;
+extern pub fn SDL_RenderCopy(renderer : * SDL_Renderer,texture : * SDL_Texture,srcrect : * const SDL_Rect,dstrect : * const SDL_Rect) : i32;
+extern pub fn SDL_RenderCopyEx(renderer : * SDL_Renderer,texture : * SDL_Texture,srcrect : * const SDL_Rect,dstrect : * const SDL_Rect,angle : double,center : * const SDL_Point,flip : const SDL_RendererFlip) : i32;
+extern pub fn SDL_RenderDrawPointF(renderer : * SDL_Renderer,x : float,y : float) : i32;
+extern pub fn SDL_RenderDrawPointsF(renderer : * SDL_Renderer,points : * const SDL_FPoint,count : i32) : i32;
+extern pub fn SDL_RenderDrawLineF(renderer : * SDL_Renderer,x1 : float,y1 : float,x2 : float,y2 : float) : i32;
+extern pub fn SDL_RenderDrawLinesF(renderer : * SDL_Renderer,points : * const SDL_FPoint,count : i32) : i32;
+extern pub fn SDL_RenderDrawRectF(renderer : * SDL_Renderer,rect : * const SDL_FRect) : i32;
+extern pub fn SDL_RenderDrawRectsF(renderer : * SDL_Renderer,rects : * const SDL_FRect,count : i32) : i32;
+extern pub fn SDL_RenderFillRectF(renderer : * SDL_Renderer,rect : * const SDL_FRect) : i32;
+extern pub fn SDL_RenderFillRectsF(renderer : * SDL_Renderer,rects : * const SDL_FRect,count : i32) : i32;
+extern pub fn SDL_RenderCopyF(renderer : * SDL_Renderer,texture : * SDL_Texture,srcrect : * const SDL_Rect,dstrect : * const SDL_FRect) : i32;
+extern pub fn SDL_RenderCopyExF(renderer : * SDL_Renderer,texture : * SDL_Texture,srcrect : * const SDL_Rect,dstrect : * const SDL_FRect,angle : double,center : * const SDL_FPoint,flip : const SDL_RendererFlip) : i32;
+extern pub fn SDL_RenderGeometry(renderer : * SDL_Renderer,texture : * SDL_Texture,vertices : * const SDL_Vertex,num_vertices : i32,indices : * i32,num_indices : i32) : i32;
+extern pub fn SDL_RenderGeometryRaw(renderer : * SDL_Renderer,texture : * SDL_Texture,xy : * float,xy_stride : i32,color : * const SDL_Color,color_stride : i32,uv : * float,uv_stride : i32,num_vertices : i32,indices : * void,num_indices : i32,size_indices : i32) : i32;
+extern pub fn SDL_RenderReadPixels(renderer : * SDL_Renderer,rect : * const SDL_Rect,format : Uint32,pixels : * void,pitch : i32) : i32;
+extern pub fn SDL_RenderPresent(renderer : * SDL_Renderer) : void;
+extern pub fn SDL_DestroyTexture(texture : * SDL_Texture) : void;
+extern pub fn SDL_DestroyRenderer(renderer : * SDL_Renderer) : void;
+extern pub fn SDL_RenderFlush(renderer : * SDL_Renderer) : i32;
+extern pub fn SDL_GL_BindTexture(texture : * SDL_Texture,texw : * float,texh : * float) : i32;
+extern pub fn SDL_GL_UnbindTexture(texture : * SDL_Texture) : i32;
+extern pub fn SDL_RenderGetMetalLayer(renderer : * SDL_Renderer) : * void;
+extern pub fn SDL_RenderGetMetalCommandEncoder(renderer : * SDL_Renderer) : * void;
+extern pub fn SDL_RenderSetVSync(renderer : * SDL_Renderer,vsync : i32) : i32;
+extern pub fn SDL_CreateShapedWindow(title : * u8,x : u32,y : u32,w : u32,h : u32,flags : Uint32) : * SDL_Window;
+extern pub fn SDL_IsShapedWindow(window : * const SDL_Window) : SDL_bool;
+type SDL_WindowShapeParams = union SDL_WindowShapeParams;
+struct SDL_WindowShapeMode {
+	mode : WindowShapeMode,
+	parameters : SDL_WindowShapeParams,
+}
+extern pub fn SDL_SetWindowShape(window : * SDL_Window,shape : * SDL_Surface,shape_mode : * SDL_WindowShapeMode) : i32;
+extern pub fn SDL_GetShapedWindowMode(window : * SDL_Window,shape_mode : * SDL_WindowShapeMode) : i32;
+extern pub fn SDL_LinuxSetThreadPriority(threadID : Sint64,priority : i32) : i32;
+extern pub fn SDL_LinuxSetThreadPriorityAndPolicy(threadID : Sint64,sdlPriority : i32,schedPolicy : i32) : i32;
+extern pub fn SDL_IsTablet() : SDL_bool;
+extern pub fn SDL_OnApplicationWillTerminate() : void;
+extern pub fn SDL_OnApplicationDidReceiveMemoryWarning() : void;
+extern pub fn SDL_OnApplicationWillResignActive() : void;
+extern pub fn SDL_OnApplicationDidEnterBackground() : void;
+extern pub fn SDL_OnApplicationWillEnterForeground() : void;
+extern pub fn SDL_OnApplicationDidBecomeActive() : void;
+extern pub fn SDL_GetTicks() : Uint32;
+extern pub fn SDL_GetTicks64() : Uint64;
+extern pub fn SDL_GetPerformanceCounter() : Uint64;
+extern pub fn SDL_GetPerformanceFrequency() : Uint64;
+extern pub fn SDL_Delay(ms : Uint32) : void;
+type SDL_TimerCallback = fn(Uint32,* void) : Uint32;
+type SDL_TimerID = i32;
+extern pub fn SDL_AddTimer(interval : Uint32,callback : SDL_TimerCallback,param : * void) : SDL_TimerID;
+extern pub fn SDL_RemoveTimer(id : SDL_TimerID) : SDL_bool;
+struct SDL_version {
+	major : Uint8,
+	minor : Uint8,
+	patch : Uint8,
+}
+extern pub fn SDL_GetVersion(ver : * SDL_version) : void;
+extern pub fn SDL_GetRevision() : * u8;
+extern pub fn SDL_GetRevisionNumber() : i32;
+struct SDL_Locale {
+	language : * u8,
+	country : * u8,
+}
+extern pub fn SDL_GetPreferredLocales() : * SDL_Locale;
+extern pub fn SDL_OpenURL(url : * u8) : i32;
+extern pub fn SDL_Init(flags : Uint32) : i32;
+extern pub fn SDL_InitSubSystem(flags : Uint32) : i32;
+extern pub fn SDL_QuitSubSystem(flags : Uint32) : void;
+extern pub fn SDL_WasInit(flags : Uint32) : Uint32;
+extern pub fn SDL_Quit() : void;

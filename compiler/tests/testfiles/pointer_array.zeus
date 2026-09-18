@@ -1,0 +1,16 @@
+fn print_args(args: [*u8]) : void {
+    for let arg in args {
+        println(arg);
+    }
+}
+fn main() :i32 {
+    let args: [*u8;2] = [r"asde" as *u8,r"bcd" as *u8];
+    println("---- Array Loop ----");
+    for let arg in args {
+        println(arg);
+    }
+    println("---- Range Loop ----");
+    print_args(args);
+
+    return 0;
+}

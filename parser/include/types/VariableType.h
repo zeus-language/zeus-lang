@@ -148,17 +148,17 @@ namespace types {
     class ArrayType final : public VariableType {
     private:
         size_t m_size;
-        std::weak_ptr<VariableType> m_baseType;
+        std::shared_ptr<VariableType> m_baseType;
 
     public:
-        ArrayType(std::string name, const size_t size, std::weak_ptr<VariableType> baseType) : VariableType(
+        ArrayType(std::string name, const size_t size, std::shared_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::ARRAY),
             m_size(size), m_baseType(std::move(baseType)) {
         }
 
         [[nodiscard]] size_t size() const { return m_size; }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
+        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
     };
 
     struct StructField {
