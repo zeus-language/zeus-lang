@@ -916,8 +916,8 @@ namespace llvm_backend {
         auto value = codegen_base(node->accessNode(), llvmState);
         const auto resultType = resolveLlvmType(node->expressionType().value(), llvmState);
         const auto result = (!resultType->isVoidTy())
-                          ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
-                          : nullptr;
+                                ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
+                                : nullptr;
         if (auto unionType = std::dynamic_pointer_cast<
             types::UnionType>(node->accessNode()->expressionType().value())) {
             value = llvmState.Builder->CreateLoad(llvmState.Builder->getInt32Ty(), value, "match_union_value");
@@ -1716,7 +1716,7 @@ namespace llvm_backend {
             if (const auto arrayDataPtrType = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
                 arrayElementType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
                 arrayLLvmType = arrayElementType;
-            }else {
+            } else {
                 assert(false && "data field is not a pointer");
                 return nullptr;
             }
