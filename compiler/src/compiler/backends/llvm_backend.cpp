@@ -2443,7 +2443,7 @@ namespace llvm_backend {
         if (llvmState.Builder->GetInsertBlock() == nullptr) {
             auto initializer = llvm::ConstantStruct::get(
                 llvm::cast<llvm::StructType>(sliceLLVMType),
-                llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), stringValue.size()),
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), stringValue.size()),
                 llvm::ConstantExpr::getBitCast(strValue, llvm::PointerType::getUnqual(*llvmState.TheContext)));
             return new llvm::GlobalVariable(
                 *llvmState.TheModule,
