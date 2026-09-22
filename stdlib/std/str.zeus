@@ -68,6 +68,9 @@ struct string {
         self.data[self.length] = 0 as u8; // Null-terminate
     }
     pub fn append(self : mut &string, other : &string) : void {
+        if  other.length == 0 {
+            return;
+        }
         let new_length : i32 = self.length + other.length;
         self.increase_capacity(new_length);
         // Append the new data
@@ -77,6 +80,9 @@ struct string {
         self.data[self.length] = 0 as u8; // Null-terminate
     }
     pub fn append(self : mut &string, other : string) : void {
+        if  other.length == 0 {
+            return;
+        }
         let new_length : i32 = self.length + other.length;
         self.increase_capacity(new_length);
         // Append the new data
@@ -142,7 +148,7 @@ struct string {
     pub fn as_slice(self : &string) : [u8] {
         let mut slice : [u8];
         slice.data = self.data;
-        slice.length = self.length as u64;
+        slice.length = self.length;
         return slice;
     }
 
@@ -304,6 +310,20 @@ struct string {
         copy_str.length = self.length;
         copy_str.capacity = self.capacity;
         return copy_str;
+    }
+
+    pub fn startswith(self: &string,value :[u8]) : bool {
+        let mut result = true;
+        if self.length < value.length as i32 {
+            return false;
+        }
+        for let i in 0 .. value.length as i32 {
+            if self.data[i] != value[i] {
+                result = false;
+                break;
+            }
+        }
+        return result;
     }
 }
 
@@ -495,15 +515,15 @@ pub fn i64_to_str(value : i64) : string {
 pub fn str_to_int(s : [u8]) : i32 {
     let mut result : i32 = 0;
     let mut is_negative : bool = false;
-    let mut start_index : u64 = 0 as u64;
+    let mut start_index : i32 = 0;
 
-    if s.length == 0 as u64 {
+    if s.length == 0 {
         return 0; // Handle empty string
     }
 
     if s.data[0] == '-' as u8 {
         is_negative = true;
-        start_index = 1 as u64;
+        start_index = 1;
     }
 
     for ii in start_index .. s.length {
@@ -524,7 +544,7 @@ pub fn str_to_int(s : [u8]) : i32 {
 }
 
 pub fn str_to_bool(s : [u8]) : bool {
-    if s.length == 4 as u64 {
+    if s.length == 4  {
         if s.data[0] == 't' as u8 and s.data[1] == 'r' as u8 and s.data[2] == 'u' as u8 and s.data[3] == 'e' as u8 {
             return true;
         }
@@ -535,17 +555,17 @@ pub fn str_to_bool(s : [u8]) : bool {
 pub fn str_to_double(s : [u8]) : double {
     let mut result : double = 0.0 as double;
     let mut is_negative : bool = false;
-    let mut start_index : u64 = 0 as u64;
+    let mut start_index : i32 = 0 ;
     let mut decimal_found : bool = false;
     let mut decimal_place : double = 0.1 as double;
 
-    if s.length == 0 as u64 {
+    if s.length == 0 {
         return 0.0 as double; // Handle empty string
     }
 
     if s.data[0] == '-' as u8 {
         is_negative = true;
-        start_index = 1 as u64;
+        start_index = 1;
     }
 
     for i2 in start_index .. s.length {

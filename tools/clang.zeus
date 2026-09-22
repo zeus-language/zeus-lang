@@ -1180,8 +1180,7 @@ extern pub fn clang_getCursorSpelling(c : CXCursor) : CXString;
 
 extern pub fn clang_getCursorDisplayName(current_cursor: CXCursor) : CXString;
 
-extern pub fn clang_disposeString(data : *void,
-                                                                   private_flags : u32) : void;
+extern pub fn clang_disposeString(data : *void, private_flags : u32) : void;
 
 extern pub fn clang_getCString(data : *void,
                                  private_flags : u32) : *u8;
@@ -1232,5 +1231,25 @@ extern pub fn clang_getCursorResultType (C : CXCursor) : CXType;
 extern pub fn clang_getTypedefDeclUnderlyingType (C : CXCursor) : CXType;
 extern pub fn clang_getPointeeType (C : CXType) : CXType;
 extern pub fn clang_Type_getNamedType (C : CXType) : CXType;
+extern pub fn clang_getCanonicalType (C : CXType) : CXType;
 extern pub fn clang_isConstQualifiedType (C : CXType) : u32;
 extern pub fn clang_getTypeSpelling (CT : CXType) : CXString;
+extern pub fn clang_getTypeDeclaration (CT : CXType) : CXCursor;
+extern pub fn clang_getNumArgTypes(t : CXType) : i32;
+extern pub fn clang_getArgType(t : CXType, i : u32) : CXType;
+extern pub fn clang_getResultType(t : CXType) : CXType;
+extern pub fn clang_getElementType(t : CXType): CXType;
+extern pub fn clang_getUnqualifiedType(t : CXType) : CXType;
+extern pub fn clang_getNumElements(t : CXType) : i32;
+type CXFile = *void;
+extern pub fn clang_getIncludedFile(cursor : CXCursor) : CXFile;
+extern pub fn clang_getFileName(file : CXFile) : CXString;
+
+struct CXSourceLocation{
+    pub data : * void,
+    pub data1 : *void,
+    pub int_data : u32,
+}
+extern pub fn clang_getCursorLocation(cursor : CXCursor) : CXSourceLocation;
+extern pub fn clang_Location_isFromMainFile (location : CXSourceLocation) : i32;
+extern pub fn clang_Location_isInSystemHeader (location : CXSourceLocation) : i32;

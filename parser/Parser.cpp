@@ -1443,10 +1443,7 @@ namespace parser {
                 }
                 consume(Token::RIGHT_SQUAR);
                 return std::make_shared<ast::SliceRawType>(typeToken, namespaceElements, typeModifier,
-                                                           std::make_shared<ast::RawType>(
-                                                               typeToken, namespaceElements,
-                                                               ast::TypeModifier::NONE,
-                                                               std::nullopt));
+                                                           std::move(rawType.value()));
             }
             return std::nullopt;
         }
@@ -2704,7 +2701,8 @@ namespace parser {
             consume(Token::OPEN_BRACE);
             while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
                 auto variantName = current();
-                consume(Token::IDENTIFIER);
+                if (!consume(Token::IDENTIFIER))
+                    break;
                 ast::UnionVariant variant(variantName);
                 // parse tuple
                 if (canConsume(Token::LEFT_CURLY)) {

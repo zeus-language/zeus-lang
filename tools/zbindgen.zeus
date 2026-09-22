@@ -22,14 +22,60 @@ fn default_case(arg_type : CXType) : string {
     return result;
 }
 
+fn parse_func_proto(arg_type : CXType) : string {
+   let arg_cnt =  clang_getNumArgTypes(arg_type);
+    let mut args :string = string::new();
+    for let i in 0 .. arg_cnt {
+        let arg = clang_getArgType(arg_type,i as u32);
+        if i != 0 {
+            args.append(',');
+        }
+        let mut arg_name = argtype_to_zeus_type(arg);
+        args.append(arg_name);
+        arg_name.destroy();
+    }
+    let mut rtype = argtype_to_zeus_type(clang_getResultType(arg_type));
+
+    let mut proto = string::from_slice("fn(");
+    proto.append(args);
+    proto.append(") : ");
+    proto.append(rtype);
+    args.destroy();
+    rtype.destroy();
+    return proto;
+}
+
+fn const_array_to_zeus_type(arg_type : CXType) : string {
+    let pointee_type2 = clang_getElementType(arg_type);
+    let mut type_str = argtype_to_zeus_type(pointee_type2);
+    let size = clang_getNumElements(arg_type);
+
+    let mut arr = string::from_slice("[");
+    arr.append(type_str);
+    arr.append(';');
+    arr.append(size);
+    arr.append(']');
+
+    type_str.destroy();
+    return arr;
+}
+
+
+
 fn argtype_to_zeus_type(arg_type : CXType ) : string {
-    // if(clang_isConstQualifiedType(arg_type) != 0 as u32) {
-    //     println("argtype_to_zeus_type: const");
-    //     return argtype_to_zeus_type(clang_Type_getNamedType(arg_type));
-    // }
+     if(clang_isConstQualifiedType(arg_type) != 0 as u32) {
+        // clang_visitChildren(cursor, RemoveConstFromType, (&non_constType) as *void);
+
+        return argtype_to_zeus_type(clang_getUnqualifiedType(arg_type));
+     }
 
     if(arg_type.kind == CXTypeKind::Pointer) {
-        return pointer_to_zeus_type(clang_getPointeeType(arg_type));
+            let pointee_type2 = clang_getPointeeType(arg_type);
+            if pointee_type2.kind == CXTypeKind::FunctionProto {
+                return argtype_to_zeus_type(pointee_type2);
+            }else{
+                return pointer_to_zeus_type(pointee_type2);
+            }
     }
 
     let value =  match arg_type.kind {
@@ -47,9 +93,10 @@ fn argtype_to_zeus_type(arg_type : CXType ) : string {
         CXTypeKind::Long =>  string::from_slice("i64"),
         CXTypeKind::Float =>   string::from_slice("float"),
         CXTypeKind::Double =>  string::from_slice("double"),
-        CXTypeKind::Pointer => pointer_to_zeus_type(clang_getPointeeType(arg_type)),
         CXTypeKind::Typedef => argtype_to_zeus_type(clang_Type_getNamedType(arg_type)),
+        CXTypeKind::ConstantArray => const_array_to_zeus_type(arg_type),
         CXTypeKind::Elaborated =>  type_as_slice(arg_type), // argtype_to_zeus_type(clang_Type_getNamedType(arg_type)),
+        CXTypeKind::FunctionProto => parse_func_proto(arg_type),
         _ => default_case(arg_type),
     };
     return value;
@@ -58,6 +105,10 @@ fn argtype_to_zeus_type(arg_type : CXType ) : string {
 fn handle_function_decl(cursor : CXCursor) : void {
     let spelling = clang_getCursorSpelling(cursor);
     let spelling_cstr = clang_getCString(spelling.data,spelling.private_flags);
+    if spelling_cstr[0] == '_' {
+        clang_disposeString(spelling.data,spelling.private_flags);
+        return;
+    }
     printf(r"extern pub fn %s(", spelling_cstr);
     clang_disposeString(spelling.data,spelling.private_flags);
 
@@ -87,15 +138,25 @@ fn handle_function_decl(cursor : CXCursor) : void {
 }
 fn handle_typedef_decl(cursor : CXCursor) : void {
     let spelling = clang_getCursorSpelling(cursor);
+
+
     let spelling_cstr = clang_getCString(spelling.data,spelling.private_flags);
+    if spelling_cstr[0] == '_' {
+        clang_disposeString(spelling.data,spelling.private_flags);
+        return;
+    }
     let base_type = clang_getTypedefDeclUnderlyingType(cursor);
     let mut _type = argtype_to_zeus_type(base_type);
 
+    if _type.startswith("struct ") or _type.startswith("enum ") {
+        _type.destroy();
+        clang_disposeString(spelling.data,spelling.private_flags);
+        return;
+    }
     printf(r"type %s = ", spelling_cstr);
     print(_type);
     println(";");
     _type.destroy();
-
     clang_disposeString(spelling.data,spelling.private_flags);
 }
 fn visit_fields(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CXChildVisitResult {
@@ -123,6 +184,10 @@ fn handle_struct_decl(cursor : CXCursor) : void {
 
 fn visit_children(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CXChildVisitResult {
 
+    if clang_Location_isInSystemHeader(clang_getCursorLocation(cursor)) != 0 {
+        return CXChildVisitResult::Continue;
+    }
+
     match cursor.kind {
         CXCursorKind::FunctionDecl => handle_function_decl(cursor),
         CXCursorKind::StructDecl => handle_struct_decl(cursor),
@@ -142,7 +207,14 @@ fn visit_children(cursor :CXCursor, parent : CXCursor, data : *void) : clang::CX
 //        CXCursorKind::IntegerLiteral => {
 //              println("IntegerLiteral");
 //          },
-        //_ => printf(r"cursor.kind: %d\n", cursor.kind),
+        CXCursorKind::InclusionDirective => {
+            let file = clang_getIncludedFile(cursor);
+            let file_name = clang_getFileName(file);
+            let file_name_str = clang_getCString(file_name.data,file_name.private_flags);
+            printf(r"// Included file: %s\n", file_name_str);
+            clang_disposeString(file_name.data,file_name.private_flags);
+        },
+        _ => {},
     };
 
 
@@ -158,16 +230,17 @@ fn main(argc : i32, argv :** u8) : i32 {
     let index : *void = clang::clang_createIndex(0, 0);
     defer clang::clang_disposeIndex(index);
 
-    let filename = r"/usr/include/x86_64-linux-gnu/sys/stat.h";
+    let filename = r"/usr/local/include/raylib.h";
     //let filename = r"/usr/include/SDL2/SDL.h";
     //println("parse file: ${filename}")
-    let options : i32 = 0;
+    let options : i32 = 2;
     let mut unsaved_files : *CXUnsavedFile = null as *CXUnsavedFile;
+    let args:[*u8;3] = [r"-x" as *u8,r"c" as *u8, null as *u8];
     let tu = clang_parseTranslationUnit(
                 index,
                 filename as *u8,
-                null as **u8 ,
-                0,
+                args as **u8,
+                args.length() - 1,
                 null as * CXUnsavedFile,
                 0,
                 options,

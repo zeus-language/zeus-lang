@@ -227,11 +227,22 @@ size_t types::StructType::getInterfaceIndex(const std::shared_ptr<InterfaceType>
     throw std::runtime_error("Interface not implemented by struct");
 }
 
+std::shared_ptr<types::VariableType> types::SliceType::baseType() const {
+    for (const auto &field: fields()) {
+        if (field.name == "data") {
+            if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(field.type)) {
+                return ptrType->baseType();
+            }
+        }
+    }
+    throw std::runtime_error("Slice type does not have a data field");
+}
+
 types::SliceType::SliceType(std::string name, const std::shared_ptr<VariableType> &baseType) : StructType(
     std::move(name),
     {
         {
-            .type = std::make_shared<types::IntegerType>("u64", 8, false),
+            .type = std::make_shared<types::IntegerType>("i32", 4, false),
             .name = "length"
         },
         {

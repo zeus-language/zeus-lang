@@ -521,7 +521,8 @@ namespace llvm_backend {
         const auto dataLayout = llvm::DataLayout(context.TheModule.get());
         const auto _struct = llvm::cast<llvm::StructType>(llvmStructType);
         const auto pointerSize = dataLayout.getPointerSize();
-        return _struct->getNumElements() <= 2 || _struct->getScalarSizeInBits() <= pointerSize * 8;
+        return _struct->getNumElements() <= 2 || (
+                   _struct->getScalarSizeInBits() > 0 && _struct->getScalarSizeInBits() <= pointerSize * 8);
     }
 
     llvm::GlobalVariable *getOrCreateGlobalString(const LLVMBackendState &llvmState, const std::string &value,
@@ -783,12 +784,12 @@ namespace llvm_backend {
                 default:
                     assert(false && "Destructuring non-struct union variant is not supported");
             }
-            auto fieldType = resolveLlvmType(structField.type, llvmState);
+            const auto fieldType = resolveLlvmType(structField.type, llvmState);
             const auto arrayValue = llvmState.Builder->CreateConstGEP1_32(
                 llvmState.Builder->getInt8Ty(), unionPointer, offset, structField.name);
-            auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, structField.name);
+            const auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, structField.name);
             if (fieldType->isStructTy()) {
-                auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
+                const auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
                 createMemCpy(llvmState, dest, arrayValue, fieldType);
                 llvmState.addNamedValue(member.lexical(), dest);
             } else {
@@ -809,12 +810,12 @@ namespace llvm_backend {
         const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
 
         for (auto &member: node->memberNames()) {
-            auto fieldType = resolveLlvmType(variant.value().associatedTypes.at(index), llvmState);
+            const auto fieldType = resolveLlvmType(variant.value().associatedTypes.at(index), llvmState);
             const auto arrayValue = llvmState.Builder->CreateConstGEP1_32(
                 llvmState.Builder->getInt8Ty(), unionPointer, offset, member.lexical());
-            auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, member.lexical());
+            const auto value = llvmState.Builder->CreateLoad(fieldType, arrayValue, member.lexical());
             if (fieldType->isStructTy()) {
-                auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
+                const auto dest = llvmState.Builder->CreateAlloca(fieldType, nullptr, member.lexical());
                 createMemCpy(llvmState, dest, arrayValue, fieldType);
                 llvmState.addNamedValue(member.lexical(), dest);
             } else {
@@ -914,9 +915,9 @@ namespace llvm_backend {
     llvm::Value *codegen(ast::MatchExpression *node, LLVMBackendState &llvmState) {
         auto value = codegen_base(node->accessNode(), llvmState);
         const auto resultType = resolveLlvmType(node->expressionType().value(), llvmState);
-        auto result = (!resultType->isVoidTy())
-                          ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
-                          : nullptr;
+        const auto result = (!resultType->isVoidTy())
+                                ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
+                                : nullptr;
         if (auto unionType = std::dynamic_pointer_cast<
             types::UnionType>(node->accessNode()->expressionType().value())) {
             value = llvmState.Builder->CreateLoad(llvmState.Builder->getInt32Ty(), value, "match_union_value");
@@ -1396,8 +1397,8 @@ namespace llvm_backend {
     }
 
 
-    void generateRangeCheck(const Token &location, llvm::Value *indexValue, llvm::Value *arrayLength,
-                            LLVMBackendState &llvmState) {
+    static void generateRangeCheck(const Token &location, llvm::Value *indexValue, llvm::Value *arrayLength,
+                                   LLVMBackendState &llvmState) {
         const auto indexType = indexValue->getType();
         const auto lengthType = arrayLength->getType();
         const auto targetType = llvm::Type::getInt64Ty(*llvmState.TheContext);
@@ -1662,7 +1663,7 @@ namespace llvm_backend {
         return llvmState.Builder->CreateBr(llvmState.currentBreakBlock.currentLoop);
     }
 
-    llvm::Value *codegen_iterator_for(const ast::ForLoop *node, LLVMBackendState &llvmState) {
+    static llvm::Value *codegen_iterator_for(const ast::ForLoop *node, LLVMBackendState &llvmState) {
         llvm::Function *TheFunction = llvmState.Builder->GetInsertBlock()->getParent();
 
         llvm::BasicBlock *PreheaderBB = llvmState.Builder->GetInsertBlock();
@@ -1687,7 +1688,9 @@ namespace llvm_backend {
             return nullptr;
         }
 
-        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(llvmVarType, 2);
+        const auto iteratorType = llvmState.Builder->getInt32Ty();
+
+        llvm::PHINode *Variable = llvmState.Builder->CreatePHI(iteratorType, 2);
 
 
         const auto iterableValue = codegen_base(node->range(), llvmState);
@@ -1696,9 +1699,43 @@ namespace llvm_backend {
             assert(false && "Failed to generate iterable value for a for loop");
             return nullptr;
         }
-        size_t arraySize = 0;
+        llvm::Value *endValue;
+
+        auto arrayLLvmType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
+        llvm::Type *arrayElementType;
+
+
+        auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
+
         if (const auto &arrayType = std::dynamic_pointer_cast<types::ArrayType>(iterableType.value())) {
-            arraySize = arrayType->size();
+            const auto arraySize = arrayType->size();
+            endValue = llvmState.Builder->getInt32(arraySize);
+            arrayElementType = arrayLLvmType->getArrayElementType();
+        } else if (const auto sliceType = std::dynamic_pointer_cast<types::SliceType>(iterableType.value())) {
+            const auto dataField = sliceType->field("data");
+            if (const auto arrayDataPtrType = std::dynamic_pointer_cast<types::PointerType>(dataField->type)) {
+                arrayElementType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
+                arrayLLvmType = arrayElementType;
+            } else {
+                assert(false && "data field is not a pointer");
+                return nullptr;
+            }
+            const auto sliceLLvmType = resolveLlvmType(sliceType, llvmState);
+            const auto dataLLvmType = resolveLlvmType(dataField->type, llvmState);
+            size_t index = sliceType->getFieldIndexByName("data");
+            arrayAllocation = llvm::getLoadStorePointerOperand(arrayAllocation);
+            const auto originalPtr = arrayAllocation;
+
+            arrayAllocation = llvmState.Builder->CreateStructGEP(sliceLLvmType, arrayAllocation, index,
+                                                                 "loop_slice_data_ptr");
+            arrayAllocation = llvmState.Builder->CreateLoad(dataLLvmType,
+                                                            arrayAllocation, "loop_slice_data");
+
+            index = sliceType->getFieldIndexByName("length");
+            endValue = llvmState.Builder->CreateStructGEP(sliceLLvmType, originalPtr, index,
+                                                          "loop_slice_length");
+            endValue = llvmState.Builder->CreateLoad(resolveLlvmType(sliceType->field("length")->type, llvmState),
+                                                     endValue, "loop_slice_length");
         } else {
             assert(false && "Iterable in for loop is not an array");
             return nullptr;
@@ -1707,27 +1744,27 @@ namespace llvm_backend {
         llvm::Value *startValue = llvmState.Builder->getInt32(0);
 
         // load array value
-        const auto arrayType = resolveLlvmType(node->range()->expressionType().value(), llvmState);
-        const auto arrayAllocation = llvmState.findVariable(node->range()->expressionToken().lexical());
 
-        if (startValue->getType() != llvmVarType) {
-            startValue = llvmState.Builder->CreateIntCast(startValue, llvmVarType, true, "for_start_cast");
+        if (startValue->getType() != iteratorType) {
+            startValue = llvmState.Builder->CreateIntCast(startValue, iteratorType, true, "for_start_cast");
         } {
             std::vector<llvm::Value *> indices;
-            const auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
-            indices.push_back(zero);
+            if (iterableType.value()->typeKind() == types::TypeKind::ARRAY) {
+                const auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), 0);
+                indices.push_back(zero);
+            }
             indices.push_back(Variable);
-            const auto elementPtr = llvmState.Builder->CreateGEP(arrayType, arrayAllocation, indices,
+            const auto elementPtr = llvmState.Builder->CreateGEP(arrayLLvmType, arrayAllocation, indices,
                                                                  "elem_ptr");
             llvm::Value *loadedValue = llvmState.Builder->CreateLoad(
-                arrayType->getArrayElementType(),
+                arrayElementType,
                 elementPtr,
                 "array_elem");
-            if (loadedValue->getType() != llvmVarType) {
-                loadedValue = llvmState.Builder->CreateIntCast(loadedValue, llvmVarType, true, "for_elem_cast");
-            }
+
             if (node->isConstant()) {
                 llvmState.addNamedValue(node->iteratorToken().lexical(), loadedValue);
+            } else {
+                assert(false && "Non-constant iterator variable in for loop is not supported");
             }
         }
 
@@ -1738,23 +1775,22 @@ namespace llvm_backend {
         llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
         llvmState.Builder->SetInsertPoint(LoopBB);
-        codegen_base(node->block(), llvmState);
+        codegen(node->block(), llvmState);
         llvmState.currentBreakBlock.currentLoop = oldCurrentLoop;
         llvmState.currentBreakBlock.afterLoop = oldAfterLoop;
         // Step: increment the loop variable.
-        const auto stepValue = llvm::ConstantInt::get(llvmVarType, 1);
+        const auto stepValue = llvm::ConstantInt::get(iteratorType, 1);
         const auto nextVar = llvmState.Builder->CreateAdd(Variable, stepValue, "nextvar");
 
         Variable->addIncoming(startValue, PreheaderBB);
 
         // Compute the end condition.
-        llvm::Value *endValue = llvmState.Builder->getInt32(arraySize);
         if (!endValue) {
             assert(false && "Failed to generate end value for the for loop");
             return nullptr;
         }
-        if (endValue->getType() != llvmVarType) {
-            endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
+        if (endValue->getType() != iteratorType) {
+            endValue = llvmState.Builder->CreateIntCast(endValue, iteratorType, true, "for_end_cast");
         }
         llvm::Value *endCond = llvmState.Builder->CreateICmpSLT(nextVar, endValue, "loopcond");
 
@@ -1825,13 +1861,13 @@ namespace llvm_backend {
         if (endValue->getType() != llvmVarType) {
             endValue = llvmState.Builder->CreateIntCast(endValue, llvmVarType, true, "for_end_cast");
         }
-        const auto loadedItertaor = llvmState.Builder->CreateLoad(llvmVarType, iteratorVar, "iterator_load");
+        const auto loadedIterator = llvmState.Builder->CreateLoad(llvmVarType, iteratorVar, "iterator_load");
 
         llvm::Value *endCond = nullptr;
         if (range->isInclusive()) {
-            endCond = llvmState.Builder->CreateICmpSLE(loadedItertaor, endValue, "loopcond");
+            endCond = llvmState.Builder->CreateICmpSLE(loadedIterator, endValue, "loopcond");
         } else {
-            endCond = llvmState.Builder->CreateICmpSLT(loadedItertaor, endValue, "loopcond");
+            endCond = llvmState.Builder->CreateICmpSLT(loadedIterator, endValue, "loopcond");
         }
 
 
@@ -2407,7 +2443,7 @@ namespace llvm_backend {
         if (llvmState.Builder->GetInsertBlock() == nullptr) {
             auto initializer = llvm::ConstantStruct::get(
                 llvm::cast<llvm::StructType>(sliceLLVMType),
-                llvm::ConstantInt::get(llvm::Type::getInt64Ty(*llvmState.TheContext), stringValue.size()),
+                llvm::ConstantInt::get(llvm::Type::getInt32Ty(*llvmState.TheContext), stringValue.size()),
                 llvm::ConstantExpr::getBitCast(strValue, llvm::PointerType::getUnqual(*llvmState.TheContext)));
             return new llvm::GlobalVariable(
                 *llvmState.TheModule,
@@ -2574,7 +2610,7 @@ namespace llvm_backend {
         if (!functionCall) {
             if (auto functionDefinition = llvmState.findFunction(node->functionName())) {
                 auto functionName = functionDefinition.value()->functionName();
-                auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
+                const auto external = functionDefinition.value()->getAnnotationsOfType<types::ExternalAnnotation>();
                 for (auto &annotation: external) {
                     llvmState.addExternalLibrary(annotation->library());
                     if (annotation->externalName()) {
@@ -2703,6 +2739,31 @@ namespace llvm_backend {
 
                     args.push_back(unionAlloc);
                     continue;
+                } else if (arg->expressionType().value()->typeKind() == types::TypeKind::ARRAY && node->
+                           functionDefinition()) {
+                    const auto funcDef = node->functionDefinition().value();
+                    const auto param = funcDef->getParam(args.size() - (isStructReturn ? 1 : 0));
+                    const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
+
+                    if (param->type.value()->typeKind() == types::TypeKind::SLICE) {
+                        auto sliceType = resolveLlvmType(param->type.value(), llvmState);
+                        auto alloc = llvmState.Builder->CreateAlloca(sliceType, nullptr, "slice_alloca");
+
+                        auto llvmArgType = resolveLlvmType(arg->expressionType().value(), llvmState);
+
+                        const auto indexPointer =
+                                llvmState.Builder->CreateStructGEP(sliceType, alloc, 0, "slice_index");
+                        const auto dataPointer =
+                                llvmState.Builder->CreateStructGEP(sliceType, alloc, 1, "slice_data");
+                        const auto alignment = DL.getPrefTypeAlign(indexPointer->getType());
+
+                        llvmState.Builder->CreateAlignedStore(
+                            llvmState.Builder->getInt64(llvmArgType->getArrayNumElements()), indexPointer, alignment);
+                        llvmState.Builder->CreateAlignedStore(value, dataPointer, alignment);
+
+                        args.push_back(alloc);
+                        continue;
+                    }
                 }
                 args.push_back(value);
             } else {
@@ -2748,14 +2809,18 @@ namespace llvm_backend {
         return returnValuePtr;
     }
 
-    llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
-        llvmState.currentBreakBlock.BlockUsed = true;
+    void handleDeferStack(LLVMBackendState &llvmState) {
         for (auto &defer: llvmState.deferStack) {
             for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
         }
         llvmState.deferStack.clear();
+    }
+
+    llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
+        llvmState.currentBreakBlock.BlockUsed = true;
+
         if (const auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
             const auto parentFunction = llvmState.Builder->GetInsertBlock()->getParent();
@@ -2777,16 +2842,19 @@ namespace llvm_backend {
                 memcopyArgs.push_back(llvmState.Builder->getInt64(structSize));
                 memcopyArgs.push_back(llvmState.Builder->getFalse());
                 llvmState.Builder->CreateCall(memcpyCall, memcopyArgs);
+                handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRetVoid();
             }
             if (retValue->getType()->isPointerTy() && parentFunction->getReturnType()->isStructTy()) {
-                auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
+                const auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
+                handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRet(loadedValue);
             }
+            handleDeferStack(llvmState);
             return llvmState.Builder->CreateRet(retValue);
-        } else {
-            return llvmState.Builder->CreateRetVoid();
         }
+        handleDeferStack(llvmState);
+        return llvmState.Builder->CreateRetVoid();
     }
 
     static llvm::DISubroutineType *CreateFunctionType(LLVMBackendState &llvmState, unsigned NumArgs) {
@@ -3497,8 +3565,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     llvm::outs() << "Wrote " << objectFileName.string() << "\n";
 
     std::vector<std::string> flags;
+    bool dynamicLinking = true;
     for (const auto &lib: context.linkerFlags) {
         flags.push_back("-l" + lib);
+        if (lib != "c" && lib != "m" && lib != "pthread") {
+            dynamicLinking = false;
+        }
     }
 
 
@@ -3517,10 +3589,12 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
         flags.push_back("-L" + libDir.string());
     }
 
-    if (options.fuseLd) {
-        flags.push_back("-fuse-ld=" + *options.fuseLd);
-    } else if (auto linker = detect_linker()) {
-        flags.push_back("-fuse-ld=" + *linker);
+    if (dynamicLinking) {
+        if (options.fuseLd) {
+            flags.push_back("-fuse-ld=" + *options.fuseLd);
+        } else if (auto linker = detect_linker()) {
+            flags.push_back("-fuse-ld=" + *linker);
+        }
     }
 
     if (!link_modules(errorStream, basePath, executableName, flags, objectFiles)) {

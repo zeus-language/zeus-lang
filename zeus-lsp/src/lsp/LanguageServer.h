@@ -44,6 +44,9 @@ class LanguageServer {
     [[nodiscard]] lsp::TextDocument_InlayHintResult resolveInlayHints(
         const lsp::requests::TextDocument_InlayHint::Params &&params);
 
+    lsp::requests::CompletionItem_Resolve::Result resolveCompletionItem(
+        const lsp::requests::CompletionItem_Resolve::Params &move);
+
 public:
     explicit LanguageServer(lsp::LspOptions options, const env::Environment &env);
 

@@ -148,17 +148,17 @@ namespace types {
     class ArrayType final : public VariableType {
     private:
         size_t m_size;
-        std::weak_ptr<VariableType> m_baseType;
+        std::shared_ptr<VariableType> m_baseType;
 
     public:
-        ArrayType(std::string name, const size_t size, std::weak_ptr<VariableType> baseType) : VariableType(
+        ArrayType(std::string name, const size_t size, std::shared_ptr<VariableType> baseType) : VariableType(
                 std::move(name), TypeKind::ARRAY),
             m_size(size), m_baseType(std::move(baseType)) {
         }
 
         [[nodiscard]] size_t size() const { return m_size; }
 
-        [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType.lock(); }
+        [[nodiscard]] const std::shared_ptr<VariableType> &baseType() const { return m_baseType; }
     };
 
     struct StructField {
@@ -327,7 +327,7 @@ namespace types {
 
         [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
 
-        size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
+        [[nodiscard]] size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -343,7 +343,17 @@ namespace types {
     };
 
     class SliceType final : public StructType {
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            if (const auto otherPtrType = dynamic_cast<const ArrayType *>(&other)) {
+                return *this->baseType() == *otherPtrType->baseType();
+            }
+            return StructType::compare(other);
+        }
+
     public:
+        [[nodiscard]] std::shared_ptr<VariableType> baseType() const;
+
         explicit SliceType(std::string name, const std::shared_ptr<VariableType> &baseType);
     };
 

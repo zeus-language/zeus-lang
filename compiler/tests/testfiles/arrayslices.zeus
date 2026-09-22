@@ -1,0 +1,16 @@
+fn sum_slice( s : [i32]) : i32 {
+    let mut result :i32 = 0;
+    for let x in s {
+        result += x;
+    }
+    return result;
+}
+
+fn main() : i32 {
+    let hello = [1,2,3,4,5];
+
+    let r : i32 = sum_slice(hello);
+    println("result = ${r}");
+
+    return 0;
+}
