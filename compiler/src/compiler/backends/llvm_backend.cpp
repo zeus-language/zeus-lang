@@ -2806,14 +2806,18 @@ namespace llvm_backend {
         return returnValuePtr;
     }
 
-    llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
-        llvmState.currentBreakBlock.BlockUsed = true;
+    void handleDeferStack(LLVMBackendState &llvmState) {
         for (auto &defer: llvmState.deferStack) {
             for (auto deferedExpression: defer.deferedStatements) {
                 codegen_base(deferedExpression, llvmState);
             }
         }
         llvmState.deferStack.clear();
+    }
+
+    llvm::Value *codegen(const ast::ReturnStatement *node, LLVMBackendState &llvmState) {
+        llvmState.currentBreakBlock.BlockUsed = true;
+
         if (const auto returnValue = node->returnValue()) {
             llvm::Value *retValue = llvm_backend::codegen_base(returnValue.value(), llvmState);
             const auto parentFunction = llvmState.Builder->GetInsertBlock()->getParent();
@@ -2835,16 +2839,19 @@ namespace llvm_backend {
                 memcopyArgs.push_back(llvmState.Builder->getInt64(structSize));
                 memcopyArgs.push_back(llvmState.Builder->getFalse());
                 llvmState.Builder->CreateCall(memcpyCall, memcopyArgs);
+                handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRetVoid();
             }
             if (retValue->getType()->isPointerTy() && parentFunction->getReturnType()->isStructTy()) {
-                auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
+                const auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
+                handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRet(loadedValue);
             }
+            handleDeferStack(llvmState);
             return llvmState.Builder->CreateRet(retValue);
-        } else {
-            return llvmState.Builder->CreateRetVoid();
         }
+        handleDeferStack(llvmState);
+        return llvmState.Builder->CreateRetVoid();
     }
 
     static llvm::DISubroutineType *CreateFunctionType(LLVMBackendState &llvmState, unsigned NumArgs) {

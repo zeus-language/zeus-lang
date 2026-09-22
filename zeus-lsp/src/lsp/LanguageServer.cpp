@@ -454,6 +454,10 @@ void LanguageServer::handleRequest() {
                 .add<lsp::requests::TextDocument_InlayHint>(
                     [&](lsp::requests::TextDocument_InlayHint::Params &&params) {
                         return resolveInlayHints(std::move(params));
+                    })
+                .add<lsp::requests::CompletionItem_Resolve>(
+                    [&](lsp::requests::CompletionItem_Resolve::Params &&params) {
+                        return resolveCompletionItem(std::move(params));
                     });
 
         // Main loop
@@ -634,6 +638,12 @@ lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
     }
     result = hints;
     return result;
+}
+
+lsp::requests::CompletionItem_Resolve::Result LanguageServer::resolveCompletionItem(
+    const lsp::requests::CompletionItem_Resolve::Params &move) {
+    auto result = lsp::requests::CompletionItem_Resolve::Result{};
+    return move;
 }
 
 

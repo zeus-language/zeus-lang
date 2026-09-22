@@ -1,0 +1,15 @@
+fn message(answer : i32) : string {
+    let mut msg =  "The answer to everything is ${answer}.";
+    return msg.copy();
+}
+
+fn main() : i32{
+    let i = 42;
+    let mut msg = message(i);
+    if i == 42 {
+        println(msg);
+        return 0;
+    }
+    println("The answer is wrong!");
+    return 1;
+}
