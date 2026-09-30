@@ -111,3 +111,7 @@ std::optional<std::shared_ptr<types::VariableType> > types::Scope::getArrayType(
     const std::shared_ptr<VariableType> &base_type, size_t size) {
     return m_typeRegistry.getArrayType(base_type, size);
 }
+
+std::shared_ptr<types::VariableType> types::Scope::getNullPointerType() {
+    return m_typeRegistry.getNullPointerType();
+}

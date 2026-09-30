@@ -439,7 +439,7 @@ namespace types {
                 break;
             case ast::NumberType::NULLPTR:
                 node->setExpressionType(
-                    context.currentScope->getPointerType(context.currentScope->getTypeByName("void").value()).value());
+                    context.currentScope->getNullPointerType());
                 break;
             default:
                 assert(false && "Unknown number type");
@@ -1298,9 +1298,7 @@ namespace types {
         type_check_base(node->expression(), context);
         type_check_base(node->accessNode(), context);
         if (node->accessNode()->expressionType() && node->expression()->expressionType()) {
-            if (node->accessNode()->expressionType().value()->name() != node->expression()->expressionType().value()
-                ->
-                name()) {
+            if (*node->accessNode()->expressionType().value() != *node->expression()->expressionType().value()) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expressionToken(),
@@ -1717,7 +1715,7 @@ namespace types {
         const auto lhs = node->lhs().value();
         const auto rhs = node->rhs();
         if (lhs->expressionType() && rhs->expressionType()) {
-            if (lhs->expressionType().value()->name() != rhs->expressionType().value()->name()) {
+            if (*lhs->expressionType().value() != *rhs->expressionType().value()) {
                 context.messages.insert({
                     .outputType = parser::OutputType::ERROR,
                     .token = node->expressionToken(),
@@ -2610,7 +2608,7 @@ namespace types {
             return;
         }
         if (node->expression()->expressionType() && var->type) {
-            if (node->expression()->expressionType().value()->name() != var->type->name()) {
+            if (*node->expression()->expressionType().value() != *var->type) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
                     node->expression()->expressionToken(),

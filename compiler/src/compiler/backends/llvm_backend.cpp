@@ -1885,7 +1885,6 @@ namespace llvm_backend {
         llvmState.currentBreakBlock.afterLoop = AfterBB;
         llvmState.currentBreakBlock.BlockUsed = false;
         // Generate the loop body.
-        //llvmState.Builder->SetInsertPoint(LoopBB);
 
         codegen_base(node->block(), llvmState);
         llvmState.currentBreakBlock.currentLoop = oldCurrentLoop;
@@ -1965,7 +1964,7 @@ namespace llvm_backend {
         }
         args.push_back(lhs);
         args.push_back(rhs);
-        auto call = llvmState.Builder->CreateCall(function, args);
+        const auto call = llvmState.Builder->CreateCall(function, args);
 
         if (isStructReturn) {
             call->addParamAttr(0, llvm::Attribute::getWithStructRetType(*llvmState.TheContext,

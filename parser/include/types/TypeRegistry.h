@@ -32,6 +32,8 @@ namespace types {
 
         std::optional<std::shared_ptr<VariableType> > getSliceType(const std::shared_ptr<VariableType> &value);
 
+        std::shared_ptr<types::VariableType> getNullPointerType();
+
         static std::optional<std::shared_ptr<VariableType> > getRangeType(
             const std::optional<std::shared_ptr<types::VariableType> >::value_type &value);
 

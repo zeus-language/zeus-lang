@@ -23,7 +23,7 @@ struct string {
     pub fn new(capacity : i32) : string {
         let mut str_obj : string;
         str_obj.data = core::libc::malloc(capacity as u64);
-        if str_obj.data == 0 as *u8 {
+        if str_obj.data == null {
             panic("could not allocate memory for new string!");
             return str_obj; // Return an empty string object on allocation failure
         }
@@ -38,11 +38,11 @@ struct string {
     }
 
     pub fn destroy(self : mut &string) : void {
-        if self.data != 0 as *u8 {
+        if self.data != null {
             core::libc::free(self.data);
         }
         // Optionally, you can set fields to zero to avoid dangling pointers
-        self.data = 0 as *u8;
+        self.data = null;
         self.length = 0;
         self.capacity = 0;
     }
@@ -238,15 +238,15 @@ struct string {
                 let mut suffix : string;
                 suffix.length = self.length - (i + old_length);
                 suffix.capacity = suffix.length + 1;
-                suffix.data = null as *u8;
+                suffix.data = null;
 
                 if suffix.length > 0 {
                     suffix.data = core::libc::malloc(suffix.capacity as u64);
                     // copy data to suffix
 
-                    if suffix.data == 0 as *u8 {
+                    if suffix.data == null {
                         // Handle memory allocation failure
-                        suffix.data = 0 as *u8;
+                        suffix.data = null;
                         suffix.length = 0;
                         suffix.capacity = 0;
                         return suffix; // or handle error appropriately
@@ -299,9 +299,9 @@ struct string {
     pub fn copy(self : &string) : string {
         let mut copy_str : string;
         copy_str.data = core::libc::malloc(self.capacity as u64);
-        if copy_str.data == 0 as *u8 {
+        if copy_str.data == null {
             // Handle memory allocation failure
-            copy_str.data = 0 as *u8;
+            copy_str.data = null;
             copy_str.length = 0;
             copy_str.capacity = 0;
             return copy_str;
@@ -330,7 +330,7 @@ struct string {
 pub fn utf8_string_length(s : *u8) : u32 {
     let mut length : u32 = 0 as u32;
     let mut i : i32 = 0;
-    if s == 0 as *u8 {
+    if s == null {
         return 0 as u32;
     }
 

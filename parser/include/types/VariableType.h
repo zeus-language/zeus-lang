@@ -104,7 +104,9 @@ namespace types {
         [[nodiscard]] std::shared_ptr<VariableType> baseType() const { return m_baseType; }
     };
 
-    class PointerType final : public TypeWithBaseType {
+    class NullPointerType;
+
+    class PointerType : public TypeWithBaseType {
     public:
         PointerType(std::string name, std::shared_ptr<VariableType> baseType) : TypeWithBaseType(
             std::move(name), std::move(baseType)) {
@@ -124,6 +126,17 @@ namespace types {
                 return *this->baseType() == *otherPtrType->baseType() or isOneSideVoid;
             }
             return false;
+        }
+    };
+
+    class NullPointerType final : public PointerType {
+    public:
+        explicit NullPointerType(std::shared_ptr<VariableType> baseType) : PointerType("nullptr", std::move(baseType)) {
+        }
+
+    protected:
+        [[nodiscard]] bool compare(const VariableType &other) const override {
+            return dynamic_cast<const PointerType *>(&other) != nullptr;
         }
     };
 
