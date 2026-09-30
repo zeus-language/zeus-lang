@@ -79,13 +79,13 @@ struct File {
     }
 
     pub fn write(self: &File, content : [u8]) : void {
-        if (self.ptr != null as *FILE)
+        if (self.ptr != null)
         {
             fputs(content.data, self.ptr);
         }
     }
     pub fn write(self: &File, content : string) : void {
-        if (self.ptr != null as *FILE)
+        if (self.ptr != null)
         {
             fputs(content.as_c_str(), self.ptr);
         }
@@ -93,13 +93,13 @@ struct File {
 
     pub fn read_to_string(self: &File,result :mut &string) : void {
         let mut buffer : [u8; 256] = [0 as u8; 256];
-        while fgets(buffer as *u8, 256, self.ptr) != 0 as *u8 {
+        while fgets(buffer as *u8, 256, self.ptr) != null {
             result.append(buffer as *u8);
         }
     }
 
     pub fn close(self: mut &File) : void {
-        if (self.ptr != null as *FILE)
+        if (self.ptr != null)
         {
             fclose(self.ptr);
         }
@@ -109,7 +109,7 @@ struct File {
 }
 
 pub fn create_tmp_file() : Path {
-    let mut tmp_path = tmpnam(null as *u8);
+    let mut tmp_path = tmpnam(null);
     let path  = string::from_c_str(tmp_path);
     return Path::new(path);
 }

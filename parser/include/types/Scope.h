@@ -63,5 +63,7 @@ namespace types {
 
         std::optional<std::shared_ptr<VariableType> > getArrayType(
             const std::shared_ptr<VariableType> &base_type, size_t size);
+
+        std::shared_ptr<types::VariableType> getNullPointerType();
     };
 }

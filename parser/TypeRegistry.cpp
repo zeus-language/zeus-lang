@@ -54,6 +54,16 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getSli
     return std::make_optional(slice);
 }
 
+std::shared_ptr<types::VariableType> types::TypeRegistry::getNullPointerType() {
+    auto typeName = "nullptr";
+    if (auto foundType = getTypeByName(typeName, false)) {
+        return foundType.value();
+    }
+    auto type = std::make_shared<NullPointerType>(getTypeByName("void", false).value());
+    registerType(type);
+    return type;
+}
+
 std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getPointerType(
     const std::shared_ptr<VariableType> &base_type) {
     auto typeName = "*" + base_type->name();

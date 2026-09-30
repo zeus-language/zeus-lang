@@ -32,12 +32,6 @@ struct array<T>{
         self.length = self.length + 1 as i64;
     }
 
-//    fn [](index : i32) : T {
-//        if index < 0 or index >= length {
-//            panic("Index out of bounds");
-//        }
-//        return data[index];
-//    }
 
     pub fn set(self: mut &array<T>,index : i64, value : T) : void {
         if index < 0 as i64 or index >= self.length {
@@ -68,7 +62,7 @@ struct array<T>{
 
     pub fn destroy(self: mut &array<T>) : void {
         core::libc::free(self.data as *u8);
-        self.data = null as *T;
+        self.data = null;
         self.length = 0 as i64;
         self.capacity = 0 as i64;
         self = null as &array<T>;
