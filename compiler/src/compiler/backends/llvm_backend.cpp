@@ -543,7 +543,7 @@ namespace llvm_backend {
 
     llvm::Value *codegen(ast::FunctionCallNode *node, LLVMBackendState &llvmState);
 
-    llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState);
+    llvm::Value *codegen(const ast::NumberConstant *node, LLVMBackendState &llvmState);
 
     llvm::Value *codegen(const ast::StringConstant *node, LLVMBackendState &llvmState);
 
@@ -2400,10 +2400,14 @@ namespace llvm_backend {
         return alloca; // Return the allocation instruction
     }
 
-    llvm::Value *codegen(const ast::NumberConstant *node, const LLVMBackendState &llvmState) {
+    llvm::Value *codegen(const ast::NumberConstant *node, LLVMBackendState &llvmState) {
         switch (node->numberType()) {
             case ast::NumberType::INTEGER:
-
+                if (node->rawType()) {
+                    const auto llvmType = resolveLlvmType(node->expressionType().value(), llvmState, false, true);
+                    const auto intType = std::dynamic_pointer_cast<types::IntegerType>(node->expressionType().value());
+                    return llvm::ConstantInt::get(llvmType, std::get<int64_t>(node->value()), intType->isSigned());
+                }
                 return llvm::ConstantInt::get(*llvmState.TheContext,
                                               llvm::APInt(node->numBits(), std::get<int64_t>(node->value()), true));
             case ast::NumberType::HEX_NUMBER:
@@ -2519,11 +2523,11 @@ namespace llvm_backend {
             }
         }
         auto instanceType = node->instanceNode()->expressionType();
-        if (auto refTye = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
+        if (const auto refTye = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
             instanceType = refTye->baseType();
         }
-        auto typeName = instanceType.has_value() ? instanceType.value()->rawTypeName() : "";
-        auto interfaceType = std::dynamic_pointer_cast<types::InterfaceType>(instanceType.value());
+        const auto typeName = instanceType.has_value() ? instanceType.value()->rawTypeName() : "";
+        const auto interfaceType = std::dynamic_pointer_cast<types::InterfaceType>(instanceType.value());
         if (interfaceType) {
             const auto methodOption = interfaceType->findMethodWithIndex(methodName);
             if (!methodOption) {
@@ -2532,8 +2536,7 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
             auto [method, methodIndex] = methodOption.value();
-            std::cerr << "Found method " << methodName << " in interface " << typeName << " with index " << methodIndex
-                    << "\n";
+
             // first member of the struct is the vtable pointer, second member is the data pointer
             //const auto vTableType = checkAndGenerateVTableForInterface(interfaceType, llvmState);
             auto ptrType = llvmState.Builder->getPtrTy();

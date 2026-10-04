@@ -161,6 +161,7 @@ std::optional<int> mapTokenType(const Token::Type type) {
         case Token::Type::CHAR:
             return 16;
         case Token::Type::NUMBER:
+        case Token::Type::NUMBER_WITH_SUFFIX:
         case Token::Type::HEX_NUMBER:
         case Token::Type::BIN_NUMBER:
         case Token::Type::OCT_NUMBER:

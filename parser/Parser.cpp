@@ -133,6 +133,28 @@ namespace parser {
             return std::nullopt;
         }
 
+        std::optional<std::shared_ptr<ast::ASTNode> > parseTypedNumber() {
+            if (!canConsume(Token::NUMBER_WITH_SUFFIX)) {
+                return std::nullopt;
+            }
+            Token numberToken = current();
+            consume(Token::NUMBER_WITH_SUFFIX);
+            auto posU = numberToken.lexical().find('u');
+            auto posI = numberToken.lexical().find('i');
+            size_t position = posI;
+            if (posU != std::string::npos) {
+                position = posU;
+            }
+            auto namespaceElements = std::vector<Token>{};
+            auto location = numberToken.source_location;
+            location.byte_offset += position;
+            location.num_bytes -= position;
+            auto typeToken = Token(Token::Type::IDENTIFIER, location);
+            auto rawType = std::make_shared<ast::RawType>(typeToken, namespaceElements, ast::TypeModifier::NONE,
+                                                          std::nullopt);
+            return std::make_shared<ast::NumberConstant>(numberToken, ast::NumberType::INTEGER, rawType);
+        }
+
         std::optional<std::shared_ptr<ast::ASTNode> > parseHexNumber() {
             if (!canConsume(Token::HEX_NUMBER)) {
                 return std::nullopt;
@@ -601,6 +623,8 @@ namespace parser {
 
             if (auto number = parseNumber()) {
                 result = std::move(number.value());
+            } else if (auto typedNumber = parseTypedNumber()) {
+                result = std::move(typedNumber.value());
             } else if (auto octNumber = parseOctNumber()) {
                 result = std::move(octNumber.value());
             } else if (auto hexNumber = parseHexNumber()) {
@@ -1770,6 +1794,8 @@ namespace parser {
             std::optional<std::shared_ptr<ast::ASTNode> > result = std::nullopt;
             if (auto number = parseNumber()) {
                 result = std::move(number.value());
+            } else if (auto typedNumber = parseTypedNumber()) {
+                result = std::move(typedNumber.value());
             } else if (auto octNumber = parseOctNumber()) {
                 result = std::move(octNumber.value());
             } else if (auto hexNumber = parseHexNumber()) {

@@ -9,6 +9,7 @@
 #include <variant>
 
 #include "ASTNode.h"
+#include "VariableDeclaration.h"
 #include "lexer/Lexer.h"
 
 namespace ast {
@@ -31,9 +32,12 @@ namespace ast {
     class NumberConstant final : public ASTNode {
         NumberValue m_value;
         NumberType m_numberType;
+        std::shared_ptr<RawType> m_type = nullptr;
 
     public:
         explicit NumberConstant(Token constant, NumberType numberType);
+
+        explicit NumberConstant(Token constant, NumberType numberType, const std::shared_ptr<RawType> &type);
 
         [[nodiscard]] NumberType numberType() const { return m_numberType; }
         [[nodiscard]] NumberValue value() const { return m_value; }
@@ -42,6 +46,10 @@ namespace ast {
             return true;
         }
 
+
+        [[nodiscard]] std::optional<RawType *> rawType() const {
+            return (m_type != nullptr) ? std::make_optional(m_type.get()) : std::nullopt;
+        }
 
         ~NumberConstant() override = default;
 
@@ -63,5 +71,3 @@ namespace ast {
         }
     };
 } // ast
-
-

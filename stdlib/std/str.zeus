@@ -95,10 +95,21 @@ struct string {
         self.append(number as i64);
     }
 
+    pub fn append(self : mut &string, number : i16) : void {
+        self.append(number as i64);
+    }
+
+    pub fn append(self : mut &string, number : i8) : void {
+        self.append(number as i64);
+    }
+
     pub fn append(self : mut &string, number : i64) : void {
         let mut num_str : string = i64_to_str(number);
         self.append(&num_str);
         num_str.destroy();
+    }
+    pub fn append(self : mut &string, number : u16) : void {
+        self.append(number as u64);
     }
 
     pub fn append(self : mut &string, number : u32) : void {

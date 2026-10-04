@@ -7,6 +7,8 @@
 #include <cassert>
 #include <cmath>
 
+#include "ast/VariableDeclaration.h"
+
 namespace ast {
     NumberValue parseNumber(const std::string &lexical, const NumberType type) {
         switch (type) {
@@ -82,6 +84,12 @@ namespace ast {
         : ASTNode(std::move(constant), NodeType::NUMBER_CONSTANT),
           m_value(parseNumber(expressionToken().lexical(), numberType)),
           m_numberType(numberType) {
+    }
+
+    NumberConstant::NumberConstant(Token constant, const NumberType numberType, const std::shared_ptr<RawType> &rawType)
+        : ASTNode(std::move(constant), NodeType::NUMBER_CONSTANT),
+          m_value(parseNumber(expressionToken().lexical(), numberType)),
+          m_numberType(numberType), m_type(rawType) {
     }
 
     size_t NumberConstant::numBits() const {

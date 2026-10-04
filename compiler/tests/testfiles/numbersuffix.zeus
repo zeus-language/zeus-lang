@@ -1,0 +1,14 @@
+
+fn main() : i32 {
+    let i16num = 12i16;
+    let i16types : i16 = 12i16;
+    if i16num == i16types {
+        println("${i16num} == ${i16types}");
+    }
+    let i8num = 12i8;
+    let i8types : i8 = 12i8;
+    if i8num == i8types {
+        println("${i8num} == ${i8types}");
+    }
+    return 0;
+}

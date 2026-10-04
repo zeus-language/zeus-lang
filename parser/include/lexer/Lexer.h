@@ -124,7 +124,8 @@ public:
         PLUS_EQUAL,
         MINUS_EQUAL,
         MULTIPLY_EQUAL,
-        DIV_EQUAL
+        DIV_EQUAL,
+        NUMBER_WITH_SUFFIX
     } type;
 
     SourceLocation source_location;

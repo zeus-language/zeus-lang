@@ -405,7 +405,20 @@ namespace types {
             context.currentScope->getArrayType(u8Type, node->value().size()).value());
     }
 
-    void type_check(ast::NumberConstant *node, const Context &context) {
+    void type_check(ast::NumberConstant *node, Context &context) {
+        if (const auto rawType = node->rawType()) {
+            const auto type = resolveFromRawType(rawType.value(), context.currentScope, false);
+            if (type.has_value()) {
+                node->setExpressionType(type.value());
+            } else {
+                context.messages.insert({
+                    .outputType = parser::OutputType::ERROR,
+                    .token = rawType.value()->typeToken,
+                    .message = "The number constant has an unknown type suffix"
+                });
+            }
+            return;
+        }
         switch (node->numberType()) {
             case ast::NumberType::INTEGER: {
                 if (node->numBits() == 32) {
