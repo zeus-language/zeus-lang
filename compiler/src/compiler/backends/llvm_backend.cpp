@@ -2536,8 +2536,7 @@ namespace llvm_backend {
                 return nullptr; // Error handling
             }
             auto [method, methodIndex] = methodOption.value();
-            std::cerr << "Found method " << methodName << " in interface " << typeName << " with index " << methodIndex
-                    << "\n";
+
             // first member of the struct is the vtable pointer, second member is the data pointer
             //const auto vTableType = checkAndGenerateVTableForInterface(interfaceType, llvmState);
             auto ptrType = llvmState.Builder->getPtrTy();
