@@ -297,6 +297,19 @@ namespace lexer {
                 if (current == 'f' || current == 'F') {
                     *numberTokenType = Token::FLOAT_NUMBER;
                     *endPosition += 1;
+                } else if (current == 'i' or current == 'u') {
+                    *endPosition += 2;
+                    *numberTokenType = Token::NUMBER_WITH_SUFFIX;
+                    current = content[*endPosition];
+
+                    while (isNumber(current) or (index == 0 and current == '-') or
+                           (current == '.' and isNumber(content[*endPosition + 1]))) {
+                        *endPosition += 1;
+                        current = content[*endPosition];
+                        index++;
+                        if (content.size() <= *endPosition)
+                            break;
+                    };
                 }
                 // if (current < '0' || current > '9')
                 //     *endPosition -= 1;
@@ -332,7 +345,8 @@ namespace lexer {
             }
 
         public:
-            std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code, bool skipComments) {
+            std::vector<Token> lex_file(const std::string &filepath, const std::string &source_code,
+                                        bool skipComments) {
                 contentPtr = std::make_shared<std::string>(source_code);
                 this->file_path = filepath;
                 tokens.reserve(contentPtr->size() / 4);

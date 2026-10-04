@@ -664,3 +664,32 @@ TEST(LexerLexOperators, LexDivisionEqual) {
     EXPECT_EQ(tokens[1].type, Token::Type::DIV_EQUAL);
     VerifyTokenPosition(tokens[1], source, 1, 2, "/=");
 }
+
+TEST(LexerLexNumber, LexI16Suffix) {
+    const std::string source = "let i = 32i16";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[3].type, Token::Type::NUMBER_WITH_SUFFIX);
+    VerifyTokenPosition(tokens[3], source, 8, 5, "32i16");
+}
+
+TEST(LexerLexNumber, LexI8Suffix) {
+    const std::string source = "let i = 32i8";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 5);
+    EXPECT_EQ(tokens[3].type, Token::Type::NUMBER_WITH_SUFFIX);
+    VerifyTokenPosition(tokens[3], source, 8, 4, "32i8");
+}
+
+TEST(LexerLexNumber, LexI16SuffixWithSemicolon) {
+    const std::string source = "let i = 32i8;";
+    const auto tokens = lexer::lex_file("test.zeus", source);
+    ASSERT_FALSE(tokens.empty());
+    EXPECT_EQ(tokens.size(), 6);
+    EXPECT_EQ(tokens[3].type, Token::Type::NUMBER_WITH_SUFFIX);
+    VerifyTokenPosition(tokens[3], source, 8, 4, "32i8");
+    EXPECT_EQ(tokens[4].type, Token::Type::SEMICOLON);
+    VerifyTokenPosition(tokens[4], source, 12, 1, ";");
+}
