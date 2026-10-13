@@ -707,9 +707,18 @@ namespace types {
             });
             return;
         }
-        node->setExpressionType(type.value());
 
-        const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value());
+        auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value());
+        if (unionType->isGeneric()) {
+            const auto matchingTypes = context.currentFunction->matchingTypes(unionType->rawTypeName());
+            if (matchingTypes.size() > 0) {
+                node->setExpressionType(matchingTypes.at(0));
+                unionType = std::dynamic_pointer_cast<UnionType>(matchingTypes.at(0));
+            }
+        } else {
+            node->setExpressionType(unionType);
+        }
+
         const auto variant = unionType->getVariant(node->expressionToken().lexical());
         if (!variant) {
             context.messages.insert({
@@ -1126,7 +1135,14 @@ namespace types {
                     });
                     return;
                 }
-                node->setExpressionType(type.value());
+                if (unionType->isGeneric()) {
+                    const auto matchingTypes = context.currentFunction->matchingTypes(unionType->rawTypeName());
+                    if (matchingTypes.size() > 0) {
+                        node->setExpressionType(matchingTypes.at(0));
+                    }
+                } else {
+                    node->setExpressionType(unionType);
+                }
             } else {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -1138,9 +1154,10 @@ namespace types {
             }
         } else {
             context.messages.insert({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "Could not determine type of enum access base."
+                .outputType = parser::OutputType::ERROR,
+                .token = node->expressionToken(),
+                .message = "Could not determine type of enum access for the name '" + node->expressionToken().lexical()
+                           + "'"
             });
         }
     }
@@ -1179,7 +1196,14 @@ namespace types {
                     });
                     return;
                 }
-                node->setExpressionType(type.value());
+                if (unionType->isGeneric()) {
+                    const auto matchingTypes = context.currentFunction->matchingTypes(unionType->rawTypeName());
+                    if (matchingTypes.size() > 0) {
+                        node->setExpressionType(matchingTypes.at(0));
+                    }
+                } else {
+                    node->setExpressionType(unionType);
+                }
             } else {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -1191,9 +1215,10 @@ namespace types {
             }
         } else {
             context.messages.insert({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "Could not determine type of enum access base."
+                .outputType = parser::OutputType::ERROR,
+                .token = node->expressionToken(),
+                .message = "Could not determine type of enum access for the name '" + node->expressionToken().lexical()
+                           + "'"
             });
         }
     }
@@ -2266,7 +2291,7 @@ namespace types {
 
                 node->setExpressionType(nonGenericType.value());
             } else if (funcDef->returnType()) {
-                const auto type = resolveFromRawType(funcDef->returnType().value(), context.currentScope);
+                const auto type = resolveFromRawType(funcDef->returnType().value(), context.currentScope, true);
                 if (!type) {
                     context.messages.insert({
                         .outputType = parser::OutputType::ERROR,
@@ -2346,7 +2371,7 @@ namespace types {
                         }
                     }
                 } else if (auto unionType = std::dynamic_pointer_cast<types::UnionType>(type.value())) {
-                    const auto variant = unionType->getVariant(node->functionName());
+                    auto variant = unionType->getVariant(node->functionName());
                     if (variant && variant->type == UnionVariantType::TUPLE) {
                         // check arguments
                         if (node->args().size() != variant->associatedTypes.size()) {
@@ -2358,6 +2383,17 @@ namespace types {
                                            std::to_string(node->args().size()) + "."
                             });
                         }
+
+                        if (unionType->isGeneric()) {
+                            if (node->args().size() > 0) {
+                                auto param = node->args()[0]->expressionType();
+                                auto nonGenericType = unionType->makeNonGenericType(param.value());
+                                context.currentScope->registerType(nonGenericType);
+                                unionType = std::dynamic_pointer_cast<UnionType>(nonGenericType);
+                                variant = unionType->getVariant(node->functionName());
+                            }
+                        }
+
                         for (int i = 0; i < node->args().size(); ++i) {
                             auto arg = node->args()[i];
                             auto associatedType = variant->associatedTypes[i];
@@ -2374,6 +2410,7 @@ namespace types {
                                 });
                             }
                         }
+
 
                         node->setExpressionType(unionType);
                         return;
@@ -2791,7 +2828,7 @@ namespace types {
             }
         }
         if (node->returnType()) {
-            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope)) {
+            if (const auto returnType = resolveFromRawType(node->returnType().value(), context.currentScope, true)) {
                 if (returnType.value()->typeKind() == TypeKind::INTERFACE) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
@@ -2815,7 +2852,7 @@ namespace types {
         }
 
         for (auto &arg: node->args()) {
-            arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
+            arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope, true);
             if (!arg.type) {
                 context.messages.insert({
                     parser::OutputType::ERROR,
@@ -3289,6 +3326,9 @@ namespace types {
                                                              unionVariants, genericTypes);
         const auto parentScope = context.currentScope->parentScope();
         context.currentScope->registerType(type);
+        if (!genericTypes.empty()) {
+            context.currentScope->registerTypeAlias(unionDecl->expressionToken().lexical(), type);
+        }
         // check for duplicate type names in the same scope
         if (const auto existingType = context.currentScope->getTypeByName(type->name())) {
             if (auto existingStruct = std::dynamic_pointer_cast<types::UnionType>(existingType.value())) {

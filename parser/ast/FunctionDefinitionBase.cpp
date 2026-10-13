@@ -87,4 +87,19 @@ namespace ast {
         signature += ")";
         return signature;
     }
+
+    std::vector<std::shared_ptr<types::VariableType> > FunctionDefinitionBase::matchingTypes(const std::string &name) {
+        std::vector<std::shared_ptr<types::VariableType> > types;
+        if (auto returnType = resolvedReturnType()) {
+            if (returnType.value()->rawTypeName() == name) {
+                types.push_back(returnType.value());
+            }
+        }
+        for (auto &arg: args()) {
+            if (arg.type and arg.type.value()->rawTypeName() == name) {
+                types.push_back(arg.type.value());
+            }
+        }
+        return types;
+    }
 }

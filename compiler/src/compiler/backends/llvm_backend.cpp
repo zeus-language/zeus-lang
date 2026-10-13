@@ -892,7 +892,7 @@ namespace llvm_backend {
         if (const auto unionType = std::dynamic_pointer_cast<types::UnionType>(node->expressionType().value())) {
             const auto enumValue = unionType->getVariantIndex(node->variantName().lexical());
             const auto type = resolveLlvmType(unionType, llvmState);
-            const auto allocValue = llvmState.Builder->CreateAlloca(type, nullptr, "enum_value");
+            const auto allocValue = llvmState.Builder->CreateAlloca(type, nullptr, node->variantName().lexical());
             llvmState.Builder->CreateStore(llvm::ConstantInt::get(llvmState.Builder->getInt32Ty(), enumValue),
                                            allocValue);
             return allocValue;
@@ -2275,24 +2275,25 @@ namespace llvm_backend {
     llvm::Value *codegen(const ast::VariableDeclaration *node, LLVMBackendState &llvmState) {
         llvm::Type *varType = resolveLlvmType(node->expressionType().value(), llvmState);
 
+        const auto variableName = node->expressionToken().lexical();
         if (node->constant() && !varType->isStructTy()) {
-            llvmState.addNamedValue(node->expressionToken().lexical(), nullptr);
+            llvmState.addNamedValue(variableName, nullptr);
             // Handle constant variable declaration if needed
             if (const auto initialValue = node->initialValue()) {
                 if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
-                    llvmState.addNamedValue(node->expressionToken().lexical(), initValue);
+                    llvmState.addNamedValue(variableName, initValue);
                 } else {
                     assert(false && "Failed to generate initial value for constant");
                     return nullptr;
                 }
             }
-            return llvmState.findVariable(node->expressionToken().lexical());
+            return llvmState.findVariable(variableName);
         }
 
 
         llvm::AllocaInst *alloca = llvmState.Builder->CreateAlloca(varType, nullptr,
-                                                                   node->expressionToken().lexical());
-        llvmState.addNamedAllocation(node->expressionToken().lexical(), alloca, node->expressionType().value());
+                                                                   variableName);
+        llvmState.addNamedAllocation(variableName, alloca, node->expressionType().value());
 
         if (const auto initialValue = node->initialValue()) {
             if (const auto stringConstant = dynamic_cast<ast::RawStringConstant *>(initialValue.value())) {
@@ -2342,10 +2343,10 @@ namespace llvm_backend {
                     return alloca;
                 }
                 if (arrayValue) {
-                    llvm::Value *value = nullptr;
-                    value = (arrayValue->getType()->isPointerTy())
-                                ? arrayValue
-                                : getLoadStorePointerOperand(arrayValue);
+                    llvm::Value *value = (arrayValue->getType()->isPointerTy())
+                                             ? arrayValue
+                                             : getLoadStorePointerOperand(arrayValue);
+
                     const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                     const size_t size = DL.getTypeAllocSize(varType);
 
@@ -2356,6 +2357,8 @@ namespace llvm_backend {
                                                     size);
                 }
                 return alloca;
+            } else if (varType->isPointerTy()) {
+                std::cerr << "var decl for other type\n";
             }
             if (llvm::Value *initValue = codegen_base(initialValue.value(), llvmState)) {
                 llvmState.Builder->CreateStore(initValue, alloca);
@@ -2737,7 +2740,11 @@ namespace llvm_backend {
                     auto llvmArgType = resolveLlvmType(arg->expressionType().value(), llvmState);
                     auto unionAlloc = llvmState.Builder->CreateAlloca(
                         llvmArgType, nullptr, "union_alloc");
-                    createMemCpy(llvmState, unionAlloc, value, llvmArgType);
+
+                    if (value->getType()->isArrayTy())
+                        llvmState.Builder->CreateStore(value, unionAlloc);
+                    else
+                        createMemCpy(llvmState, unionAlloc, value, llvmArgType);
 
                     args.push_back(unionAlloc);
                     continue;
@@ -2847,7 +2854,8 @@ namespace llvm_backend {
                 handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRetVoid();
             }
-            if (retValue->getType()->isPointerTy() && parentFunction->getReturnType()->isStructTy()) {
+            if (retValue->getType()->isPointerTy() && (
+                    parentFunction->getReturnType()->isStructTy() or parentFunction->getReturnType()->isArrayTy())) {
                 const auto loadedValue = llvmState.Builder->CreateLoad(parentFunction->getReturnType(), retValue);
                 handleDeferStack(llvmState);
                 return llvmState.Builder->CreateRet(loadedValue);

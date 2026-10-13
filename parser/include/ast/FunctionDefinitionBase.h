@@ -107,5 +107,7 @@ namespace ast {
         [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > resolvedReturnType() const {
             return m_resolvedReturnTyoe;
         }
+
+        [[nodiscard]] std::vector<std::shared_ptr<types::VariableType> > matchingTypes(const std::string &name);
     };
 }

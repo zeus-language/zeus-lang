@@ -257,7 +257,12 @@ namespace types {
 
         [[nodiscard]] std::optional<UnionVariant> getVariant(const std::string &variantName) const;
 
-        size_t getVariantIndex(const std::string &variantName) const;
+        [[nodiscard]] size_t getVariantIndex(const std::string &variantName) const;
+
+        std::shared_ptr<VariableType> makeNonGenericType(
+            const std::shared_ptr<VariableType> &genericParam) override;
+
+        bool isGeneric();
 
     private:
         std::vector<UnionVariant> m_variants;

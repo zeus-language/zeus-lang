@@ -104,6 +104,36 @@ size_t types::UnionType::getVariantIndex(const std::string &variantName) const {
     throw std::invalid_argument("Variant not found");
 }
 
+std::shared_ptr<types::VariableType> types::UnionType::makeNonGenericType(
+    const std::shared_ptr<VariableType> &genericParam) {
+    std::vector<UnionVariant> variants;
+    std::vector<std::shared_ptr<VariableType> > genericParams;
+    for (auto variant: this->variants()) {
+        auto new_variant = UnionVariant{variant.type, variant.associatedTypes, variant.fields, variant.name};
+        for (size_t i = 0; i < new_variant.associatedTypes.size(); ++i) {
+            auto type = variant.associatedTypes[i];
+            if (type->typeKind() == TypeKind::GENERIC) {
+                new_variant.associatedTypes[i] = genericParam;
+            }
+        }
+
+        for (auto field: new_variant.fields) {
+            if (field.type->typeKind() == TypeKind::GENERIC) {
+                field.type = genericParam;
+            }
+        }
+        variants.push_back(new_variant);
+    }
+    genericParams.push_back(genericParam);
+    return std::make_shared<types::UnionType>(rawTypeName(), variants, genericParams);
+}
+
+bool types::UnionType::isGeneric() {
+    return std::ranges::any_of(m_genericParams, [](const auto &param) {
+        return param->typeKind() == TypeKind::GENERIC;
+    });
+}
+
 
 types::StructType::StructType(std::string name, const std::vector<StructField> &fields,
                               const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
