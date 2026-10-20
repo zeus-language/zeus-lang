@@ -53,11 +53,12 @@ namespace ast {
             return std::move(cloneNode);
         }
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(genericParam);
-            m_range->makeNonGeneric(genericParam);
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+                            const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(sourceParam, genericParam);
+            m_range->makeNonGeneric(sourceParam, genericParam);
             for (const auto &stmt: m_block->statements()) {
-                stmt->makeNonGeneric(genericParam);
+                stmt->makeNonGeneric(sourceParam, genericParam);
             }
         }
     };

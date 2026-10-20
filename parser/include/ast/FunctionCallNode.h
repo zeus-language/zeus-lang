@@ -81,13 +81,15 @@ namespace ast {
 
         std::shared_ptr<ASTNode> clone() override;
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(genericParam);
-            if (genericType()) {
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+                            const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(sourceParam, genericParam);
+            if (genericType() && genericType() == sourceParam) {
                 m_genericType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
             }
-            for (auto &arg: m_args) {
-                arg->makeNonGeneric(genericParam);
+
+            for (const auto &arg: m_args) {
+                arg->makeNonGeneric(sourceParam, genericParam);
             }
         }
 

@@ -150,8 +150,9 @@ namespace parser {
             location.byte_offset += position;
             location.num_bytes -= position;
             auto typeToken = Token(Token::Type::IDENTIFIER, location);
+            auto genericParams = std::vector<Token>{};
             auto rawType = std::make_shared<ast::RawType>(typeToken, namespaceElements, ast::TypeModifier::NONE,
-                                                          std::nullopt);
+                                                          genericParams);
             return std::make_shared<ast::NumberConstant>(numberToken, ast::NumberType::INTEGER, rawType);
         }
 
@@ -262,8 +263,9 @@ namespace parser {
             const auto tempToken = Token(tempVarName, Token::IDENTIFIER, stringToken.source_location);
             const auto typeToken = Token("string", Token::IDENTIFIER, stringToken.source_location);
             bool constant = false;
+            std::vector<Token> genericParams;
             auto type = std::make_shared<ast::RawType>(typeToken, std::vector<Token>{}, ast::TypeModifier::NONE,
-                                                       std::nullopt);
+                                                       genericParams);
             auto tempString = std::make_shared<ast::VariableDeclaration>(tempToken, type,
                                                                          constant, std::nullopt);
             auto nodes = std::vector<std::shared_ptr<ast::ASTNode> >();
@@ -1404,18 +1406,22 @@ namespace parser {
             auto &typeToken = current();
 
             if (tryConsume(Token::IDENTIFIER)) {
-                std::optional<Token> genericParam = std::nullopt;
+                std::vector<Token> genericParams;
                 if (tryConsume(Token::LESS)) {
-                    genericParam = current();
-                    consume(Token::IDENTIFIER);
+                    while (canConsume(Token::IDENTIFIER)) {
+                        auto genericParam = current();
+                        consume(Token::IDENTIFIER);
+                        genericParams.push_back(genericParam);
 
-
-                    if (!canConsume(Token::GREATER)) {
-                        m_messages.push_back(ParserMessasge{
-                            .token = current(),
-                            .message = "expected '>' to close generic struct declaration!"
-                        });
-                        return std::nullopt;
+                        if (!tryConsume(Token::COMMA)) {
+                            if (!canConsume(Token::GREATER)) {
+                                m_messages.push_back(ParserMessasge{
+                                    .token = current(),
+                                    .message = "expected '>' to close generic struct declaration!"
+                                });
+                                return std::nullopt;
+                            }
+                        }
                     }
                     consume(Token::GREATER);
                 }
@@ -1423,10 +1429,10 @@ namespace parser {
                     return std::make_shared<ast::PointerRawType>(typeToken, namespaceElements, typeModifier,
                                                                  std::make_shared<ast::RawType>(
                                                                      typeToken, namespaceElements, secondModifier,
-                                                                     genericParam));
+                                                                     genericParams));
                 }
 
-                return std::make_shared<ast::RawType>(typeToken, namespaceElements, typeModifier, genericParam);
+                return std::make_shared<ast::RawType>(typeToken, namespaceElements, typeModifier, genericParams);
             }
 
 
@@ -2711,7 +2717,7 @@ namespace parser {
                     auto genericParamToken = current();
                     consume(Token::IDENTIFIER);
                     genericParams.push_back(genericParamToken);
-                    if (!canConsume(Token::COMMA)) {
+                    if (!tryConsume(Token::COMMA)) {
                         if (!canConsume(Token::GREATER)) {
                             m_messages.push_back(ParserMessasge{
                                 .token = current(),

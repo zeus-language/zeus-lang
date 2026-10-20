@@ -126,3 +126,15 @@ void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type
 void types::TypeRegistry::registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type) {
     m_typeAliases[name] = type;
 }
+
+std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::findResolvedGenericTypes(
+    const std::string &rawTypeName, const std::vector<std::shared_ptr<VariableType> > &resolvedTypes) {
+    auto result = std::vector<std::shared_ptr<types::VariableType> >{};
+    for (auto &type: m_types) {
+        if (type->rawTypeName() == rawTypeName) {
+            result.push_back(type);
+            // todo check resolved types
+        }
+    }
+    return result;
+}

@@ -130,7 +130,7 @@ namespace types {
     std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
                                                                      std::shared_ptr<Scope> &currentScope,
                                                                      bool resolveGeneric) {
-        const bool useRawGenericName = rawType->genericParam.has_value() && resolveGeneric;
+        const bool useRawGenericName = rawType->hasGenericParam() && resolveGeneric;
         if (const auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
             const auto baseType = resolveFromRawType(arrayType->baseType.get(), currentScope);
             if (!baseType) return std::nullopt;
@@ -191,9 +191,17 @@ namespace types {
                 auto nonGenericType = currentScope->getTypeByName(rawType->fullTypeName(), false);
                 if (nonGenericType)
                     return nonGenericType;
-                auto param = currentScope->getTypeByName(rawType->genericParam.value().lexical(), false);
+                std::vector<std::shared_ptr<VariableType> > genericParams;
+                for (auto &p: rawType->genericParams) {
+                    auto param = currentScope->getTypeByName(p.lexical(), false);
+                    if (!param)
+                        return std::nullopt;
+                    genericParams.push_back(param.value());
+                }
                 auto type = currentScope->getTypeByName(rawType->typeToken.lexical(), useRawGenericName);
-                nonGenericType = type.value()->makeNonGenericType(param.value());
+                if (!type)
+                    return std::nullopt;
+                nonGenericType = type.value()->makeNonGenericType(genericParams);
                 currentScope->registerType(nonGenericType.value());
                 return nonGenericType;
             } else

@@ -1,0 +1,2 @@
+Error(Err 1)
+Result(R)

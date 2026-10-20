@@ -115,3 +115,14 @@ std::optional<std::shared_ptr<types::VariableType> > types::Scope::getArrayType(
 std::shared_ptr<types::VariableType> types::Scope::getNullPointerType() {
     return m_typeRegistry.getNullPointerType();
 }
+
+std::vector<std::shared_ptr<types::VariableType> > types::Scope::findResolvedGenericTypes(
+    const std::string &rawTypeName,
+    const std::vector<std::shared_ptr<VariableType> > &resolvedTypes) {
+    auto result = m_typeRegistry.findResolvedGenericTypes(rawTypeName, resolvedTypes);
+
+    if (m_parentScope && result.empty()) {
+        return m_parentScope->findResolvedGenericTypes(rawTypeName, resolvedTypes);
+    }
+    return result;
+}

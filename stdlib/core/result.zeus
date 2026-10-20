@@ -1,0 +1,4 @@
+union Result<R,E> {
+    Result(R),
+    Error(E)
+}

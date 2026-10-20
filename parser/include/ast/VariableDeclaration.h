@@ -18,6 +18,8 @@ namespace ast {
         NONE
     };
 
+    std::string joinTokenList(const std::vector<Token> &tokens);
+
     struct RawType {
     private:
         std::string m_fullTypeName;
@@ -26,23 +28,23 @@ namespace ast {
         Token typeToken;
         std::vector<Token> namespaceElements;
         TypeModifier typeModifier = TypeModifier::NONE;
-        std::optional<Token> genericParam = std::nullopt;
+        std::vector<Token> genericParams;
 
         RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
-                std::optional<Token> genericParam)
+                std::vector<Token> genericParams)
             : typeToken(std::move(type_token)), namespaceElements(namespaceElements),
-              typeModifier(typeModifier), genericParam(std::move(genericParam)) {
+              typeModifier(typeModifier), genericParams(std::move(genericParams)) {
             m_fullTypeName = typeToken.lexical();
-            if (this->genericParam.has_value()) {
-                m_fullTypeName += "<" + this->genericParam.value().lexical() + ">";
+            if (!this->genericParams.empty()) {
+                m_fullTypeName += "<" + joinTokenList(this->genericParams) + ">";
             }
         }
 
         RawType(Token type_token, const std::vector<Token> &namespaceElements, const TypeModifier typeModifier,
-                std::optional<Token> genericParam, std::string fullTypeName)
+                std::vector<Token> genericParams, std::string fullTypeName)
             : m_fullTypeName(std::move(fullTypeName)), typeToken(std::move(type_token)),
               namespaceElements(namespaceElements),
-              typeModifier(typeModifier), genericParam(std::move(genericParam)) {
+              typeModifier(typeModifier), genericParams(std::move(genericParams)) {
         }
 
         RawType(Token type_token, const TypeModifier typeModifier)
@@ -57,7 +59,11 @@ namespace ast {
         }
 
         [[nodiscard]] virtual std::shared_ptr<RawType> clone() const {
-            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParam, m_fullTypeName);
+            return std::make_unique<RawType>(typeToken, namespaceElements, typeModifier, genericParams, m_fullTypeName);
+        }
+
+        [[nodiscard]] bool hasGenericParam() const {
+            return !genericParams.empty();
         }
     };
 
@@ -66,7 +72,7 @@ namespace ast {
 
         PointerRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
                        std::shared_ptr<RawType> base_type)
-            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
+            : RawType(type_token, namespaceElements, typeModifier, {}),
               baseType(std::move(base_type)) {
         }
 
@@ -82,7 +88,7 @@ namespace ast {
 
         SliceRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
                      std::shared_ptr<RawType> base_type)
-            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
+            : RawType(type_token, namespaceElements, typeModifier, {}),
               baseType(std::move(base_type)) {
         }
 
@@ -99,7 +105,7 @@ namespace ast {
 
         ArrayRawType(const Token &type_token, const std::vector<Token> &namespaceElements, TypeModifier typeModifier,
                      std::shared_ptr<RawType> base_type, size_t size)
-            : RawType(type_token, namespaceElements, typeModifier, std::nullopt),
+            : RawType(type_token, namespaceElements, typeModifier, {}),
               baseType(std::move(base_type)),
               size(size) {
         }
@@ -117,7 +123,7 @@ namespace ast {
 
         FunctionRawType(const Token &type_token, std::vector<std::shared_ptr<RawType> > argument_types,
                         std::shared_ptr<RawType> return_type)
-            : RawType(type_token, {}, TypeModifier::NONE, std::nullopt),
+            : RawType(type_token, {}, TypeModifier::NONE, {}),
               argumentTypes(std::move(argument_types)),
               returnType(std::move(return_type)) {
         }
@@ -161,7 +167,7 @@ namespace ast {
 
         VariableDeclaration &operator=(const VariableDeclaration &) = delete;
 
-        std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
+        [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
             if (m_initialValue.has_value()) {
                 return m_initialValue.value()->getNodeByToken(token);
             }
@@ -170,15 +176,14 @@ namespace ast {
 
         std::shared_ptr<ASTNode> clone() override;
 
-        VariableDeclaration copy() const;
+        [[nodiscard]] VariableDeclaration copy() const;
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(genericParam);
+        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+                            const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(sourceParam, genericParam);
             if (m_initialValue.has_value()) {
-                m_initialValue.value()->makeNonGeneric(genericParam);
+                m_initialValue.value()->makeNonGeneric(sourceParam, genericParam);
             }
         }
     };
 } // ast
-
-

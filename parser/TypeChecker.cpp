@@ -2285,7 +2285,7 @@ namespace types {
                         node->genericParam().value().lexical(), false);
                     const auto typeWithGeneric = context.currentScope->getTypeByName(
                         rawType->typeToken.lexical(), true);
-                    nonGenericType = typeWithGeneric.value()->makeNonGenericType(param.value());
+                    nonGenericType = typeWithGeneric.value()->makeNonGenericType({param.value()});
                     context.currentScope->registerType(nonGenericType.value());
                 }
 
@@ -2385,18 +2385,52 @@ namespace types {
                         }
 
                         if (unionType->isGeneric()) {
-                            if (node->args().size() > 0) {
-                                auto param = node->args()[0]->expressionType();
-                                auto nonGenericType = unionType->makeNonGenericType(param.value());
-                                context.currentScope->registerType(nonGenericType);
-                                unionType = std::dynamic_pointer_cast<UnionType>(nonGenericType);
-                                variant = unionType->getVariant(node->functionName());
+                            if (!node->args().empty()) {
+                                std::vector<std::shared_ptr<VariableType> > params;
+                                bool matches = true;
+                                std::shared_ptr<ast::ASTNode> nonMatchingArg = nullptr;
+
+                                for (auto &arg: node->args()) {
+                                    type_check_base(arg.get(), context);
+                                    if (!arg->expressionType()) {
+                                        matches = false;
+                                        nonMatchingArg = arg;
+                                        break;
+                                    }
+
+                                    params.push_back(arg->expressionType().value());
+                                }
+                                if (matches) {
+                                    auto types = context.currentScope->findResolvedGenericTypes(
+                                        unionType->rawTypeName(), params);
+                                    auto nonGenericType = unionType->makeNonGenericType(params);
+                                    if (types.size() == 1) {
+                                        context.currentScope->registerType(types[0]);
+                                        unionType = std::dynamic_pointer_cast<UnionType>(types[0]);
+                                        variant = unionType->getVariant(node->functionName());
+                                    } else {
+                                        context.messages.insert({
+                                            .outputType = parser::OutputType::ERROR,
+                                            .token = node->expressionToken(),
+                                            .message =
+                                            "The generic union type could not be resolved. No matching unique type could be found"
+                                        });
+                                    }
+                                } else {
+                                    context.messages.insert({
+                                        .outputType = parser::OutputType::ERROR,
+                                        .token = nonMatchingArg->expressionToken(),
+                                        .message =
+                                        "The generic union type could not be resolved. As the type of the argument \"" +
+                                        nonMatchingArg->expressionToken().lexical() + "\" could not be resolved."
+                                    });
+                                }
                             }
                         }
 
                         for (int i = 0; i < node->args().size(); ++i) {
-                            auto arg = node->args()[i];
-                            auto associatedType = variant->associatedTypes[i];
+                            const auto &arg = node->args()[i];
+                            const auto &associatedType = variant->associatedTypes[i];
                             if (!arg->expressionType() || *arg->expressionType().value() != *associatedType) {
                                 context.messages.insert({
                                     .outputType = parser::OutputType::ERROR,
@@ -2725,7 +2759,7 @@ namespace types {
                 }
                 arg.type = resolveFromRawType(resolvedType.value().get(), context.currentScope);
             } else {
-                arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope);
+                arg.type = resolveFromRawType(arg.rawType.value().get(), context.currentScope, true);
             }
             if (!arg.type) {
                 context.messages.insert({
@@ -2903,8 +2937,7 @@ namespace types {
                                     returnStatement->returnValue().value()->expressionToken(),
                                     "Type mismatch in return statement of function '" + node->functionName() +
                                     "': expected '" +
-                                    resolveFromRawType(node->returnType().value(), context.currentScope).value()->
-                                    name()
+                                    node->expressionType().value()->name()
                                     +
                                     "', but got '" +
                                     returnStatement->returnValue().value()->expressionType().value()->name() + "'."

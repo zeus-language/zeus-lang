@@ -1,6 +1,18 @@
 #include "ast/VariableDeclaration.h"
+#include <sstream>
 
 namespace ast {
+    std::string joinTokenList(const std::vector<Token> &tokens) {
+        std::stringstream ss;
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            ss << tokens[i].lexical();
+            if (i < tokens.size() - 1)
+                ss << ",";
+        }
+        return ss.str();
+    }
+
+
     VariableDeclaration::VariableDeclaration(Token name, std::optional<std::shared_ptr<RawType> > type, bool constant,
                                              std::optional<std::shared_ptr<ASTNode> > initialValue) : ASTNode(std::move(
                 name), ast::NodeType::VARIABLE_DECLARATION), m_type(std::move(type)),

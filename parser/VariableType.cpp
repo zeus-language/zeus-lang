@@ -10,11 +10,15 @@
 
 
 std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(
-    const std::shared_ptr<VariableType> &genericParam) {
+    const std::vector<std::shared_ptr<VariableType> > &genericParams) {
     if (this->baseType()->typeKind() != TypeKind::GENERIC) {
         return std::make_shared<types::PointerType>(VariableType::name(), this->baseType());
     }
-    return std::make_shared<types::PointerType>("*" + genericParam->name(), genericParam);
+    assert(genericParams.size() == 1 && "pointers can only have one generic param");
+    if (this->baseType()->typeKind() == TypeKind::GENERIC)
+        return std::make_shared<types::PointerType>("*" + genericParams[0]->name(), genericParams[0]);
+    assert(false && "a pointer type is either generic or not");
+    return nullptr;
 }
 
 
@@ -105,26 +109,29 @@ size_t types::UnionType::getVariantIndex(const std::string &variantName) const {
 }
 
 std::shared_ptr<types::VariableType> types::UnionType::makeNonGenericType(
-    const std::shared_ptr<VariableType> &genericParam) {
+    const std::vector<std::shared_ptr<VariableType> > &genericParams) {
     std::vector<UnionVariant> variants;
-    std::vector<std::shared_ptr<VariableType> > genericParams;
+    std::vector<std::shared_ptr<VariableType> > nonGenericParams;
     for (auto variant: this->variants()) {
         auto new_variant = UnionVariant{variant.type, variant.associatedTypes, variant.fields, variant.name};
         for (size_t i = 0; i < new_variant.associatedTypes.size(); ++i) {
             auto type = variant.associatedTypes[i];
-            if (type->typeKind() == TypeKind::GENERIC) {
-                new_variant.associatedTypes[i] = genericParam;
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                if (type == this->m_genericParams[genIndex]) {
+                    new_variant.associatedTypes[i] = genericParams[genIndex];
+                }
             }
         }
 
         for (auto field: new_variant.fields) {
-            if (field.type->typeKind() == TypeKind::GENERIC) {
-                field.type = genericParam;
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                if (field.type == this->m_genericParams[genIndex]) {
+                    field.type = genericParams[genIndex];
+                }
             }
         }
         variants.push_back(new_variant);
     }
-    genericParams.push_back(genericParam);
     return std::make_shared<types::UnionType>(rawTypeName(), variants, genericParams);
 }
 
@@ -157,11 +164,15 @@ const ast::FunctionDefinition *types::StructType::getMethodByName(const std::str
 }
 
 std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
-    const std::shared_ptr<VariableType> &genericParam) {
+    const std::vector<std::shared_ptr<VariableType> > &genericParams) {
     auto fields = this->m_fields;
+
     for (auto &field: fields) {
-        if (field.type->typeKind() == TypeKind::GENERIC) {
-            field.type = genericParam;
+        for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+            if (field.type == this->m_genericParam) {
+                // TODO
+                field.type = genericParams[0];
+            }
         }
     }
     std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
@@ -176,10 +187,13 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
                                              (argOld.rawType)
                                                  ? std::make_optional(argOld.rawType.value()->clone())
                                                  : std::nullopt, argOld.isConstant);
-            if (argOld.type && argOld.type.value()->typeKind() == TypeKind::GENERIC) {
-                arg.type = genericParam;
-            } else {
-                arg.type = argOld.type;
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                if (argOld.type && argOld.type.value() == m_genericParam) {
+                    arg.type = genericParams[genIndex];
+                    break;
+                } else {
+                    arg.type = argOld.type;
+                }
             }
 
 
@@ -204,20 +218,23 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(
         functionClone->setParentStruct(this);
 
         if (method->returnType()) {
-            if (method->returnType().value()->genericParam) {
-                auto expr = method->expressionType().value();
-                functionClone->setExpressionType(expr);
-            } else if (method->expressionType() && method->expressionType().value()->typeKind() ==
-                       TypeKind::GENERIC) {
-                functionClone->setExpressionType(genericParam);
-            } else {
-                functionClone->setExpressionType(method->expressionType().value());
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                if (method->returnType().value()->hasGenericParam()) {
+                    auto expr = method->expressionType().value();
+                    functionClone->setExpressionType(expr);
+                } else if (method->expressionType() && method->expressionType().value() == this->m_genericParam) {
+                    functionClone->setExpressionType(genericParams[genIndex]);
+                } else {
+                    functionClone->setExpressionType(method->expressionType().value());
+                }
             }
         }
 
 
         for (auto &stmt: functionClone->block()->statements()) {
-            stmt->makeNonGeneric(genericParam);
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                stmt->makeNonGeneric(this->m_genericParam.value(), genericParams[genIndex]);
+            }
         }
         methods.push_back(functionClone);
     }

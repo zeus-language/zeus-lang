@@ -71,16 +71,17 @@ namespace ast {
             return nullptr;
         }
 
-        virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) {
+        virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+                                    const std::shared_ptr<types::VariableType> &genericParam) {
             if (!m_expressionType.has_value()) {
                 return;
             }
-            if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
+            if (m_expressionType.value() == sourceParam) {
                 m_expressionType = genericParam;
             } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
                        m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
                 if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
-                    if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
+                    if (ptrType->baseType() == sourceParam) {
                         auto newBaseType = genericParam;
                         const auto newPtrType = std::make_shared<types::PointerType>(
                             "*" + newBaseType->name(), newBaseType);

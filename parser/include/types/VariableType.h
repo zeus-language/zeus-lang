@@ -44,7 +44,7 @@ namespace types {
         void setTypeKind(const TypeKind typeKind) { m_typeKind = typeKind; }
 
         [[nodiscard]] virtual bool compare(const VariableType &other) const {
-            return this->name() == other.name();
+            return this->name() == other.name() and typeKind() == other.typeKind();
         }
 
     public:
@@ -69,7 +69,7 @@ namespace types {
         }
 
         virtual std::shared_ptr<VariableType> makeNonGenericType(
-            const std::shared_ptr<VariableType> &genericParam) {
+            const std::vector<std::shared_ptr<VariableType> > &genericParams) {
             assert(false && "makeNonGenericType not implemented for this type");
             return nullptr;
         }
@@ -116,7 +116,7 @@ namespace types {
 
 
         std::shared_ptr<VariableType>
-        makeNonGenericType(const std::shared_ptr<VariableType> &genericParam) override;
+        makeNonGenericType(const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -260,7 +260,7 @@ namespace types {
         [[nodiscard]] size_t getVariantIndex(const std::string &variantName) const;
 
         std::shared_ptr<VariableType> makeNonGenericType(
-            const std::shared_ptr<VariableType> &genericParam) override;
+            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
         bool isGeneric();
 
@@ -339,7 +339,7 @@ namespace types {
         [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
 
         std::shared_ptr<VariableType> makeNonGenericType(
-            const std::shared_ptr<VariableType> &genericParam) override;
+            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
         void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods);
 
