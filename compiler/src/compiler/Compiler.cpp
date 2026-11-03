@@ -56,6 +56,10 @@ namespace compiler {
         const auto tokens = lexer::lex_file(inputPath.string(), content.value());
 
         auto result = parser::parse_tokens(tokens);
+        const SourceLocation location = result.module->modulePath().empty()
+                                            ? SourceLocation{}
+                                            : result.module->modulePath()[0].source_location;
+        result.module->setModulePath({Token(inputPath.filename(), Token::IDENTIFIER, location)});
 
         modules::include_modules(options.stdlibDirectories, moduleCache, environment, result);
         for (const auto &message: result.messages) {

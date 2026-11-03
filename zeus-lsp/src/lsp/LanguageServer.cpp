@@ -106,6 +106,10 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
     const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
 
     auto result = parser::parse_tokens(tokens);
+    const SourceLocation location = result.module->modulePath().empty()
+                                        ? SourceLocation{}
+                                        : result.module->modulePath()[0].source_location;
+    result.module->setModulePath({Token(file_path.filename(), Token::IDENTIFIER, location)});
     std::vector<std::filesystem::path> includeDirs;
     includeDirs.reserve(rtlDirectories.size() + 1);
     for (auto &dir: rtlDirectories) {
@@ -114,6 +118,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
         }
     }
     includeDirs.push_back(parentDir);
+    moduleCache.removeModule(file_path.string());
 
     modules::include_modules(includeDirs, moduleCache, env, result);
 

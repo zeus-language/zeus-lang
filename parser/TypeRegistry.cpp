@@ -1,7 +1,5 @@
 #include  "types/TypeRegistry.h"
-
 #include <algorithm>
-
 #include "ast/FunctionDefinition.h"
 
 std::shared_ptr<types::EnumType> types::createOstypeEnum() {
@@ -121,11 +119,9 @@ void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type
     for (auto &m_type: m_types) {
         if (m_type->name() == type->name()) {
             m_type = type;
-            std::cerr << "re register type: " << type->name() << "\n";
             return;
         }
     }
-    std::cerr << "register type: " << type->name() << "\n";
     m_types.emplace_back(type);
 }
 

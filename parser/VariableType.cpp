@@ -296,7 +296,9 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(std::
 
     auto structType = std::make_shared<StructType>(VariableType::rawTypeName(), fields, std::move(methods),
                                                    interfaces(), genericParams.at(0));
-
+    if (auto type = currentScope->getTypeByName(structType->name(), false)) {
+        return type.value();
+    }
     currentScope->registerType(structType);
 
     for (const auto &method: this->methods()) {

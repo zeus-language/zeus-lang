@@ -406,7 +406,8 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
                              "lambda-infer-expression","interface-single","interface-multiple","simple-union",
                              "shorthand_operators_int","shorthand_operators_double","arrayslices","pointer_array",
-                             "nested-defer","numbersuffix","optionals","results","multi_results","option_unwrap"));
+                             "nested-defer","numbersuffix","optionals","results","multi_results","option_unwrap",
+                             "multilist"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

@@ -1111,10 +1111,10 @@ namespace types {
 
         if (!matchedMethod) {
             context.messages.insert({
-                parser::OutputType::ERROR,
-                node->expressionToken(),
-                "No matching overload found for method '" + methodName +
-                "' with the given argument types for the signature '" + node->functionSignature() + "'."
+                .outputType = parser::OutputType::ERROR,
+                .token = node->expressionToken(),
+                .message = "No matching overload found for method '" + methodName +
+                           "' with the given argument types for the signature '" + node->functionSignature() + "'."
             });
             return;
         }
@@ -2659,9 +2659,6 @@ namespace types {
             }
             auto type = node->initialValue().value()->expressionType().value();
             node->setExpressionType(type);
-            if (!context.currentScope->getTypeByName(type->name())) {
-                context.currentScope->registerType(type);
-            }
         } else {
             const auto varType = resolveFromRawType(node->type().value(), context.currentScope, true);
             if (!varType) {
@@ -2730,6 +2727,9 @@ namespace types {
                                               node->constant(),
                                               constValue
                                           });
+        if (varType) {
+            context.currentScope->registerType(varType.value());
+        }
         if (context.currentScope->isGlobalScope() && !node->constant() && varType) {
             if (const auto slice = dynamic_cast<types::StructType *>(varType.value().get())) {
                 if (slice->name() == "[u8]") {
@@ -3208,7 +3208,12 @@ namespace types {
 
     static void process_struct_declaration(ast::StructDeclaration *const structDecl, Context &context) {
         std::vector<types::StructField> structFields;
+        if (structDecl->expressionType()) {
+            context.currentScope->registerType(structDecl->expressionType().value());
+            return;
+        }
         context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
+
         std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
         if (auto genericParams = structDecl->genericParam()) {
             genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
@@ -3311,13 +3316,22 @@ namespace types {
     static void process_union_declaration(ast::UnionDeclaration *unionDecl, Context &context) {
         std::vector<types::UnionVariant> unionVariants;
 
-        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
         std::vector<std::shared_ptr<VariableType> > genericTypes;
         for (auto &genericParam: unionDecl->genericParams()) {
             auto genericType = std::make_shared<types::GenericType>(genericParam.lexical());
             context.currentScope->registerTypeInScope(genericType);
             genericTypes.push_back(genericType);
         }
+
+        if (unionDecl->expressionType()) {
+            context.currentScope->registerType(unionDecl->expressionType().value());
+            if (!genericTypes.empty()) {
+                context.currentScope->registerTypeAlias(unionDecl->expressionToken().lexical(),
+                                                        unionDecl->expressionType().value());
+            }
+            return;
+        }
+        context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
 
         for (const auto &variant: unionDecl->variants()) {
             switch (variant.type) {
