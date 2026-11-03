@@ -1,5 +1,6 @@
 use core::libc;
 use core::utils;
+use core::option;
 /**
 * A dynamic array implementation in Zeus
 * @tparam T The type of elements stored in the array
@@ -47,13 +48,13 @@ struct array<T>{
         self.length = self.length - 1 as i64;
         return self.data[self.length];
     }
-    pub fn get(self: &array<T>,index : i64) : T {
+    pub fn get(self: &array<T>,index : i64) : Option<T> {
         if index < 0 as i64 or index >= self.length {
-            panic("Index out of bounds");
+            return Option::None;
         }
 
         let value: T = self.data[index];
-        return value;
+        return Option::Some(value);
     }
 
     pub fn clear(self: mut &array<T>) : void {

@@ -1,0 +1,60 @@
+use core::result;
+
+enum DBError {
+    ERR_1,
+    ERR_2
+}
+
+fn get_char(i : i32) : Result<u8,DBError> {
+    if i > 10 {
+       return Result::Error(DBError::ERR_1);
+    }
+    return Result::Result('R');
+}
+
+fn get_int(i : i32) : Result<i32,DBError> {
+    if i > 10 {
+       return Result::Error(DBError::ERR_2);
+    }
+    return Result::Result(32);
+}
+
+fn error(e : DBError) : [u8] {
+    return match e {
+      DBError::ERR_1 => "Err 1",
+      DBError::ERR_2 => "Err 2",
+    };
+}
+
+fn print_opt(param: Result<u8,DBError>): void {
+    match param {
+        Result::Result(s) => println("Result(${s})"),
+        Result::Error(e) => {
+            let msg = error(e);
+            println("Error(${msg})");
+        },
+    };
+}
+
+fn print_opt(param: Result<i32,DBError>): void {
+    match param {
+        Result::Result(s) => println("Result(${s})"),
+        Result::Error(e) => {
+            let msg = error(e);
+            println("Error(${msg})");
+        },
+    };
+}
+
+
+fn main() :i32 {
+    let no = get_char(12);
+    let yes = get_char(9);
+
+    print_opt(no);
+    print_opt(yes);
+
+    print_opt(get_int(99));
+    print_opt(get_int(7));
+    return 0;
+}

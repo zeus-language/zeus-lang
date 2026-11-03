@@ -1895,6 +1895,12 @@ namespace parser {
             }
             consumeKeyWord("match");
             auto identifier = tryParseToken();
+            if (!identifier) {
+                m_messages.push_back(ParserMessasge{
+                    .token = current(),
+                    .message = "Missing identifier in match expression!"
+                });
+            }
             consume(Token::OPEN_BRACE);
             std::vector<ast::MatchCase> matchCases;
             while (true) {
@@ -1905,6 +1911,8 @@ namespace parser {
                 matchCases.emplace_back(std::move(parsedMatch.value()));
             }
             consume(Token::CLOSE_BRACE);
+            if (!identifier)
+                return std::nullopt;
             return std::make_shared<ast::MatchExpression>(name, std::move(identifier.value()), matchCases);
         }
 
@@ -2731,8 +2739,15 @@ namespace parser {
             }
 
             consume(Token::OPEN_BRACE);
+            std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
             while (!canConsume(Token::CLOSE_BRACE) && hasNext()) {
                 auto variantName = current();
+
+                if (auto method = parseFunctionDefinition(true)) {
+                    methods.push_back(std::move(method.value()));
+                    continue;
+                }
+
                 if (!consume(Token::IDENTIFIER))
                     break;
                 ast::UnionVariant variant(variantName);
@@ -2775,7 +2790,7 @@ namespace parser {
             }
             consume(Token::CLOSE_BRACE);
             tryConsume(Token::SEMICOLON);
-            return std::make_shared<ast::UnionDeclaration>(unionName, genericParams, variants);
+            return std::make_shared<ast::UnionDeclaration>(unionName, genericParams, variants, methods);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseEnumDeclaration() {

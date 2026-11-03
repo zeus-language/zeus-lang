@@ -20,5 +20,7 @@ namespace ast {
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
 
         [[nodiscard]] std::optional<ASTNode *> getVariableDefinition(const std::string &name) const;
+
+        [[nodiscard]] bool hasReturnStatement() const override;
     };
 } // namespace ast

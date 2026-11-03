@@ -62,6 +62,6 @@ namespace types {
         void registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type);
 
         std::vector<std::shared_ptr<types::VariableType> > findResolvedGenericTypes(const std::string &rawTypeName,
-            const std::vector<std::shared_ptr<VariableType> > &resolvedTypes);
+            const std::vector<std::shared_ptr<VariableType> > &resolvedTypes, bool matchPartial) const;
     };
 }

@@ -24,6 +24,8 @@ namespace ast {
 
         [[nodiscard]] std::optional<ASTNode *> getVariableDefinition(const Token &token) const;
 
+        [[nodiscard]] bool hasReturnStatement() const;
+
 
         FunctionDefinition(FunctionDefinition &&) = default;
 
@@ -52,6 +54,8 @@ namespace ast {
         }
 
         std::optional<ASTNode *> getNodeByToken(const Token &token) const override;
+
+        [[nodiscard]] std::vector<std::shared_ptr<types::VariableType> >
+        matchingTypes(const std::string &name) override;
     };
 } // ast
-

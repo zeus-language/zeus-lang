@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -17,6 +18,8 @@ namespace ast {
 }
 
 namespace types {
+    class Scope;
+
     enum class TypeKind {
         INT,
         FLOAT,
@@ -68,10 +71,16 @@ namespace types {
             return compare(other);
         }
 
-        virtual std::shared_ptr<VariableType> makeNonGenericType(
-            const std::vector<std::shared_ptr<VariableType> > &genericParams) {
-            assert(false && "makeNonGenericType not implemented for this type");
+        virtual std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                                                                 const std::vector<std::shared_ptr<VariableType> > &
+                                                                 genericParams) {
+            //assert(false && "makeNonGenericType not implemented for this type");
+            std::cerr << "makeNonGenericType not implemented for this type: " << this->name() << "\n";
             return nullptr;
+        }
+
+        [[nodiscard]] virtual bool isGeneric() {
+            return false;
         }
     };
 
@@ -116,7 +125,10 @@ namespace types {
 
 
         std::shared_ptr<VariableType>
-        makeNonGenericType(const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
+        makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                           const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
+
+        [[nodiscard]] bool isGeneric() override;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -147,6 +159,10 @@ namespace types {
         }
 
         ~ReferenceType() override = default;
+
+        std::shared_ptr<VariableType>
+        makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                           const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -220,6 +236,11 @@ namespace types {
         findMethodWithIndex(
             const std::string &method_name) const;
 
+
+        [[nodiscard]] bool isGeneric() override {
+            return m_genericParam.has_value();
+        }
+
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override;
     };
@@ -238,9 +259,32 @@ namespace types {
         std::string name;
     };
 
-    class UnionType : public VariableType {
+    class VariableTypeWithMethods : public VariableType {
+    private:
+        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
+
+    public:
+        VariableTypeWithMethods(const std::string &name, const TypeKind typeKind,
+                                const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) : VariableType(
+                name, typeKind), m_methods(methods) {
+        }
+
+        [[nodiscard]] const ast::FunctionDefinition *getMethodByName(const std::string &methodName) const;
+
+        [[nodiscard]] virtual std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const {
+            std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
+            return m_methods;
+        }
+
+        void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) {
+            m_methods = methods;
+        }
+    };
+
+    class UnionType : public VariableTypeWithMethods {
     public:
         UnionType(const std::string &name, const std::vector<UnionVariant> &m_variants,
+                  const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods,
                   const std::vector<std::shared_ptr<VariableType> > &m_generic_params);
 
         [[nodiscard]] const std::vector<UnionVariant> &variants() const { return m_variants; }
@@ -259,10 +303,13 @@ namespace types {
 
         [[nodiscard]] size_t getVariantIndex(const std::string &variantName) const;
 
-        std::shared_ptr<VariableType> makeNonGenericType(
-            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
+        std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                                                         const std::vector<std::shared_ptr<VariableType> > &
+                                                         genericParams) override;
 
-        bool isGeneric();
+        bool isGeneric() override;
+
+        void setVariants(const std::vector<UnionVariant> &variants);
 
     private:
         std::vector<UnionVariant> m_variants;
@@ -271,43 +318,27 @@ namespace types {
         std::string m_linkageName;
     };
 
-    class StructType : public VariableType {
+    class StructType : public VariableTypeWithMethods {
     private:
         std::vector<std::shared_ptr<InterfaceType> > m_interfaces;
         std::vector<StructField> m_fields;
-        std::vector<std::weak_ptr<ast::FunctionDefinition> > m_methods;
         std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
         std::string m_typename;
         std::string m_linkageName;
 
     public:
-        StructType(std::string name, const std::vector<StructField> &fields,
-                   const std::vector<std::weak_ptr<ast::FunctionDefinition> > &methods,
+        StructType(const std::string &name, const std::vector<StructField> &fields,
+                   const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods,
                    const std::vector<std::shared_ptr<InterfaceType> > &interfaces,
                    std::optional<std::shared_ptr<VariableType> > genericParam);
 
         ~StructType() override {
             m_fields.clear();
-            m_methods.clear();
             m_genericParam.reset();
         }
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
 
-        [[nodiscard]] virtual std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const {
-            std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
-            for (const auto &method: m_methods) {
-                if (method.expired()) {
-                    throw std::runtime_error("Method pointer expired for struct " + name());
-                }
-                if (auto methodPtr = method.lock()) {
-                    methods.push_back(methodPtr);
-                }
-            }
-            return methods;
-        }
-
-        [[nodiscard]] const ast::FunctionDefinition *getMethodByName(const std::string &methodName) const;
 
         [[nodiscard]] std::optional<StructField> field(const std::string &fieldName) const {
             for (const auto &field: m_fields) {
@@ -338,14 +369,18 @@ namespace types {
 
         [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
 
-        std::shared_ptr<VariableType> makeNonGenericType(
-            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
+        std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                                                         const std::vector<std::shared_ptr<VariableType> > &
+                                                         genericParams) override;
 
-        void setMethods(const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods);
 
         [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
 
         [[nodiscard]] size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
+
+        [[nodiscard]] bool isGeneric() override {
+            return m_genericParam.has_value() and m_genericParam.value()->typeKind() == TypeKind::GENERIC;
+        }
 
     protected:
         [[nodiscard]] bool compare(const VariableType &other) const override {
@@ -429,6 +464,12 @@ namespace types {
                                                                              TypeKind::GENERIC),
                                                                 m_genericParam(genericParam) {
         }
+
+        bool isGeneric() override;
+
+        std::shared_ptr<VariableType>
+        makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                           const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
     };
 
     class FunctionType final : public VariableType {

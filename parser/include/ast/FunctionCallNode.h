@@ -22,7 +22,8 @@ namespace ast {
 
     public:
         explicit FunctionCallNode(Token functionName, std::vector<Token> namespacePrefix,
-                                  std::vector<std::shared_ptr<ASTNode> > args, std::optional<Token> genericParam);
+                                  std::vector<std::shared_ptr<ASTNode> > args,
+                                  const std::optional<Token> &genericParam);
 
         ~FunctionCallNode() override = default;
 
@@ -81,15 +82,16 @@ namespace ast {
 
         std::shared_ptr<ASTNode> clone() override;
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+        void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                            const std::shared_ptr<types::VariableType> &sourceParam,
                             const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(sourceParam, genericParam);
+            ASTNode::makeNonGeneric(scope, sourceParam, genericParam);
             if (genericType() && genericType() == sourceParam) {
                 m_genericType = std::make_optional<std::shared_ptr<types::VariableType> >(genericParam);
             }
 
             for (const auto &arg: m_args) {
-                arg->makeNonGeneric(sourceParam, genericParam);
+                arg->makeNonGeneric(scope, sourceParam, genericParam);
             }
         }
 

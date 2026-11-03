@@ -118,11 +118,11 @@ std::shared_ptr<types::VariableType> types::Scope::getNullPointerType() {
 
 std::vector<std::shared_ptr<types::VariableType> > types::Scope::findResolvedGenericTypes(
     const std::string &rawTypeName,
-    const std::vector<std::shared_ptr<VariableType> > &resolvedTypes) {
-    auto result = m_typeRegistry.findResolvedGenericTypes(rawTypeName, resolvedTypes);
+    const std::vector<std::shared_ptr<VariableType> > &resolvedTypes, bool matchPartial) const {
+    auto result = m_typeRegistry.findResolvedGenericTypes(rawTypeName, resolvedTypes, matchPartial);
 
     if (m_parentScope && result.empty()) {
-        return m_parentScope->findResolvedGenericTypes(rawTypeName, resolvedTypes);
+        return m_parentScope->findResolvedGenericTypes(rawTypeName, resolvedTypes, matchPartial);
     }
     return result;
 }

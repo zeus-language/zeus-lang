@@ -14,11 +14,11 @@ size_t count_unicode_characters(const std::string &str, size_t start, size_t len
 
 struct SourceLocation {
     std::string filename;
-    std::shared_ptr<std::string> source;
-    std::size_t byte_offset;
-    std::size_t num_bytes;
-    size_t row{};
-    size_t col{};
+    std::shared_ptr<std::string> source = nullptr;
+    std::size_t byte_offset = 0;
+    std::size_t num_bytes = 0;
+    size_t row = 0;
+    size_t col = 0;
 
     [[nodiscard]] std::string text() const { return source->substr(byte_offset, num_bytes); }
 
@@ -143,6 +143,10 @@ public:
         }
         return source_location.text();
     }
+
+
+    // Token(const Token &other) : m_lexical(other.lexical()), type(other.type), source_location{other.source_location} {
+    // }
 
     bool operator==(const Token &other) const {
         return source_location == other.source_location && m_lexical == other.m_lexical && type == other.type;

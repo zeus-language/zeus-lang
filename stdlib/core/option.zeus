@@ -1,4 +1,15 @@
+use core::utils;
 union Option<T> {
-   Some(T),
-  None
+    Some(T),
+    None
+
+    pub fn unwrap<T>(self : &Option<T> ) : T {
+        let mut result : T;
+        match self {
+          Option::Some(v) => {result = v;},
+          Option::None =>  panic("unwrapped optional without value"),
+          _ => panic("unknown option variant"),
+        };
+        return result;
+    }
 }

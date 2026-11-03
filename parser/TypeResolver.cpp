@@ -201,7 +201,7 @@ namespace types {
                 auto type = currentScope->getTypeByName(rawType->typeToken.lexical(), useRawGenericName);
                 if (!type)
                     return std::nullopt;
-                nonGenericType = type.value()->makeNonGenericType(genericParams);
+                nonGenericType = type.value()->makeNonGenericType(currentScope, genericParams);
                 currentScope->registerType(nonGenericType.value());
                 return nonGenericType;
             } else

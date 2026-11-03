@@ -1,22 +1,30 @@
 use std::array;
-
+use core::utils;
 fn main() : i32 {
-    let mut arr : array<i32> = new_array<i32>();
+    let mut arr = new_array<i32>();
     defer arr.destroy();
     arr.push(10);
     arr.push(20);
     arr.push(30);
 
-    for i in 0 as i64 .. arr.length() {
-        printf(r"Element at index %d: %d\n", i, arr.get(i));
+    for i in 0i64 .. arr.length() {
+        let x = arr.get(i);
+        match x{
+            Option::Some(xx) =>  printf(r"Element at index %d: %d\n", i, xx),
+            Option::None => panic("array is empty"),
+        }
+
     }
 
     let popped_value : i32 = arr.pop();
     printf(r"Popped value: %d\n", popped_value);
 
-    arr.set(0 as i64, 100);
-    printf(r"Element at index 0 after set: %d\n", arr.get(0 as i64));
-
+    arr.set(0i64, 100);
+    let x = arr.get(0i64);
+    match x{
+        Option::Some(xx) => print("Element at index 0 after set: ${xx}\n"),
+        Option::None => panic("array is empty"),
+    }
     arr.clear();
     printf(r"Array length after clear: %d\n", arr.length());
     return 0;

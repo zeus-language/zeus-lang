@@ -84,4 +84,12 @@ namespace ast {
         }
         return std::nullopt;
     }
+
+    bool BlockNode::hasReturnStatement() const {
+        for (auto &stmt: m_statements) {
+            if (stmt->hasReturnStatement())
+                return true;
+        }
+        return false;
+    }
 } // namespace ast

@@ -36,6 +36,10 @@ namespace ast {
         return std::nullopt;
     }
 
+    bool FunctionDefinition::hasReturnStatement() const {
+        return m_blockNode->hasReturnStatement();
+    }
+
     std::shared_ptr<ast::FunctionDefinitionBase> FunctionDefinition::cloneFunction() {
         return cloneFunction2();
     }
@@ -84,5 +88,14 @@ namespace ast {
             return result;
         }
         return std::nullopt;
+    }
+
+    std::vector<std::shared_ptr<types::VariableType> > FunctionDefinition::matchingTypes(const std::string &name) {
+        auto matches = FunctionDefinitionBase::matchingTypes(name);
+        for (const auto &stmt: m_blockNode->statements()) {
+            if (stmt->expressionType() && stmt->expressionType().value()->rawTypeName() == name)
+                matches.push_back(stmt->expressionType().value());
+        }
+        return matches;
     }
 } // ast

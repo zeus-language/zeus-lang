@@ -49,12 +49,17 @@ namespace ast {
             return std::move(cloneNode);
         }
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+        void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                            const std::shared_ptr<types::VariableType> &sourceParam,
                             const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(sourceParam, genericParam);
+            ASTNode::makeNonGeneric(scope, sourceParam, genericParam);
             if (m_returnValue) {
-                m_returnValue->makeNonGeneric(sourceParam, genericParam);
+                m_returnValue->makeNonGeneric(scope, sourceParam, genericParam);
             }
+        }
+
+        [[nodiscard]] bool hasReturnStatement() const override {
+            return true;
         }
     };
 } // ast

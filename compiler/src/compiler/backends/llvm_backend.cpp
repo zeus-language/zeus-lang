@@ -103,7 +103,7 @@ namespace {
             }
             if (NamedAllocations.contains(name)) {
                 if (!loadValue)
-                    return NamedAllocations[name].allocaInst;
+                    return NamedAllocations.at(name).allocaInst;
                 return Builder->CreateLoad(NamedAllocations[name].allocaInst->getAllocatedType(),
                                            NamedAllocations[name].allocaInst, name);
             }
@@ -633,6 +633,7 @@ namespace llvm_backend {
 
 
     llvm::Value *codegen_base(ast::ASTNode *node, LLVMBackendState &llvmState) {
+        assert(node && "node is not null");
         emitLocation(node, llvmState);
         if (const auto returnStatement = dynamic_cast<ast::ReturnStatement *>(node)) {
             return llvm_backend::codegen(returnStatement, llvmState);
@@ -804,7 +805,13 @@ namespace llvm_backend {
         const auto unionType = std::dynamic_pointer_cast<types::UnionType>(type);
         const size_t enumValue = unionType->getVariantIndex(node->expressionToken().lexical());
         const auto variant = unionType->getVariant(node->expressionToken().lexical());
-        const auto unionPointer = codegen_base(node->accessNode(), llvmState);
+        assert(node->accessNode() && "access node is required");
+        auto unionPointer = codegen_base(node->accessNode(), llvmState);
+        if (unionPointer->getType()->isArrayTy()) {
+            if (const auto tmp = llvm::getLoadStorePointerOperand(unionPointer)) {
+                unionPointer = tmp;
+            }
+        }
         size_t index = 0;
         size_t offset = 4;
         const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
@@ -918,8 +925,21 @@ namespace llvm_backend {
         const auto result = (!resultType->isVoidTy())
                                 ? llvmState.Builder->CreateAlloca(resultType, nullptr, "match_result")
                                 : nullptr;
+        auto accessNodeType = node->accessNode()->expressionType().value();
+        if (auto refType = std::dynamic_pointer_cast<
+            types::ReferenceType>(accessNodeType)) {
+            accessNodeType = refType->baseType();
+            // auto type = resolveLlvmType(accessNodeType, llvmState);
+        }
+        if (value->getType()->isArrayTy()) {
+            if (const auto tmp = llvm::getLoadStorePointerOperand(value)) {
+                value = tmp;
+            }
+        }
+
         if (auto unionType = std::dynamic_pointer_cast<
-            types::UnionType>(node->accessNode()->expressionType().value())) {
+            types::UnionType>(accessNodeType)) {
+            //assert(value->getType()->isArrayTy() && "union is an llvm array type");
             value = llvmState.Builder->CreateLoad(llvmState.Builder->getInt32Ty(), value, "match_union_value");
         }
         const auto function = llvmState.Builder->GetInsertBlock()->getParent();
@@ -2555,17 +2575,19 @@ namespace llvm_backend {
                                                                  methodPtrPtr, "method_ptr");
 
             const auto call = llvmState.Builder->CreateCall(methodType, methodPtr, args);
+            auto resultType = resolveLlvmType(method->expressionType().value(),
+                                              llvmState);
             if (method->expressionType().value()->typeKind() == types::TypeKind::STRUCT) {
                 call->addRetAttr(llvm::Attribute::getWithStructRetType(*llvmState.TheContext,
-                                                                       resolveLlvmType(
-                                                                           method->expressionType().value(),
-                                                                           llvmState)));
+                                                                       resultType));
                 call->addRetAttr(llvm::Attribute::Writable);
                 call->addRetAttr(llvm::Attribute::DeadOnUnwind);
                 call->addRetAttr(llvm::Attribute::NoAlias);
             }
             if (method->expressionType().value()->typeKind() != types::TypeKind::VOID) {
-                return call;
+                const auto result = llvmState.Builder->CreateAlloca(resultType);
+                llvmState.Builder->CreateStore(call, result);
+                return llvmState.Builder->CreateLoad(resultType, result);
             }
 
             return nullptr;
@@ -2578,6 +2600,9 @@ namespace llvm_backend {
             functionCall = llvmState.TheModule->getFunction(mangleName);
         }
         if (!functionCall) {
+            for (auto &func: llvmState.TheModule->functions()) {
+                std::cerr << "Available function: " << func.getName().str() << "\n";
+            }
             std::cerr << "Method " << mangleName << " not found in structure.\n";
             assert(false && "Method not declared before call");
 
@@ -2594,8 +2619,11 @@ namespace llvm_backend {
             call->addParamAttr(0, llvm::Attribute::NoAlias);
         }
 
-        if (!functionCall->getReturnType()->isVoidTy())
-            return call;
+        if (!functionCall->getReturnType()->isVoidTy()) {
+            const auto result = llvmState.Builder->CreateAlloca(functionCall->getReturnType());
+            llvmState.Builder->CreateStore(call, result);
+            return llvmState.Builder->CreateLoad(functionCall->getReturnType(), result);
+        }
         return returnAlloca;
     }
 
@@ -2813,8 +2841,11 @@ namespace llvm_backend {
         }
 
 
-        if (!functionCall->getReturnType()->isVoidTy())
-            return call;
+        if (!functionCall->getReturnType()->isVoidTy()) {
+            const auto result = llvmState.Builder->CreateAlloca(functionCall->getReturnType());
+            llvmState.Builder->CreateStore(call, result);
+            return llvmState.Builder->CreateLoad(functionCall->getReturnType(), result);
+        }
         return returnValuePtr;
     }
 
@@ -3510,15 +3541,14 @@ void llvm_backend::generateExecutable(const compiler::CompilerOptions &options, 
     std::vector<std::string> visitedModules;
     codegen_module(module, context, visitedModules);
     for (auto &type: registeredTypes) {
-        if (auto structType = std::dynamic_pointer_cast<types::StructType>(type)) {
-            if (structType->genericParam() and structType->genericParam().value()->typeKind() ==
-                types::TypeKind::GENERIC) {
+        if (auto typeWithMethods = std::dynamic_pointer_cast<types::VariableTypeWithMethods>(type)) {
+            if (typeWithMethods->isGeneric()) {
                 continue;
             }
-            for (auto &method: structType->methods()) {
+            for (auto &method: typeWithMethods->methods()) {
                 llvm_backend::codegen_functionstub(method.get(), context);
             }
-            for (auto &method: structType->methods()) {
+            for (auto &method: typeWithMethods->methods()) {
                 llvm_backend::codegen(method.get(), context);
             }
         }

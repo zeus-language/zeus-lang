@@ -4,6 +4,8 @@
 #include <optional>
 
 #include "ASTNode.h"
+#include "DestructureStruct.h"
+#include "DestructureTuple.h"
 #include "lexer/Lexer.h"
 
 namespace ast {
@@ -73,7 +75,8 @@ namespace ast {
             for (auto &[matchKeys, expression]: m_matchCases) {
                 std::vector<std::shared_ptr<ASTNode> > keyClones;
                 for (const auto &key: matchKeys) {
-                    keyClones.push_back(key->clone());
+                    auto clonedKey = key->clone();
+                    keyClones.push_back(clonedKey);
                 }
                 matchCaseClones.push_back(MatchCase{std::move(keyClones), expression->clone()});
             }
@@ -82,7 +85,38 @@ namespace ast {
                                                                std::move(matchCaseClones));
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());
+
+            for (auto &[matchKeys,_]: cloneNode->matchCases()) {
+                for (auto &key: matchKeys) {
+                    if (auto destruct = std::dynamic_pointer_cast<DestructureTuple>(key)) {
+                        destruct->setAccessNode(cloneNode->accessNode());
+                    } else if (auto destruct2 = std::dynamic_pointer_cast<DestructureStruct>(key)) {
+                        destruct2->setAccessNode(cloneNode->accessNode());
+                    }
+                }
+            }
+
             return std::move(cloneNode);
+        }
+
+        [[nodiscard]] bool hasReturnStatement() const override {
+            for (auto &[matchKeys, expression]: m_matchCases) {
+                if (expression->hasReturnStatement())
+                    return true;
+            }
+            return false;
+        }
+
+        void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                            const std::shared_ptr<types::VariableType> &sourceParam,
+                            const std::shared_ptr<types::VariableType> &genericParam) override {
+            for (auto &[matchKeys, expression]: m_matchCases) {
+                for (const auto &key: matchKeys) {
+                    key->makeNonGeneric(scope, sourceParam, genericParam);
+                }
+                expression->makeNonGeneric(scope, sourceParam, genericParam);
+            }
+            m_accessNode->makeNonGeneric(scope, sourceParam, genericParam);
         }
     };
 } // ast

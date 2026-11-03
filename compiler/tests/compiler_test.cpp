@@ -406,7 +406,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "global_var","new-string","var-type-infer","alternative-number-repr","lambda-expression",
                              "lambda-infer-expression","interface-single","interface-multiple","simple-union",
                              "shorthand_operators_int","shorthand_operators_double","arrayslices","pointer_array",
-                             "nested-defer","numbersuffix","optionals","results"));
+                             "nested-defer","numbersuffix","optionals","results","multi_results","option_unwrap"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 
@@ -420,7 +420,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
                              "interpolation-utf8-error","unimplemented-interface","interface-by-value",
                              "nonexaustive-enum-match","nonexaustive-enum-match2","union-tuple-type",
-                             "union-struct-type", "struct-init-error"
+                             "union-struct-type", "struct-init-error","invalid_result"
                          ));
 INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                          testing::Values( "arithmetic-bitwise-and-float",

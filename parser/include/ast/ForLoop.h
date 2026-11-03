@@ -1,5 +1,6 @@
 #pragma once
 #include "ASTNode.h"
+#include "BlockNode.h"
 
 namespace ast {
     class ForLoop final : public ASTNode {
@@ -11,7 +12,8 @@ namespace ast {
 
     public:
         ForLoop(Token forToken, Token iterator, std::shared_ptr<ASTNode> rangeStart,
-                const bool isConstant, std::shared_ptr<BlockNode> body) : ASTNode(std::move(forToken)),
+                const bool isConstant, std::shared_ptr<BlockNode> body) : ASTNode(std::move(forToken),
+                                                                              ast::NodeType::FOR_LOOP),
                                                                           m_iterator(std::move(iterator)),
                                                                           m_range(std::move(rangeStart)),
                                                                           m_isConstant(isConstant),
@@ -53,12 +55,13 @@ namespace ast {
             return std::move(cloneNode);
         }
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &sourceParam,
+        void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                            const std::shared_ptr<types::VariableType> &sourceParam,
                             const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(sourceParam, genericParam);
-            m_range->makeNonGeneric(sourceParam, genericParam);
+            ASTNode::makeNonGeneric(scope, sourceParam, genericParam);
+            m_range->makeNonGeneric(scope, sourceParam, genericParam);
             for (const auto &stmt: m_block->statements()) {
-                stmt->makeNonGeneric(sourceParam, genericParam);
+                stmt->makeNonGeneric(scope, sourceParam, genericParam);
             }
         }
     };

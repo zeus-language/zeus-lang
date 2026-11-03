@@ -67,6 +67,7 @@ namespace types {
         std::shared_ptr<types::VariableType> getNullPointerType();
 
         std::vector<std::shared_ptr<VariableType> > findResolvedGenericTypes(
-            const std::string &rawTypeName, const std::vector<std::shared_ptr<VariableType> > &resolvedTypes);
+            const std::string &rawTypeName, const std::vector<std::shared_ptr<VariableType> > &resolvedTypes,
+            bool matchPartial) const;
     };
 }
