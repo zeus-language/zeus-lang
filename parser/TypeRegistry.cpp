@@ -1,7 +1,5 @@
 #include  "types/TypeRegistry.h"
-
 #include <algorithm>
-
 #include "ast/FunctionDefinition.h"
 
 std::shared_ptr<types::EnumType> types::createOstypeEnum() {
@@ -118,11 +116,56 @@ std::optional<std::shared_ptr<types::VariableType> > types::TypeRegistry::getTyp
 }
 
 void types::TypeRegistry::registerType(const std::shared_ptr<VariableType> &type) {
-    if (std::ranges::none_of(m_types, [&type](const auto &t) { return t->name() == type->name(); })) {
-        m_types.push_back(type);
+    for (auto &m_type: m_types) {
+        if (m_type->name() == type->name()) {
+            m_type = type;
+            return;
+        }
     }
+    m_types.emplace_back(type);
 }
 
 void types::TypeRegistry::registerTypeAlias(const std::string &name, const std::shared_ptr<VariableType> &type) {
     m_typeAliases[name] = type;
+}
+
+std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::findResolvedGenericTypes(
+    const std::string &rawTypeName, const std::vector<std::shared_ptr<VariableType> > &resolvedTypes,
+    bool matchPartial) const {
+    auto result = std::vector<std::shared_ptr<types::VariableType> >{};
+    for (auto &type: m_types) {
+        if (type->rawTypeName() == rawTypeName) {
+            bool fieldsMatch = true;
+            bool partialMatch = false;
+            if (const auto structType = std::dynamic_pointer_cast<StructType>(type)) {
+                if (*resolvedTypes.at(0) != *structType->genericParam().value()) {
+                    fieldsMatch = false;
+                    break;
+                }
+            } else if (const auto unionType = std::dynamic_pointer_cast<UnionType>(type)) {
+                for (size_t j = 0; j < resolvedTypes.size(); ++j) {
+                    const auto &resolvedType = resolvedTypes.at(j);
+
+                    for (size_t i = 0; i < unionType->genericParams().size(); ++i) {
+                        if (matchPartial) {
+                            if (*resolvedType != *unionType->genericParams().at(i)) {
+                                partialMatch = true;
+                                break;
+                            }
+                        } else if (i == j and *resolvedType != *unionType->genericParams().at(i)) {
+                            fieldsMatch = false;
+                            break;
+                        }
+                    }
+                    if (partialMatch)
+                        break;
+                }
+            }
+
+            if (fieldsMatch or partialMatch) {
+                result.push_back(type);
+            }
+        }
+    }
+    return result;
 }

@@ -1,0 +1,24 @@
+use core::option;
+
+
+fn xget(i : i32) : Option<u8> {
+    if i > 10 {
+       return Option::None;
+    }
+    return Option::Some('T');
+}
+fn print_opt(param: Option<u8>): void {
+    match param {
+        Option::Some(s) => println("Some(${s})"),
+        Option::None => println("None"),
+    };
+}
+
+fn main() :i32 {
+    let no = xget(12);
+    let yes = xget(9);
+
+    print_opt(no);
+    print_opt(yes);
+    return 0;
+}

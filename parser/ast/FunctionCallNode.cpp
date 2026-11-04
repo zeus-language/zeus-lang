@@ -6,9 +6,10 @@
 
 namespace ast {
     FunctionCallNode::FunctionCallNode(Token functionName, std::vector<Token> namespacePrefix,
-                                       std::vector<std::shared_ptr<ASTNode> > args, std::optional<Token> genericParam)
+                                       std::vector<std::shared_ptr<ASTNode> > args,
+                                       const std::optional<Token> &genericParam)
         : ASTNode(std::move(functionName)), m_namespacePrefix(std::move(namespacePrefix)), m_args(std::move(args)),
-          m_genericParam(std::move(genericParam)) {
+          m_genericParam(genericParam) {
     }
 
     std::string FunctionCallNode::functionSignature() const {
@@ -46,10 +47,17 @@ namespace ast {
         for (const auto &arg: m_args) {
             argClones.push_back(arg->clone());
         }
+        auto prefixes = std::vector<Token>{};
+        for (auto &token: m_namespacePrefix) {
+            prefixes.emplace_back(token);
+        }
+        auto genericParam = (m_genericParam)
+                                ? std::make_optional(m_genericParam.value())
+                                : std::nullopt;
         auto cloneNode = std::make_shared<FunctionCallNode>(expressionToken(),
-                                                            m_namespacePrefix,
+                                                            prefixes,
                                                             std::move(argClones),
-                                                            m_genericParam);
+                                                            genericParam);
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         if (genericType()) {

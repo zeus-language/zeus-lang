@@ -15,6 +15,7 @@
 #include <string>
 
 #include "ast/FieldAccess.h"
+#include "ast/ForLoop.h"
 #include "ast/FunctionCallNode.h"
 #include "ast/FunctionDefinition.h"
 #include "ast/LambdaExpression.h"
@@ -48,7 +49,7 @@ constexpr bool tokenInRange(const Token &token, const size_t line, const size_t 
            character + 1 <= token.source_location.col + token.source_location.num_bytes;
 }
 
-lsp::Uri toUri(const std::string &filePath) {
+static lsp::Uri toUri(const std::string &filePath) {
     if (filePath.starts_with("file:")) {
         return lsp::Uri::parse(filePath);
     }
@@ -105,6 +106,10 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
     const auto tokens = lexer::lex_file(std::string(file_path.string()), text);
 
     auto result = parser::parse_tokens(tokens);
+    const SourceLocation location = result.module->modulePath().empty()
+                                        ? SourceLocation{}
+                                        : result.module->modulePath()[0].source_location;
+    result.module->setModulePath({Token(file_path.filename().string(), Token::IDENTIFIER, location)});
     std::vector<std::filesystem::path> includeDirs;
     includeDirs.reserve(rtlDirectories.size() + 1);
     for (auto &dir: rtlDirectories) {
@@ -113,6 +118,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
         }
     }
     includeDirs.push_back(parentDir);
+    moduleCache.removeModule(file_path.string());
 
     modules::include_modules(includeDirs, moduleCache, env, result);
 
@@ -559,6 +565,12 @@ static void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::I
             }
             break;
         }
+        case ast::NodeType::FOR_LOOP: {
+            auto forLoop = const_cast<ast::ForLoop *>(dynamic_cast<const ast::ForLoop *>(node));
+            resolveInlayHintForNode(forLoop->block(), hints);
+            break;
+        }
+
         case ast::NodeType::BLOCK: {
             auto blockStmt = const_cast<ast::BlockNode *>(dynamic_cast<const ast::BlockNode *>(node));
             for (const auto &stmt: blockStmt->statements()) {
@@ -702,7 +714,7 @@ static void addCompletionItemForFunction(const ast::FunctionDefinitionBase *func
             item.kind = lsp::CompletionItemKind::Function;
         }
 
-        item.detail = nsPrefix + function->functionSignature(false);
+        item.detail = nsPrefix + function->functionSignature(false, true);
         addToCompletionListIfMatches(std::move(item), completions);
     }
 }
@@ -731,7 +743,7 @@ static bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result 
                         item.insertText = method->functionName() + "()";
                         item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
                         item.kind = lsp::CompletionItemKind::Method;
-                        item.detail = structType->name() + "." + method->functionSignature(false);
+                        item.detail = structType->name() + "." + method->functionSignature(false, true);
                         completionList.items.push_back(std::move(item));
                     }
                 }
@@ -778,7 +790,7 @@ static bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result 
                         item.insertText = method->functionName() + "()";
                         item.insertTextMode = lsp::InsertTextMode::AdjustIndentation;
                         item.kind = lsp::CompletionItemKind::Method;
-                        item.detail = structType->name() + "." + method->functionSignature(false);
+                        item.detail = structType->name() + "." + method->functionSignature(false, true);
                         completionList.items.push_back(std::move(item));
                     }
                     result = completionList;
@@ -1064,7 +1076,7 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
             if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(instanceType.value())) {
                 instanceType = refType->baseType();
             }
-            if (auto structType = std::dynamic_pointer_cast<types::StructType>(instanceType.value())) {
+            if (auto structType = std::dynamic_pointer_cast<types::VariableTypeWithMethods>(instanceType.value())) {
                 bool methodFound = false;
                 for (const auto &method: structType->methods()) {
                     if (method->functionName() == funcName) {

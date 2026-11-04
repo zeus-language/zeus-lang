@@ -86,7 +86,7 @@ namespace ast {
             return m_rawAnnotations;
         }
 
-        [[nodiscard]] std::string functionSignature(bool withNamespace = true) const;
+        [[nodiscard]] std::string functionSignature(bool withNamespace = true, bool withReturnType = false) const;
 
         [[nodiscard]] VisibilityModifier visibilityModifier() const {
             return m_visibilityModifier;
@@ -107,5 +107,7 @@ namespace ast {
         [[nodiscard]] std::optional<std::shared_ptr<types::VariableType> > resolvedReturnType() const {
             return m_resolvedReturnTyoe;
         }
+
+        [[nodiscard]] virtual std::vector<std::shared_ptr<types::VariableType> > matchingTypes(const std::string &name);
     };
 }

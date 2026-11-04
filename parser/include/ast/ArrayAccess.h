@@ -72,13 +72,13 @@ namespace ast {
             return std::move(cloneNode);
         }
 
-        void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) override {
-            ASTNode::makeNonGeneric(genericParam);
-            m_accessExpression->makeNonGeneric(genericParam);
-            m_indexExpression->makeNonGeneric(genericParam);
-            m_arrayType = m_arrayType.value()->makeNonGenericType(genericParam);
+        void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                            const std::shared_ptr<types::VariableType> &sourceParam,
+                            const std::shared_ptr<types::VariableType> &genericParam) override {
+            ASTNode::makeNonGeneric(scope, sourceParam, genericParam);
+            m_accessExpression->makeNonGeneric(scope, sourceParam, genericParam);
+            m_indexExpression->makeNonGeneric(scope, sourceParam, genericParam);
+            m_arrayType = getOrMakeNonGenericType(m_arrayType.value(), genericParam, scope);
         }
     };
 } // ast
-
-

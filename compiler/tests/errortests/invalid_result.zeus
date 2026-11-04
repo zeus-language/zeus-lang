@@ -1,0 +1,21 @@
+use core::result;
+
+enum MyError {
+    E1,
+    E2
+}
+
+fn call(x : i32) : Result<i32,MyError> {
+    return Result::Result(x);
+}
+
+fn main() : i32 {
+    let mut c :Result<i32,> = call(22);
+    let r : Result<u8,MyError> = call(32);
+    let r2 : Result = call(4);
+    let t = call(3);
+    let mut x :Result<i32,MyError,u8> = call(22);
+
+
+    return 0;
+}

@@ -2,6 +2,9 @@
 #include "Scope.h"
 #include "ast/BlockNode.h"
 #include "ast/VariableDeclaration.h"
+#include <set>
+
+#include "parser/Parser.h"
 
 namespace types {
     std::optional<std::unique_ptr<ast::RawType> > resolveRawTypeFromUsage(ast::BlockNode *blockNode,
@@ -11,5 +14,10 @@ namespace types {
 
     std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
                                                                      std::shared_ptr<Scope> &currentScope,
+                                                                     bool resolveGeneric = false);
+
+    std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
+                                                                     std::shared_ptr<Scope> &currentScope,
+                                                                     std::set<parser::ParserMessasge> &messages,
                                                                      bool resolveGeneric = false);
 }

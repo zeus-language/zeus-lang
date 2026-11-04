@@ -10,6 +10,10 @@
 #include "lexer/Lexer.h"
 #include "types/VariableType.h"
 
+namespace types {
+    class Scope;
+}
+
 namespace ast {
     enum class NodeType {
         RETURN,
@@ -50,6 +54,10 @@ namespace ast {
         DESTRUCTURE_STRUCT,
     };
 
+    std::shared_ptr<types::VariableType> getOrMakeNonGenericType(const std::shared_ptr<types::VariableType> &sourceType,
+                                                                 const std::shared_ptr<types::VariableType> &
+                                                                 genericParam, std::shared_ptr<types::Scope> &scope);
+
     class ASTNode {
     private:
         Token m_token;
@@ -71,24 +79,9 @@ namespace ast {
             return nullptr;
         }
 
-        virtual void makeNonGeneric(const std::shared_ptr<types::VariableType> &genericParam) {
-            if (!m_expressionType.has_value()) {
-                return;
-            }
-            if (m_expressionType.value()->typeKind() == types::TypeKind::GENERIC) {
-                m_expressionType = genericParam;
-            } else if (m_expressionType.value()->typeKind() == types::TypeKind::POINTER ||
-                       m_expressionType.value()->typeKind() == types::TypeKind::ARRAY) {
-                if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(m_expressionType.value())) {
-                    if (ptrType->baseType()->typeKind() == types::TypeKind::GENERIC) {
-                        auto newBaseType = genericParam;
-                        const auto newPtrType = std::make_shared<types::PointerType>(
-                            "*" + newBaseType->name(), newBaseType);
-                        m_expressionType = newPtrType;
-                    }
-                }
-            }
-        }
+        virtual void makeNonGeneric(std::shared_ptr<types::Scope> &scope,
+                                    const std::shared_ptr<types::VariableType> &sourceParam,
+                                    const std::shared_ptr<types::VariableType> &genericParam);
 
 
         ASTNode(ASTNode &&) = default;
@@ -126,6 +119,7 @@ namespace ast {
         }
 
         [[nodiscard]] NodeType nodeType() const { return m_nodeType; }
+        [[nodiscard]] virtual bool hasReturnStatement() const { return false; }
     };
 } // ast
 

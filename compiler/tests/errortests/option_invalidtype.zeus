@@ -1,0 +1,10 @@
+use core::option;
+
+fn main() : i32 {
+    let val : Option<Bla> = Option::None;
+
+    let test = Option::None;
+
+    let x : Option<i32,bool>;
+    return 0;
+}

@@ -65,7 +65,7 @@ namespace ast {
     }
 
 
-    std::string FunctionDefinitionBase::functionSignature(const bool withNamespace) const {
+    std::string FunctionDefinitionBase::functionSignature(const bool withNamespace, bool withReturnType) const {
         std::string signature;
         if (withNamespace) {
             for (auto &ns: m_namespacePrefix) {
@@ -85,6 +85,31 @@ namespace ast {
             }
         }
         signature += ")";
+        if (withReturnType && expressionType()) {
+            signature += " : " + expressionType().value()->name();
+        }
         return signature;
+    }
+
+    std::vector<std::shared_ptr<types::VariableType> > FunctionDefinitionBase::matchingTypes(const std::string &name) {
+        std::vector<std::shared_ptr<types::VariableType> > types;
+        if (auto returnType = resolvedReturnType()) {
+            if (returnType.value()->rawTypeName() == name) {
+                types.push_back(returnType.value());
+            }
+        }
+        for (auto &arg: args()) {
+            if (!arg.type)
+                continue;
+            if (auto refType = std::dynamic_pointer_cast<types::ReferenceType>(arg.type.value())) {
+                if (refType->baseType()->rawTypeName() == name) {
+                    types.push_back(refType->baseType());
+                }
+            } else if (arg.type.value()->rawTypeName() == name) {
+                types.push_back(arg.type.value());
+            }
+        }
+
+        return types;
     }
 }

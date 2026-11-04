@@ -1,0 +1,33 @@
+use std::array;
+fn test1() : void {
+    let mut arr = new_array<i32>();
+    defer arr.destroy();
+    arr.push(12);
+    arr.push(11);
+
+    print_arr(&arr);
+}
+
+fn test2() : void {
+    let mut arr = new_array<i32>();
+    defer arr.destroy();
+    for i in 1..20 {
+        arr.push(i*2);
+    }
+
+    print_arr(&arr);
+}
+
+fn print_arr(arr : &array<i32>) : void {
+    for i in 0i64 .. arr.length() {
+        let value = arr.get(i).unwrap();
+        println("${i} = ${value}");
+    }
+}
+
+fn main() : i32 {
+    test1();
+    println("----------------------");
+    test2();
+    return 0;
+}
