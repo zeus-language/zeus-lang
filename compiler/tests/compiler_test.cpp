@@ -421,7 +421,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestWithError, CompilerTestError,
                              "try-infer-void-return","keyword-as-identifier","array-assign-immutable",
                              "interpolation-utf8-error","unimplemented-interface","interface-by-value",
                              "nonexaustive-enum-match","nonexaustive-enum-match2","union-tuple-type",
-                             "union-struct-type", "struct-init-error","invalid_result"
+                             "union-struct-type", "struct-init-error","invalid_result","option_invalidtype"
                          ));
 INSTANTIATE_TEST_SUITE_P(ArithmeticErrorTests, ArithmethicTestError,
                          testing::Values( "arithmetic-bitwise-and-float",

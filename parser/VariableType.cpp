@@ -10,9 +10,10 @@
 #include "types/Scope.h"
 
 
-std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                                            const std::vector<std::shared_ptr<
-                                                                                VariableType> > &genericParams) {
+std::optional<std::shared_ptr<types::VariableType> > types::PointerType::makeNonGenericType(
+    std::shared_ptr<types::Scope> &currentScope,
+    const std::vector<std::shared_ptr<
+        VariableType> > &genericParams) {
     if (this->baseType()->typeKind() != TypeKind::GENERIC) {
         return std::make_shared<types::PointerType>(VariableType::name(), this->baseType());
     }
@@ -23,7 +24,7 @@ std::shared_ptr<types::VariableType> types::PointerType::makeNonGenericType(std:
     return nullptr;
 }
 
-std::shared_ptr<types::VariableType> types::ReferenceType::makeNonGenericType(
+std::optional<std::shared_ptr<types::VariableType> > types::ReferenceType::makeNonGenericType(
     std::shared_ptr<types::Scope> &currentScope, const std::vector<std::shared_ptr<VariableType> > &genericParams) {
     if (this->baseType()->typeKind() != TypeKind::GENERIC) {
         return std::make_shared<types::PointerType>(VariableType::name(), this->baseType());
@@ -137,12 +138,16 @@ size_t types::UnionType::getVariantIndex(const std::string &variantName) const {
     throw std::invalid_argument("Variant not found");
 }
 
-std::shared_ptr<types::VariableType> types::UnionType::makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                                          const std::vector<std::shared_ptr<
-                                                                              VariableType> > &genericParams) {
+std::optional<std::shared_ptr<types::VariableType> > types::UnionType::makeNonGenericType(
+    std::shared_ptr<types::Scope> &currentScope,
+    const std::vector<std::shared_ptr<
+        VariableType> > &genericParams) {
     std::vector<UnionVariant> variants;
     std::vector<std::shared_ptr<VariableType> > nonGenericParams;
     std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
+
+    if (genericParams.size() != m_genericParams.size())
+        return std::nullopt;
 
     auto unionType = std::make_shared<types::UnionType>(rawTypeName(), variants, methods, genericParams);
     if (auto type = currentScope->getTypeByName(unionType->name(), false)) {
@@ -214,7 +219,7 @@ std::shared_ptr<types::VariableType> types::UnionType::makeNonGenericType(std::s
             for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
                 if (method->returnType().value()->hasGenericParam()) {
                     auto expr = method->expressionType().value();
-                    functionClone->setExpressionType(expr->makeNonGenericType(currentScope, genericParams));
+                    functionClone->setExpressionType(expr->makeNonGenericType(currentScope, genericParams).value());
                 } else if (method->expressionType() && method->expressionType().value() == this->m_genericParams[
                                genIndex]) {
                     functionClone->setExpressionType(genericParams[genIndex]);
@@ -279,9 +284,10 @@ types::StructType::StructType(const std::string &name, const std::vector<StructF
     m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
 }
 
-std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                                           const std::vector<std::shared_ptr<
-                                                                               VariableType> > &genericParams) {
+std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonGenericType(
+    std::shared_ptr<types::Scope> &currentScope,
+    const std::vector<std::shared_ptr<
+        VariableType> > &genericParams) {
     auto fields = this->m_fields;
 
     for (auto &field: fields) {
@@ -345,7 +351,7 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(std::
             for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
                 if (method->returnType().value()->hasGenericParam()) {
                     auto expr = method->expressionType().value();
-                    functionClone->setExpressionType(expr->makeNonGenericType(currentScope, genericParams));
+                    functionClone->setExpressionType(expr->makeNonGenericType(currentScope, genericParams).value());
                 } else if (method->expressionType() && method->expressionType().value() == this->m_genericParam) {
                     functionClone->setExpressionType(genericParams[genIndex]);
                 } else {
@@ -356,8 +362,8 @@ std::shared_ptr<types::VariableType> types::StructType::makeNonGenericType(std::
 
 
         for (auto &stmt: functionClone->block()->statements()) {
-            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
-                stmt->makeNonGeneric(currentScope, this->m_genericParam.value(), genericParams[genIndex]);
+            for (const auto &genericParam: genericParams) {
+                stmt->makeNonGeneric(currentScope, this->m_genericParam.value(), genericParam);
             }
         }
         methods.push_back(functionClone);
@@ -395,7 +401,7 @@ size_t types::StructType::getInterfaceIndex(const std::shared_ptr<InterfaceType>
 std::shared_ptr<types::VariableType> types::SliceType::baseType() const {
     for (const auto &field: fields()) {
         if (field.name == "data") {
-            if (auto ptrType = std::dynamic_pointer_cast<types::PointerType>(field.type)) {
+            if (const auto ptrType = std::dynamic_pointer_cast<types::PointerType>(field.type)) {
                 return ptrType->baseType();
             }
         }
@@ -403,8 +409,8 @@ std::shared_ptr<types::VariableType> types::SliceType::baseType() const {
     throw std::runtime_error("Slice type does not have a data field");
 }
 
-types::SliceType::SliceType(std::string name, const std::shared_ptr<VariableType> &baseType) : StructType(
-    std::move(name),
+types::SliceType::SliceType(const std::string &name, const std::shared_ptr<VariableType> &baseType) : StructType(
+    name,
     {
         {
             .type = std::make_shared<types::IntegerType>("i32", 4, false),
@@ -424,9 +430,10 @@ bool types::GenericType::isGeneric() {
     return true;
 }
 
-std::shared_ptr<types::VariableType> types::GenericType::makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                                            const std::vector<std::shared_ptr<
-                                                                                VariableType> > &genericParams) {
+std::optional<std::shared_ptr<types::VariableType> > types::GenericType::makeNonGenericType(
+    std::shared_ptr<types::Scope> &currentScope,
+    const std::vector<std::shared_ptr<
+        VariableType> > &genericParams) {
     assert(genericParams.size() == 1);
     return genericParams.at(0);
 }

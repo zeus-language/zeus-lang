@@ -94,7 +94,7 @@ namespace ast {
             m_accessNode->makeNonGeneric(scope, sourceParam, genericParam);
             m_value->makeNonGeneric(scope, sourceParam, genericParam);
             m_index->makeNonGeneric(scope, sourceParam, genericParam);
-            m_arrayType = m_arrayType->makeNonGenericType(scope, {genericParam});
+            m_arrayType = getOrMakeNonGenericType(m_arrayType, genericParam, scope);
         }
     };
 } // ast

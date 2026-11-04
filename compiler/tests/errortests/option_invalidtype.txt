@@ -1,0 +1,12 @@
+FILENAME:6:16: error: Could not determine type of initial value for variable 'test'.
+    let test = Option::None;
+               ^-----
+FILENAME:8:13: error: The generalised type 'Option<i32,bool>' deos not match the specified generic type 'Option<T>'.
+    let x : Option<i32,bool>;
+            ^-----
+FILENAME:4:22: error: The generic parameter 'Bla' could not be resolved for the type 'Option<Bla>'.
+    let val : Option<Bla> = Option::None;
+                     ^--
+FILENAME:6:16: error: Union 'Option' was not defined in the scope.
+    let test = Option::None;
+               ^-----

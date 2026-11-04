@@ -71,12 +71,13 @@ namespace types {
             return compare(other);
         }
 
-        virtual std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                                 const std::vector<std::shared_ptr<VariableType> > &
-                                                                 genericParams) {
+        virtual std::optional<std::shared_ptr<VariableType> > makeNonGenericType(
+            std::shared_ptr<types::Scope> &currentScope,
+            const std::vector<std::shared_ptr<VariableType> > &
+            genericParams) {
             //assert(false && "makeNonGenericType not implemented for this type");
             std::cerr << "makeNonGenericType not implemented for this type: " << this->name() << "\n";
-            return nullptr;
+            return std::nullopt;
         }
 
         [[nodiscard]] virtual bool isGeneric() {
@@ -124,7 +125,7 @@ namespace types {
         ~PointerType() override = default;
 
 
-        std::shared_ptr<VariableType>
+        std::optional<std::shared_ptr<VariableType> >
         makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
                            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
@@ -160,7 +161,7 @@ namespace types {
 
         ~ReferenceType() override = default;
 
-        std::shared_ptr<VariableType>
+        std::optional<std::shared_ptr<VariableType> >
         makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
                            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
 
@@ -303,9 +304,10 @@ namespace types {
 
         [[nodiscard]] size_t getVariantIndex(const std::string &variantName) const;
 
-        std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                         const std::vector<std::shared_ptr<VariableType> > &
-                                                         genericParams) override;
+        std::optional<std::shared_ptr<VariableType> > makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                                                                         const std::vector<std::shared_ptr<
+                                                                             VariableType> > &
+                                                                         genericParams) override;
 
         bool isGeneric() override;
 
@@ -369,9 +371,10 @@ namespace types {
 
         [[nodiscard]] const std::string &linkageName() const override { return m_linkageName; }
 
-        std::shared_ptr<VariableType> makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
-                                                         const std::vector<std::shared_ptr<VariableType> > &
-                                                         genericParams) override;
+        std::optional<std::shared_ptr<VariableType> > makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
+                                                                         const std::vector<std::shared_ptr<
+                                                                             VariableType> > &
+                                                                         genericParams) override;
 
 
         [[nodiscard]] std::vector<std::shared_ptr<InterfaceType> > interfaces() const { return m_interfaces; }
@@ -407,7 +410,7 @@ namespace types {
     public:
         [[nodiscard]] std::shared_ptr<VariableType> baseType() const;
 
-        explicit SliceType(std::string name, const std::shared_ptr<VariableType> &baseType);
+        explicit SliceType(const std::string &name, const std::shared_ptr<VariableType> &baseType);
     };
 
 
@@ -467,7 +470,7 @@ namespace types {
 
         bool isGeneric() override;
 
-        std::shared_ptr<VariableType>
+        std::optional<std::shared_ptr<VariableType> >
         makeNonGenericType(std::shared_ptr<types::Scope> &currentScope,
                            const std::vector<std::shared_ptr<VariableType> > &genericParams) override;
     };

@@ -2358,9 +2358,18 @@ namespace types {
                     if (!typeWithGeneric.empty()) {
                         node->setExpressionType(typeWithGeneric.at(0));
                     } else {
-                        auto type = nonGenericType.value()->makeNonGenericType(context.currentScope, {param.value()});
-                        context.currentScope->registerType(type);
-                        node->setExpressionType(type);
+                        if (auto type = nonGenericType.value()->makeNonGenericType(
+                            context.currentScope, {param.value()})) {
+                            context.currentScope->registerType(type.value());
+                            node->setExpressionType(type.value());
+                        } else {
+                            context.messages.insert({
+                                .outputType = parser::OutputType::ERROR,
+                                .token = node->expressionToken(),
+                                .message = "Could not resolve return type of function '" + node->functionName() + "'."
+                            });
+                            return;
+                        }
                     }
                 }
             } else if (funcDef->returnType()) {
@@ -2660,16 +2669,23 @@ namespace types {
             auto type = node->initialValue().value()->expressionType().value();
             node->setExpressionType(type);
         } else {
-            const auto varType = resolveFromRawType(node->type().value(), context.currentScope, true);
+            std::set<parser::ParserMessasge> messages;
+            const auto varType = resolveFromRawType(node->type().value(), context.currentScope, messages, true);
             if (!varType) {
-                context.messages.insert({
-                    parser::OutputType::ERROR,
-                    node->expressionToken(),
-                    "Unknown type '" + node->type().value()->fullTypeName() + "' for variable '" + node->
-                    expressionToken().
-                    lexical() +
-                    "'."
-                });
+                if (messages.empty()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Unknown type '" + node->type().value()->fullTypeName() + "' for variable '" + node->
+                        expressionToken().
+                        lexical() +
+                        "'."
+                    });
+                } else {
+                    for (const auto &msg: messages) {
+                        context.messages.insert(msg);
+                    }
+                }
                 return;
             }
             if (varType.value()->name() == "void") {

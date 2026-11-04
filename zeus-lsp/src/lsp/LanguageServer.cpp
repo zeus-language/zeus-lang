@@ -109,7 +109,7 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
     const SourceLocation location = result.module->modulePath().empty()
                                         ? SourceLocation{}
                                         : result.module->modulePath()[0].source_location;
-    result.module->setModulePath({Token(file_path.filename(), Token::IDENTIFIER, location)});
+    result.module->setModulePath({Token(file_path.filename().string(), Token::IDENTIFIER, location)});
     std::vector<std::filesystem::path> includeDirs;
     includeDirs.reserve(rtlDirectories.size() + 1);
     for (auto &dir: rtlDirectories) {

@@ -1,12 +1,12 @@
-FILENAME:13:31: error: Type mismatch in variable initialization: variable 'c' is of type 'Result<i32>', but got initial value of type 'Result<i32, MyError>'.
+FILENAME:17:16: error: The generalised type 'Result<i32,MyError,u8>' deos not match the specified generic type 'Result<u8, MyError>'.
+    let mut x :Result<i32,MyError,u8> = call(22);
+               ^-----
+FILENAME:13:16: error: The generalised type 'Result<i32>' deos not match the specified generic type 'Result<R, E>'.
     let mut c :Result<i32,> = call(22);
-                              ^---
+               ^-----
 FILENAME:14:34: error: Type mismatch in variable initialization: variable 'r' is of type 'Result<u8, MyError>', but got initial value of type 'Result<i32, MyError>'.
     let r : Result<u8,MyError> = call(32);
                                  ^---
 FILENAME:15:23: error: Type mismatch in variable initialization: variable 'r2' is of type 'Result<R, E>', but got initial value of type 'Result<i32, MyError>'.
     let r2 : Result = call(4);
                       ^---
-FILENAME:17:41: error: Type mismatch in variable initialization: variable 'x' is of type 'Result<i32, MyError, u8>', but got initial value of type 'Result<i32, MyError>'.
-    let mut x :Result<i32,MyError,u8> = call(22);
-                                        ^---

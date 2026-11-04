@@ -17,9 +17,11 @@ namespace ast {
         if (const auto nonGenericType = scope->getTypeByName(typeName, false))
             return nonGenericType.value();
 
-        auto type = sourceType->makeNonGenericType(scope, {genericParam});
-        scope->registerType(type);
-        return type;
+        if (auto type = sourceType->makeNonGenericType(scope, {genericParam})) {
+            scope->registerType(type.value());
+            return type.value();
+        }
+        return nullptr;
     }
 
     void ASTNode::makeNonGeneric(std::shared_ptr<types::Scope> &scope,

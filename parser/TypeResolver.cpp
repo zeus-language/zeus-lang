@@ -126,9 +126,16 @@ namespace types {
         return std::nullopt;
     }
 
+    std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
+                                                                     std::shared_ptr<Scope> &currentScope,
+                                                                     bool resolveGeneric) {
+        std::set<parser::ParserMessasge> messages;
+        return resolveFromRawType(rawType, currentScope, messages, resolveGeneric);
+    }
 
     std::optional<std::shared_ptr<VariableType> > resolveFromRawType(ast::RawType *rawType,
                                                                      std::shared_ptr<Scope> &currentScope,
+                                                                     std::set<parser::ParserMessasge> &messages,
                                                                      bool resolveGeneric) {
         const bool useRawGenericName = rawType->hasGenericParam() && resolveGeneric;
         if (const auto arrayType = dynamic_cast<ast::ArrayRawType *>(rawType)) {
@@ -194,18 +201,34 @@ namespace types {
                 std::vector<std::shared_ptr<VariableType> > genericParams;
                 for (auto &p: rawType->genericParams) {
                     auto param = currentScope->getTypeByName(p.lexical(), false);
-                    if (!param)
+                    if (!param) {
+                        messages.insert({
+                            .outputType = parser::OutputType::ERROR,
+                            .token = p,
+                            .message = "The generic parameter '" + p.lexical() +
+                                       "' could not be resolved for the type '" + rawType->fullTypeName() + "'."
+                        });
                         return std::nullopt;
+                    }
                     genericParams.push_back(param.value());
                 }
                 auto type = currentScope->getTypeByName(rawType->typeToken.lexical(), useRawGenericName);
                 if (!type)
                     return std::nullopt;
                 nonGenericType = type.value()->makeNonGenericType(currentScope, genericParams);
-                currentScope->registerType(nonGenericType.value());
+                if (nonGenericType)
+                    currentScope->registerType(nonGenericType.value());
+                else {
+                    messages.insert({
+                        .outputType = parser::OutputType::ERROR,
+                        .token = rawType->typeToken,
+                        .message = "The generalised type '" + rawType->fullTypeName() +
+                                   "' deos not match the specified generic type '" + type.value()->name() + "'."
+                    });
+                }
                 return nonGenericType;
-            } else
-                return currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
+            }
+            return currentScope->getTypeByName(rawType->fullTypeName(), useRawGenericName);
         }
     }
 }
