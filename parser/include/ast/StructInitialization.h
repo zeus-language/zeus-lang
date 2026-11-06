@@ -12,17 +12,17 @@ namespace ast {
 
     class StructInitialization final : public ASTNode {
     private:
-        std::optional<Token> m_genericParam;
         std::vector<StructInitField> m_fields;
         std::optional<Token> m_unionName;
+        std::shared_ptr<RawType> m_type;
 
     public:
-        StructInitialization(Token name, std::optional<Token> genericParam,
+        StructInitialization(Token name, const std::shared_ptr<RawType> &type,
                              std::vector<StructInitField> fields,
                              std::optional<Token> unionName) : ASTNode(std::move(name)),
-                                                               m_genericParam(std::move(genericParam)),
                                                                m_fields(std::move(fields)),
-                                                               m_unionName(std::move(unionName)) {
+                                                               m_unionName(std::move(unionName)),
+                                                               m_type(type) {
         }
 
         ~StructInitialization() override = default;
@@ -37,15 +37,15 @@ namespace ast {
 
         [[nodiscard]] const std::vector<StructInitField> &fields() const { return m_fields; }
 
+
         [[nodiscard]] std::string structName() const {
-            return expressionToken().lexical() + (m_genericParam.has_value()
-                                                      ? "<" + m_genericParam.value().lexical() + ">"
-                                                      : "");
+            return m_type->fullTypeName();
         }
 
-        [[nodiscard]] const std::optional<Token> &genericParam() const {
-            return m_genericParam;
+        [[nodiscard]] std::shared_ptr<RawType> &rawType() {
+            return m_type;
         }
+
 
         [[nodiscard]] std::optional<Token> &unionName() {
             return m_unionName;
@@ -63,7 +63,7 @@ namespace ast {
             std::optional<Token> unionName = m_unionName;
 
             auto cloneNode = std::make_shared<StructInitialization>(expressionToken(),
-                                                                    m_genericParam,
+                                                                    m_type->clone(),
                                                                     std::move(fieldsClone), unionName);
             if (expressionType())
                 cloneNode->setExpressionType(expressionType().value());

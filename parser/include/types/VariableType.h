@@ -324,7 +324,7 @@ namespace types {
     private:
         std::vector<std::shared_ptr<InterfaceType> > m_interfaces;
         std::vector<StructField> m_fields;
-        std::optional<std::shared_ptr<VariableType> > m_genericParam = std::nullopt;
+        std::vector<std::shared_ptr<VariableType> > m_genericParams;
         std::string m_typename;
         std::string m_linkageName;
 
@@ -332,11 +332,11 @@ namespace types {
         StructType(const std::string &name, const std::vector<StructField> &fields,
                    const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods,
                    const std::vector<std::shared_ptr<InterfaceType> > &interfaces,
-                   std::optional<std::shared_ptr<VariableType> > genericParam);
+                   const std::vector<std::shared_ptr<VariableType> > &genericParams);
 
         ~StructType() override {
             m_fields.clear();
-            m_genericParam.reset();
+            m_genericParams.clear();
         }
 
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
@@ -361,8 +361,8 @@ namespace types {
             return 0;
         }
 
-        [[nodiscard]] const std::optional<std::shared_ptr<VariableType> > &genericParam() const {
-            return m_genericParam;
+        [[nodiscard]] const std::vector<std::shared_ptr<VariableType> > &genericParams() const {
+            return m_genericParams;
         }
 
         [[nodiscard]] const std::string &name() const override {
@@ -382,7 +382,12 @@ namespace types {
         [[nodiscard]] size_t getInterfaceIndex(const std::shared_ptr<InterfaceType> &interface) const;
 
         [[nodiscard]] bool isGeneric() override {
-            return m_genericParam.has_value() and m_genericParam.value()->typeKind() == TypeKind::GENERIC;
+            for (const auto &param: m_genericParams) {
+                if (param->typeKind() == TypeKind::GENERIC) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     protected:
@@ -418,21 +423,6 @@ namespace types {
         std::string name;
         int64_t value;
         // Additional fields can be added here for variant data
-    };
-
-    class NonGenericStructType : public StructType {
-        std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
-
-    public:
-        NonGenericStructType(std::string name, const std::vector<StructField> &fields,
-                             const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods) : StructType(
-                std::move(name), fields, {}, {}, std::nullopt),
-            m_methods(methods) {
-        }
-
-        [[nodiscard]] std::vector<std::shared_ptr<ast::FunctionDefinition> > methods() const override {
-            return m_methods;
-        }
     };
 
 

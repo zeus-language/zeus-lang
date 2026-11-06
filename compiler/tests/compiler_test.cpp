@@ -407,7 +407,7 @@ INSTANTIATE_TEST_SUITE_P(CompilerTestNoError, CompilerTest,
                              "lambda-infer-expression","interface-single","interface-multiple","simple-union",
                              "shorthand_operators_int","shorthand_operators_double","arrayslices","pointer_array",
                              "nested-defer","numbersuffix","optionals","results","multi_results","option_unwrap",
-                             "multilist"));
+                             "multilist","struct_multiparam_generic"));
 INSTANTIATE_TEST_SUITE_P(TestReadFileNoError, CompilerIOTest,
                          testing::Values("readfile"));
 

@@ -472,16 +472,20 @@ namespace parser {
             }
 
 
-            std::optional<Token> genericParam = std::nullopt;
+            std::vector<Token> genericParams;
             if (tryConsume(Token::LESS)) {
-                genericParam = current();
-                consume(Token::IDENTIFIER);
-
+                while (canConsume(Token::IDENTIFIER)) {
+                    auto genericParam = current();
+                    consume(Token::IDENTIFIER);
+                    genericParams.push_back(genericParam);
+                    if (!tryConsume(Token::COMMA))
+                        break;
+                }
 
                 if (!canConsume(Token::GREATER)) {
                     m_messages.push_back(ParserMessasge{
                         .token = current(),
-                        .message = "expected '>' to close generic struct declaration!"
+                        .message = "expected '>' to close generic struct initialization!"
                     });
                     return std::nullopt;
                 }
@@ -527,8 +531,9 @@ namespace parser {
                 tryConsume(Token::COMMA);
             }
             consume(Token::CLOSE_BRACE);
-
-            return std::make_shared<ast::StructInitialization>(structNameToken, genericParam, fields, unionName);
+            auto rawType = std::make_shared<ast::RawType>(
+                structNameToken, std::vector<Token>{}, ast::TypeModifier::NONE, genericParams);
+            return std::make_shared<ast::StructInitialization>(structNameToken, rawType, fields, unionName);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseReferenceAccess() {
@@ -2630,11 +2635,16 @@ namespace parser {
             }
             Token structName = current();
             consume(Token::IDENTIFIER);
-            std::optional<Token> genericParam = std::nullopt;
+            std::vector<Token> genericParams;
             if (tryConsume(Token::LESS)) {
-                genericParam = current();
-                consume(Token::IDENTIFIER);
-
+                while (canConsume(Token::IDENTIFIER)) {
+                    auto genericParam = current();
+                    genericParams.emplace_back(genericParam);
+                    consume(Token::IDENTIFIER);
+                    if (!tryConsume(Token::COMMA)) {
+                        break;
+                    }
+                }
 
                 if (!canConsume(Token::GREATER)) {
                     m_messages.push_back(ParserMessasge{
@@ -2700,7 +2710,7 @@ namespace parser {
 
             consume(Token::CLOSE_BRACE);
             return std::make_shared<ast::StructDeclaration>(structName, fields,
-                                                            methods, interfaceNames, genericParam);
+                                                            methods, interfaceNames, genericParams);
         }
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseTaggedUnion() {
@@ -2729,7 +2739,7 @@ namespace parser {
                         if (!canConsume(Token::GREATER)) {
                             m_messages.push_back(ParserMessasge{
                                 .token = current(),
-                                .message = "expected '>' to close generic struct declaration!"
+                                .message = "expected '>' to close generic tagged union!"
                             });
                             return std::nullopt;
                         }

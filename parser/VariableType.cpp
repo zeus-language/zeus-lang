@@ -275,13 +275,13 @@ void types::UnionType::setVariants(const std::vector<UnionVariant> &variants) {
 types::StructType::StructType(const std::string &name, const std::vector<StructField> &fields,
                               const std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods,
                               const std::vector<std::shared_ptr<InterfaceType> > &interfaces,
-                              std::optional<std::shared_ptr<VariableType> > genericParam) : VariableTypeWithMethods(
-        name,
-        TypeKind::STRUCT, methods), m_fields(fields),
-    m_genericParam(std::move(genericParam)), m_interfaces(interfaces) {
-    m_typename = VariableType::name() + (
-                     m_genericParam.has_value() ? "<" + m_genericParam.value()->name() + ">" : "");
-    m_linkageName = VariableType::name() + (m_genericParam.has_value() ? "_" + m_genericParam.value()->name() : "");
+                              const std::vector<std::shared_ptr<VariableType> > &
+                              genericParams) : VariableTypeWithMethods(
+                                                   name,
+                                                   TypeKind::STRUCT, methods), m_fields(fields),
+                                               m_genericParams(genericParams), m_interfaces(interfaces) {
+    m_typename = VariableType::name() + getGenericParamName(m_genericParams);
+    m_linkageName = VariableType::name() + getGenericParamLinkageName(m_genericParams);
 }
 
 std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonGenericType(
@@ -292,16 +292,15 @@ std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonG
 
     for (auto &field: fields) {
         for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
-            if (field.type == this->m_genericParam) {
-                // TODO
-                field.type = genericParams[0];
+            if (field.type == this->m_genericParams[genIndex]) {
+                field.type = genericParams[genIndex];
             }
         }
     }
     std::vector<std::shared_ptr<ast::FunctionDefinition> > methods;
 
     auto structType = std::make_shared<StructType>(VariableType::rawTypeName(), fields, std::move(methods),
-                                                   interfaces(), genericParams.at(0));
+                                                   interfaces(), genericParams);
     if (auto type = currentScope->getTypeByName(structType->name(), false)) {
         return type.value();
     }
@@ -318,7 +317,7 @@ std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonG
                                                  ? std::make_optional(argOld.rawType.value()->clone())
                                                  : std::nullopt, argOld.isConstant);
             for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
-                if (argOld.type && argOld.type.value() == m_genericParam) {
+                if (argOld.type && argOld.type.value() == m_genericParams[genIndex]) {
                     arg.type = genericParams[genIndex];
                     break;
                 } else {
@@ -352,7 +351,8 @@ std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonG
                 if (method->returnType().value()->hasGenericParam()) {
                     auto expr = method->expressionType().value();
                     functionClone->setExpressionType(expr->makeNonGenericType(currentScope, genericParams).value());
-                } else if (method->expressionType() && method->expressionType().value() == this->m_genericParam) {
+                } else if (method->expressionType() && method->expressionType().value() == this->m_genericParams[
+                               genIndex]) {
                     functionClone->setExpressionType(genericParams[genIndex]);
                 } else {
                     functionClone->setExpressionType(method->expressionType().value());
@@ -362,8 +362,8 @@ std::optional<std::shared_ptr<types::VariableType> > types::StructType::makeNonG
 
 
         for (auto &stmt: functionClone->block()->statements()) {
-            for (const auto &genericParam: genericParams) {
-                stmt->makeNonGeneric(currentScope, this->m_genericParam.value(), genericParam);
+            for (size_t genIndex = 0; genIndex < genericParams.size(); ++genIndex) {
+                stmt->makeNonGeneric(currentScope, this->m_genericParams[genIndex], genericParams[genIndex]);
             }
         }
         methods.push_back(functionClone);
@@ -422,7 +422,7 @@ types::SliceType::SliceType(const std::string &name, const std::shared_ptr<Varia
         }
     },
     std::vector<std::shared_ptr<ast::FunctionDefinition> >{}, std::vector<std::shared_ptr<InterfaceType> >{},
-    std::nullopt) {
+    {}) {
     setTypeKind(TypeKind::SLICE);
 }
 

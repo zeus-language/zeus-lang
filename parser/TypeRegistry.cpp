@@ -1,4 +1,4 @@
-#include  "types/TypeRegistry.h"
+#include "types/TypeRegistry.h"
 #include <algorithm>
 #include "ast/FunctionDefinition.h"
 
@@ -138,9 +138,19 @@ std::vector<std::shared_ptr<types::VariableType> > types::TypeRegistry::findReso
             bool fieldsMatch = true;
             bool partialMatch = false;
             if (const auto structType = std::dynamic_pointer_cast<StructType>(type)) {
-                if (*resolvedTypes.at(0) != *structType->genericParam().value()) {
-                    fieldsMatch = false;
-                    break;
+                for (size_t j = 0; j < resolvedTypes.size(); ++j) {
+                    const auto &resolvedType = resolvedTypes.at(j);
+                    for (size_t i = 0; i < structType->genericParams().size(); ++i) {
+                        if (matchPartial) {
+                            if (*resolvedType != *structType->genericParams().at(i)) {
+                                partialMatch = true;
+                                break;
+                            }
+                        } else if (i == j and *resolvedType != *structType->genericParams().at(i)) {
+                            fieldsMatch = false;
+                            break;
+                        }
+                    }
                 }
             } else if (const auto unionType = std::dynamic_pointer_cast<UnionType>(type)) {
                 for (size_t j = 0; j < resolvedTypes.size(); ++j) {
