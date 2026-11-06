@@ -1899,7 +1899,7 @@ namespace parser {
                 return std::nullopt;
             }
             consumeKeyWord("match");
-            auto identifier = tryParseToken();
+            auto identifier = parseExpression(false);
             if (!identifier) {
                 m_messages.push_back(ParserMessasge{
                     .token = current(),
