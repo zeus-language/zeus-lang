@@ -1,0 +1,2 @@
+V1 = 123
+V2 = Hello World

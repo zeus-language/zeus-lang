@@ -1,0 +1,19 @@
+
+struct Test<T,E> {
+    pub v1 : T,
+    pub v2 : E
+}
+
+
+fn main() : i32 {
+    let test  = Test<i32,string> {
+        v1 : 123,
+        v2 : string::from_slice("Hello World")
+    };
+
+    let v1 = test.v1;
+    let v2 = test.v2;
+    println("V1 = ${v1}");
+    println("V2 = ${v2}");
+    return 0;
+}

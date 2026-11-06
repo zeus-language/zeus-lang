@@ -16,18 +16,18 @@ namespace ast {
         std::vector<Token> m_interfaceNames;
         std::vector<StructField> m_fields;
         std::vector<std::shared_ptr<ast::FunctionDefinition> > m_methods;
-        std::optional<Token> m_genericParam;
+        std::vector<Token> m_genericParams;
 
     public:
         StructDeclaration(Token name, std::vector<StructField> fields,
                           std::vector<std::shared_ptr<ast::FunctionDefinition> > methods,
                           std::vector<Token> interfaceNames,
-                          std::optional<Token> genericParam) : ASTNode(std::move(name),
-                                                                       NodeType::STRUCT_DECLARATION),
-                                                               m_interfaceNames(std::move(interfaceNames)),
-                                                               m_fields(std::move(fields)),
-                                                               m_methods(std::move(methods)),
-                                                               m_genericParam(std::move(genericParam)) {
+                          const std::vector<Token> &genericParams) : ASTNode(std::move(name),
+                                                                             NodeType::STRUCT_DECLARATION),
+                                                                     m_interfaceNames(std::move(interfaceNames)),
+                                                                     m_fields(std::move(fields)),
+                                                                     m_methods(std::move(methods)),
+                                                                     m_genericParams(genericParams) {
         }
 
         ~StructDeclaration() override = default;
@@ -45,7 +45,7 @@ namespace ast {
         [[nodiscard]] const std::vector<StructField> &fields() const { return m_fields; }
         std::vector<std::shared_ptr<ast::FunctionDefinition> > &methods() { return m_methods; }
 
-        [[nodiscard]] const std::optional<Token> &genericParam() const { return m_genericParam; }
+        [[nodiscard]] const std::vector<Token> &genericParams() const { return m_genericParams; }
 
         std::shared_ptr<ASTNode> clone() override;
 
@@ -89,7 +89,7 @@ namespace ast {
                                                              std::move(fieldsClone),
                                                              std::move(methodsClone),
                                                              m_interfaceNames,
-                                                             m_genericParam);
+                                                             m_genericParams);
         if (expressionType())
             cloneNode->setExpressionType(expressionType().value());
         return std::move(cloneNode);

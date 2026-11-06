@@ -1612,7 +1612,7 @@ namespace types {
                                " is not a valid union type."
                 });
             }
-        } else if (const auto type = context.currentScope->getTypeByName(node->structName())) {
+        } else if (const auto type = types::resolveFromRawType(node->rawType().get(), context.currentScope, true)) {
             if (const auto structType = std::dynamic_pointer_cast<types::StructType>(type.value())) {
                 for (auto &field: node->fields()) {
                     type_check_field(field, structType->fields(), context);
@@ -3230,10 +3230,11 @@ namespace types {
         }
         context.currentScope = std::make_shared<Scope>(context.typeRegistry, context.currentScope);
 
-        std::optional<std::shared_ptr<VariableType> > genericType = std::nullopt;
-        if (auto genericParams = structDecl->genericParam()) {
-            genericType = std::make_shared<types::GenericType>(genericParams.value().lexical());
-            context.currentScope->registerTypeInScope(genericType.value());
+        std::vector<std::shared_ptr<VariableType> > genericTypes;
+        for (auto genericParam: structDecl->genericParams()) {
+            auto genericType = std::make_shared<types::GenericType>(genericParam.lexical());
+            context.currentScope->registerTypeInScope(genericType);
+            genericTypes.push_back(genericType);
         }
         for (const auto &[visibility,name, type]: structDecl->fields()) {
             const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
@@ -3301,7 +3302,7 @@ namespace types {
 
 
         auto type = std::make_shared<types::StructType>(structDecl->expressionToken().lexical(),
-                                                        structFields, methods, interfaces, genericType);
+                                                        structFields, methods, interfaces, genericTypes);
 
         const auto parentScope = context.currentScope->parentScope();
         context.currentScope->registerType(type);
