@@ -969,6 +969,7 @@ namespace llvm_backend {
             llvmState.Builder->CreateBr(endBlock);
         }
         llvmState.Builder->SetInsertPoint(defaultBlock);
+        bool isSigned = node->expressionType().value()->isSignedNumberType();
         for (const auto &[selectorNodes, expression]: node->matchCases()) {
             if (const auto range = dynamic_cast<ast::RangeExpression *>(selectorNodes.at(0).get())) {
                 const auto startValue = codegen_base(range->start(), llvmState);
@@ -978,19 +979,17 @@ namespace llvm_backend {
                 llvmState.Builder->CreateBr(rangeBlock);
 
                 llvmState.Builder->SetInsertPoint(rangeBlock);
+                const auto greaterEqualInst = (isSigned) ? llvm::ICmpInst::ICMP_SGE : llvm::ICmpInst::ICMP_UGE;
+                const auto greaterEqual = llvmState.Builder->CreateICmp(greaterEqualInst, value,
+                                                                        startValue,
+                                                                        "range_start_check");
+                auto rangeEndCheckInst = (isSigned) ? llvm::ICmpInst::ICMP_SLE : llvm::ICmpInst::ICMP_ULE;
+                if (!isInclusive)
+                    rangeEndCheckInst = (isSigned) ? llvm::ICmpInst::ICMP_SLT : llvm::ICmpInst::ICMP_ULT;
+                const auto rangeEndCheck = llvmState.Builder->CreateICmp(rangeEndCheckInst, value,
+                                                                         endValue,
+                                                                         "range_end_check");
 
-                const auto greaterEqual = llvmState.Builder->CreateICmpSGE(value,
-                                                                           startValue,
-                                                                           "range_start_check");
-                llvm::Value *rangeEndCheck;
-                if (isInclusive)
-                    rangeEndCheck = llvmState.Builder->CreateICmpSLE(value,
-                                                                     endValue,
-                                                                     "range_end_check");
-                else
-                    rangeEndCheck = llvmState.Builder->CreateICmpSLT(value,
-                                                                     endValue,
-                                                                     "range_end_check");
                 const auto inRange = llvmState.Builder->CreateAnd(greaterEqual, rangeEndCheck, "in_range_check");
 
                 llvm::BasicBlock *inRangeBlock = llvm::BasicBlock::Create(*llvmState.TheContext, "inRange", function);
@@ -2877,6 +2876,9 @@ namespace llvm_backend {
                 std::vector<llvm::Value *> memcopyArgs;
                 const llvm::DataLayout &DL = llvmState.TheModule->getDataLayout();
                 const uint64_t structSize = DL.getTypeAllocSize(llvmArgType);
+                if (retValue->getType()->isStructTy()) {
+                    retValue = llvm::getLoadStorePointerOperand(retValue);
+                }
                 memcopyArgs.push_back(llvmState.Builder->CreateBitCast(returnArg, llvmState.Builder->getPtrTy()));
                 memcopyArgs.push_back(llvmState.Builder->CreateBitCast(retValue, llvmState.Builder->getPtrTy()));
                 memcopyArgs.push_back(llvmState.Builder->getInt64(structSize));

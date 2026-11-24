@@ -83,6 +83,13 @@ namespace types {
         [[nodiscard]] virtual bool isGeneric() {
             return false;
         }
+
+        [[nodiscard]] bool isSignedNumberType() {
+            if (m_typeKind == TypeKind::INT) {
+                return m_typename[0] == 'i';
+            }
+            return false;
+        }
     };
 
     class IntegerType final : public VariableType {
