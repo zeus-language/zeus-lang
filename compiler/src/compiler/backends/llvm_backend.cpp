@@ -1639,6 +1639,9 @@ namespace llvm_backend {
                 arrayType = resolveLlvmType(arrayDataPtrType->baseType(), llvmState);
             }
             size_t index = sliceType->getFieldIndexByName("data");
+            if (!arrayPtr->getType()->isPointerTy()) {
+                arrayPtr = llvm::getLoadStorePointerOperand(arrayPtr);
+            }
             auto originalPtr = arrayPtr;
 
             arrayPtr = llvmState.Builder->CreateStructGEP(resolveLlvmType(sliceType, llvmState), arrayPtr, index,

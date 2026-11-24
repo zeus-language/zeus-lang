@@ -371,10 +371,10 @@ void LanguageServer::handleRequest() {
                         const auto &uri = params.textDocument.uri;
                         // content changes: for Full sync the first change contains whole text
                         std::string text;
-                        // if (!params.contentChanges.empty()) {
-                        //     text = std::get<lsp::TextDocumentContentChangeEventText>(
-                        //         params.contentChanges.front()).text;
-                        // }
+                        if (!params.contentChanges.empty()) {
+                            text = std::get<lsp::TextDocumentContentChangeWholeDocument>(
+                                params.contentChanges.front()).text;
+                        }
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
                         auto *cache = &m_moduleCache;
                         // async diagnostics
