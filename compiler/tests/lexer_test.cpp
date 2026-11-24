@@ -574,6 +574,31 @@ TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsAtEnd) {
     EXPECT_EQ(tokens[5].type, Token::Type::END_OF_FILE);
 }
 
+TEST(LexerLexCommentTest, TestMulipleSingleLineCommentsAtBeginning) {
+    const std::string source = R"(
+    // asdasd asd
+    // asdasd asd
+    let bla;)";
+    const auto tokens = lexer::lex_file("test.zeus", source, false);
+    EXPECT_EQ(tokens.size(), 6);
+    EXPECT_EQ(tokens[0].type, Token::Type::LINE_COMMENT);
+    VerifyTokenPosition(tokens[0], source, 5, 13, "// asdasd asd");
+    EXPECT_EQ(tokens[1].type, Token::Type::LINE_COMMENT);
+    VerifyTokenPosition(tokens[1], source, 23, 13, "// asdasd asd");
+    EXPECT_EQ(tokens[2].type, Token::Type::KEYWORD);
+    VerifyTokenPosition(tokens[2], source, 41, 3, "let");
+    EXPECT_EQ(tokens[5].type, Token::Type::END_OF_FILE);
+}
+
+TEST(LexerLexCharTest, TestLexCharEscape) {
+    const std::string source = R"('\'')";
+    const auto tokens = lexer::lex_file("test.zeus", source, false);
+    EXPECT_EQ(tokens.size(), 2);
+    EXPECT_EQ(tokens[0].type, Token::Type::CHAR);
+    VerifyTokenPosition(tokens[0], source, 0, 4, "'\\''");
+    EXPECT_EQ(tokens[1].type, Token::Type::END_OF_FILE);
+}
+
 TEST(LexerLexNumbersTest, LexHexNumbers) {
     const std::string source = "let hex1 = 0x1A3F;";
     const auto tokens = lexer::lex_file("test.zeus", source);
