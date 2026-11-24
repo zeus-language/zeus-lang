@@ -26,7 +26,7 @@ namespace compiler {
             } else if (arg == "--output"sv) {
                 options.outputDirectory = shiftarg(argList);
             } else if (arg == "--stdlib"sv) {
-                options.stdlibDirectories.emplace(options.stdlibDirectories.begin(), shiftarg(argList));
+                options.stdlibDirectories.insert(options.stdlibDirectories.begin(), shiftarg(argList));
             } else if (arg == "--release") {
                 options.buildMode = BuildMode::Release;
             } else if (arg == "--debug") {
@@ -49,9 +49,9 @@ namespace compiler {
 #endif
 
         if (const char *env_p = std::getenv("ZEUS_PATH")) {
-            options.stdlibDirectories.emplace_back(env_p + "/stdlib"s);
+            options.stdlibDirectories.insert(env_p + "/stdlib"s);
         } else if (options.stdlibDirectories.empty()) {
-            options.stdlibDirectories.push_back(std::filesystem::current_path() / "stdlib");
+            options.stdlibDirectories.insert(std::filesystem::current_path() / "stdlib");
         }
 
         return options;

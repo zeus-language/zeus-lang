@@ -17,7 +17,7 @@ namespace lsp {
         while (!argList.empty()) {
             auto arg = shiftarg(argList);
             if (arg == "--stdlib"sv) {
-                options.stdlibDirectories.emplace(options.stdlibDirectories.begin(), shiftarg(argList));
+                options.stdlibDirectories.insert(options.stdlibDirectories.begin(), shiftarg(argList));
             } else {
                 argList.push_back(arg);
                 break;
@@ -28,9 +28,9 @@ namespace lsp {
 #endif
 
         if (const char *env_p = std::getenv("ZEUS_PATH")) {
-            options.stdlibDirectories.emplace_back(env_p + "/stdlib"s);
+            options.stdlibDirectories.insert(env_p + "/stdlib"s);
         } else if (options.stdlibDirectories.empty()) {
-            options.stdlibDirectories.push_back(std::filesystem::current_path() / "stdlib");
+            options.stdlibDirectories.insert(std::filesystem::current_path() / "stdlib");
         }
 
         return options;

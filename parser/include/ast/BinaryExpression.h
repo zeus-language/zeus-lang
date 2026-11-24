@@ -84,12 +84,12 @@ namespace ast {
 
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            auto result = m_lhs->getNodeByToken(token);
-            if (result.has_value()) {
-                return result;
+            if (m_lhs) {
+                if (const auto result = m_lhs->getNodeByToken(token)) {
+                    return result;
+                }
             }
-            result = m_rhs->getNodeByToken(token);
-            if (result.has_value()) {
+            if (const auto result = m_rhs->getNodeByToken(token)) {
                 return result;
             }
             return std::nullopt;

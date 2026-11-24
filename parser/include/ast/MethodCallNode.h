@@ -71,7 +71,7 @@ namespace ast {
             if (const auto result = instanceNode()->getNodeByToken(token); result.has_value()) {
                 return result;
             }
-            const auto ownToken = expressionToken();
+            const auto &ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<MethodCallNode *>(this)) : std::nullopt;
         }
 
@@ -90,5 +90,3 @@ namespace ast {
         }
     };
 } // ast
-
-

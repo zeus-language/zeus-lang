@@ -1322,7 +1322,8 @@ namespace parser {
 
 
         std::optional<std::shared_ptr<ast::ASTNode> > parseFieldAssignment() {
-            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::DOT, 1) || !canConsume(Token::IDENTIFIER, 2)) {
+            if (!canConsume(Token::IDENTIFIER) || !canConsume(Token::DOT, 1) || !canConsume(Token::IDENTIFIER, 2) || !
+                isAssignment()) {
                 return std::nullopt;
             }
 
@@ -3030,40 +3031,13 @@ namespace parser {
     std::optional<std::pair<ast::ASTNode *, ast::ASTNode *> > Module::getNodeByToken(
         const Token &token) const {
         for (auto &node: nodes) {
-            if (const auto structDecl = dynamic_cast<ast::StructDeclaration *>(node.get())) {
-                if (structDecl->expressionType()) {
-                    const auto structType = std::dynamic_pointer_cast<
-                        types::StructType>(structDecl->expressionType().value());
-                    for (auto &method: structType->methods()) {
-                        for (const auto &innerNode: method->block()->statements()) {
-                            if (const auto result = innerNode->getNodeByToken(token)) {
-                                return std::make_pair(method.get(), result.value());
-                            }
-                        }
-                    }
-                }
-                for (const auto &method: structDecl->methods()) {
-                    for (const auto &innerNode: method->block()->statements()) {
-                        if (const auto result = innerNode->getNodeByToken(token)) {
-                            return std::make_pair(method.get(), result.value());
-                        }
-                    }
-                }
-            }
             if (auto result = node->getNodeByToken(token)) {
                 return std::make_pair(node.get(), result.value());
             }
         }
         for (auto &func: functions) {
-            if (func->expressionToken() == token) {
-                return std::make_pair(nullptr, func.get());
-            }
-            if (const auto funcDef = dynamic_cast<ast::FunctionDefinition *>(func.get())) {
-                for (auto &node: funcDef->block()->statements()) {
-                    if (const auto result = node->getNodeByToken(token)) {
-                        return std::make_pair(func.get(), result.value());
-                    }
-                }
+            if (auto result = func->getNodeByToken(token)) {
+                return std::make_pair(func.get(), result.value());
             }
         }
         return std::nullopt;

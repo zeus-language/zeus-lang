@@ -75,7 +75,7 @@ TEST_P(CompilerTest, TestNoError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
 
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
@@ -124,8 +124,8 @@ TEST_P(CompilerIOTest, TestReadFileNoError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
-    options.stdlibDirectories.emplace_back(base_path);
+    options.stdlibDirectories.insert("stdlib");
+    options.stdlibDirectories.insert(base_path);
     moduleCache.clear();
 
     options.runProgram = true;
@@ -172,7 +172,7 @@ TEST_P(ProjectEulerTest, TestNoError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
 
     options.buildMode = compiler::BuildMode::Release;
 
@@ -220,8 +220,8 @@ TEST_P(CompilerTestError, CompilerTestWithError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
-    options.stdlibDirectories.emplace_back(base_path);
+    options.stdlibDirectories.insert("stdlib");
+    options.stdlibDirectories.insert(base_path);
     options.colorOutput = false;
     compiler::parse_and_compile(options, environment, moduleCache, input_path, erstream, ostream);
 
@@ -263,8 +263,8 @@ TEST_P(ArithmethicTestError, ArithmethicErrorTests) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
-    options.stdlibDirectories.emplace_back(base_path);
+    options.stdlibDirectories.insert("stdlib");
+    options.stdlibDirectories.insert(base_path);
     options.colorOutput = false;
     compiler::parse_and_compile(options, environment, moduleCache, input_path, erstream, ostream);
 
@@ -307,8 +307,8 @@ TEST_P(PanicTest, PanicTest) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
-    options.stdlibDirectories.emplace_back(base_path);
+    options.stdlibDirectories.insert("stdlib");
+    options.stdlibDirectories.insert(base_path);
     options.colorOutput = false;
     options.runProgram = true;
     options.outputDirectory = std::filesystem::current_path();
@@ -366,7 +366,7 @@ TEST_P(EncodingTest, TestNoError) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
     options.outputDirectory = std::filesystem::current_path();

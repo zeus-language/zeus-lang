@@ -49,15 +49,14 @@ namespace ast {
         }
 
         [[nodiscard]] std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            auto result = m_accessExpression->getNodeByToken(token);
-            if (result.has_value()) {
+            if (const auto result = m_accessExpression->getNodeByToken(token)) {
                 return result;
             }
-            result = m_indexExpression->getNodeByToken(token);
-            if (result.has_value()) {
+
+            if (const auto result = m_indexExpression->getNodeByToken(token)) {
                 return result;
             }
-            auto ownToken = expressionToken();
+            const auto ownToken = expressionToken();
             return ownToken == token ? std::make_optional(const_cast<ArrayAccess *>(this)) : std::nullopt;
         }
 

@@ -2,10 +2,11 @@
 #include <filesystem>
 #include <vector>
 #include <string>
+#include <set>
 
 namespace lsp {
     struct LspOptions {
-        std::vector<std::filesystem::path> stdlibDirectories;
+        std::set<std::filesystem::path> stdlibDirectories;
         std::string compilerPath;
     };
 
