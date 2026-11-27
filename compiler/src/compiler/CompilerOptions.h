@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <optional>
 #include <vector>
+#include <set>
 
 namespace compiler {
     enum class BuildMode {
@@ -13,7 +14,7 @@ namespace compiler {
         BuildMode buildMode = BuildMode::Debug;
 
         std::filesystem::path outputDirectory;
-        std::vector<std::filesystem::path> stdlibDirectories;
+        std::set<std::filesystem::path> stdlibDirectories;
         std::vector<std::filesystem::path> includeDirectories;
         std::vector<std::filesystem::path> libraryDirectories;
         std::vector<std::string> flags;

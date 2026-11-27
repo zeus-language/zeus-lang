@@ -37,13 +37,13 @@ int main(int args, char **argv) {
     }
     lsp::LspOptions options = lsp::parseLspOptions(argList);
 #ifdef ZEUS_PATH
-    options.stdlibDirectories.emplace_back(ZEUS_PATH + "/stdlib"s);
+    options.stdlibDirectories.insert(ZEUS_PATH + "/stdlib"s);
 #endif
 
     if (const char *env_p = std::getenv("ZEUS_PATH")) {
-        options.stdlibDirectories.emplace_back(env_p + "/stdlib"s);
+        options.stdlibDirectories.insert(env_p + "/stdlib"s);
     } else if (options.stdlibDirectories.empty()) {
-        options.stdlibDirectories.push_back(std::filesystem::current_path() / "stdlib");
+        options.stdlibDirectories.insert(std::filesystem::current_path() / "stdlib");
     }
     env::Environment env = env::buildEnvironment();
     LanguageServer language_server(options, env);

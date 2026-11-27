@@ -1,0 +1,1 @@
+non ws chars count: 10

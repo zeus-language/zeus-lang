@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <map>
+#include <set>
 
 #include "Environment.h"
 #include "Parser.h"
@@ -35,7 +36,7 @@ namespace modules {
 
 
     void include_modules(
-        const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
+        const std::set<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
         const env::Environment &env,
         parser::ParseResult &result);
 }

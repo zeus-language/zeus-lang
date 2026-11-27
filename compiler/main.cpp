@@ -62,19 +62,21 @@ int main(int args, char **argv) {
     compiler::CompilerOptions options = compiler::parseCompilerOptions(argList);
 
     std::filesystem::path programPath(program);
-    options.stdlibDirectories.push_back(programPath.parent_path() / "stdlib");
+    programPath = absolute(programPath);
+    options.stdlibDirectories.insert(programPath.parent_path() / "stdlib");
     if (argList.empty()) {
         std::cerr << "input file is missing\n";
         printHelp(program);
         return 1;
     }
     std::filesystem::path file_path(argList[0]);
+    file_path = absolute(file_path);
     if (!std::filesystem::exists(file_path)) {
         std::cerr << "the first argument is not a valid input file\n";
         return 1;
     }
-    options.stdlibDirectories.push_back(file_path.parent_path() / "stdlib");
-    options.stdlibDirectories.push_back(file_path.parent_path());
+    options.stdlibDirectories.insert(file_path.parent_path() / "stdlib");
+    options.stdlibDirectories.insert(file_path.parent_path());
     env::Environment env = env::buildEnvironment();
     modules::ModuleCache moduleCache(true);
     compiler::parse_and_compile(options, env, moduleCache, file_path, std::cerr, std::cout);

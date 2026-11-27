@@ -2225,7 +2225,13 @@ namespace types {
                 break;
             case ast::BinaryOperator::INC:
             case ast::BinaryOperator::DEC:
-                if (node->rhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
+                if (!node->rhs()->expressionType()) {
+                    context.messages.insert({
+                        parser::OutputType::ERROR,
+                        node->expressionToken(),
+                        "Binary inc/dec operator requires integer operands, but the expression type is not known."
+                    });
+                } else if (node->rhs()->expressionType().value()->typeKind() != types::TypeKind::INT) {
                     context.messages.insert({
                         parser::OutputType::ERROR,
                         node->expressionToken(),
@@ -3237,7 +3243,7 @@ namespace types {
             genericTypes.push_back(genericType);
         }
         for (const auto &[visibility,name, type]: structDecl->fields()) {
-            const auto fieldType = resolveFromRawType(type.get(), context.currentScope);
+            const auto fieldType = resolveFromRawType(type.get(), context.currentScope, true);
             if (!fieldType) {
                 context.messages.insert({
                     parser::OutputType::ERROR,

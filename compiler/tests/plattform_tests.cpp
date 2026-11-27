@@ -35,7 +35,7 @@ TEST_P(PlattformWinTest, Win) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
 
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
@@ -94,7 +94,7 @@ TEST_P(PlattformLinTest, Linux) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
 
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
@@ -130,5 +130,5 @@ TEST_P(PlattformLinTest, Linux) {
 INSTANTIATE_TEST_SUITE_P(Linux, PlattformLinTest, platform_tests
 );
 #else
-#error("unsupported platform")
+#error ("unsupported platform")
 #endif

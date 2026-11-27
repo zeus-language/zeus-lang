@@ -6,8 +6,8 @@
 
 #include <config.h>
 #include <lsp/connection.h>
-#include <lsp/io/standardio.h>
-#include <lsp/messagehandler.h>
+#include <lsp/io/standard_io.h>
+#include <lsp/message_handler.h>
 #include <lsp/messages.h>
 
 #include <future>
@@ -53,7 +53,7 @@ static lsp::Uri toUri(const std::string &filePath) {
     if (filePath.starts_with("file:")) {
         return lsp::Uri::parse(filePath);
     }
-    return lsp::FileUri::fromPath(filePath);
+    return lsp::Uri::fileUriFromPath(filePath);
 }
 
 static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
@@ -95,7 +95,7 @@ static std::vector<lsp::Diagnostic> buildDiagnosticsFromMessages(
 
 
 static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > collectDiagnostics(
-    const std::vector<std::filesystem::path> &rtlDirectories,
+    const std::set<std::filesystem::path> &rtlDirectories,
     const env::Environment &env,
     modules::ModuleCache &moduleCache,
     const lsp::Uri &uri,
@@ -110,14 +110,13 @@ static std::unordered_map<std::string, std::vector<parser::ParserMessasge> > col
                                         ? SourceLocation{}
                                         : result.module->modulePath()[0].source_location;
     result.module->setModulePath({Token(file_path.filename().string(), Token::IDENTIFIER, location)});
-    std::vector<std::filesystem::path> includeDirs;
-    includeDirs.reserve(rtlDirectories.size() + 1);
+    std::set<std::filesystem::path> includeDirs;
     for (auto &dir: rtlDirectories) {
         if (std::filesystem::exists(dir)) {
-            includeDirs.push_back(dir);
+            includeDirs.insert(dir);
         }
     }
-    includeDirs.push_back(parentDir);
+    includeDirs.insert(parentDir);
     moduleCache.removeModule(file_path.string());
 
     modules::include_modules(includeDirs, moduleCache, env, result);
@@ -275,13 +274,13 @@ LanguageServer::LanguageServer(lsp::LspOptions options, const env::Environment &
 void LanguageServer::handleRequest() {
     try {
         auto connection = lsp::Connection(lsp::io::standardIO());
-        auto messageHandler = lsp::MessageHandler(connection);
+        auto messageHandler = lsp::MessageHandler(std::move(connection));
 
         // running flag
         std::atomic<bool> running{true};
 
         // Register callbacks
-        messageHandler.add<lsp::requests::Initialize>([&](lsp::requests::Initialize::Params &&params) {
+        messageHandler.on<lsp::requests::Initialize>([&](lsp::requests::Initialize::Params &&params) {
                     lsp::InitializeResult result;
                     result.capabilities.positionEncoding = lsp::PositionEncodingKind::UTF8;
 
@@ -323,21 +322,21 @@ void LanguageServer::handleRequest() {
                     };
                     auto version = std::to_string(ZEUS_VERSION_MAJOR) + "." + std::to_string(ZEUS_VERSION_MINOR) + "." +
                                    std::to_string(ZEUS_VERSION_PATCH);
-                    result.serverInfo = lsp::InitializeResultServerInfo{.name = "zeusls", .version = version};
+                    result.serverInfo = lsp::ServerInfo{.name = "zeusls", .version = version};
 
                     return lsp::requests::Initialize::Result{
                         .capabilities = result.capabilities, .serverInfo = result.serverInfo
                     };
                 })
-                .add<lsp::requests::Shutdown>([&]() {
+                .on<lsp::requests::Shutdown>([&]() {
                     running = false;
                     return lsp::requests::Shutdown::Result();
                 })
-                .add<lsp::notifications::Exit>([&]() {
+                .on<lsp::notifications::Exit>([&]() {
                     running = false;
                 })
-                .add<lsp::notifications::TextDocument_DidOpen>(
-                    [&](lsp::notifications::TextDocument_DidOpen::Params &&params) {
+                .on<lsp::notifications::TextDocumentDidOpen>(
+                    [&](lsp::notifications::TextDocumentDidOpen::Params &&params) {
                         // store document
                         auto uri = params.textDocument.uri;
                         const auto uriString = params.textDocument.uri.toString();
@@ -356,24 +355,24 @@ void LanguageServer::handleRequest() {
                                                      for (const auto &file: messages | std::views::keys) {
                                                          const auto diagnostics = buildDiagnosticsFromMessages(
                                                              messages, file);
-                                                         lsp::notifications::TextDocument_PublishDiagnostics::Params
+                                                         lsp::notifications::TextDocumentPublishDiagnostics::Params
                                                                  params2
                                                                  {
                                                                      .uri = toUri(file), .diagnostics = diagnostics
                                                                  };
                                                          messageHandler.sendNotification<
-                                                             lsp::notifications::TextDocument_PublishDiagnostics>(
+                                                             lsp::notifications::TextDocumentPublishDiagnostics>(
                                                              std::move(params2));
                                                      }
                                                  });
                     })
-                .add<lsp::notifications::TextDocument_DidChange>(
-                    [&](lsp::notifications::TextDocument_DidChange::Params &&params) {
+                .on<lsp::notifications::TextDocumentDidChange>(
+                    [&](lsp::notifications::TextDocumentDidChange::Params &&params) {
                         const auto &uri = params.textDocument.uri;
                         // content changes: for Full sync the first change contains whole text
                         std::string text;
                         if (!params.contentChanges.empty()) {
-                            text = std::get<lsp::TextDocumentContentChangeEvent_Text>(
+                            text = std::get<lsp::TextDocumentContentChangeWholeDocument>(
                                 params.contentChanges.front()).text;
                         }
                         m_openDocuments[uri.toString()] = LspDocument{.uri = uri.toString(), .text = text};
@@ -388,30 +387,35 @@ void LanguageServer::handleRequest() {
                                                      for (const auto &file: messages | std::views::keys) {
                                                          const auto diagnostics = buildDiagnosticsFromMessages(
                                                              messages, file);
-                                                         lsp::notifications::TextDocument_PublishDiagnostics::Params
+                                                         lsp::notifications::TextDocumentPublishDiagnostics::Params
                                                                  params2
                                                                  {
                                                                      .uri = toUri(file), .diagnostics = diagnostics
                                                                  };
                                                          messageHandler.sendNotification<
-                                                             lsp::notifications::TextDocument_PublishDiagnostics>(
+                                                             lsp::notifications::TextDocumentPublishDiagnostics>(
                                                              std::move(params2));
                                                      }
                                                  }
                         );
                     })
-                .add<lsp::notifications::TextDocument_DidClose>(
-                    [&](lsp::notifications::TextDocument_DidClose::Params &&params) {
+                .on<lsp::notifications::TextDocumentDidClose>(
+                    [&](lsp::notifications::TextDocumentDidClose::Params &&params) {
                         m_openDocuments.erase(params.textDocument.uri.toString());
                         m_moduleCache.removeModule(params.textDocument.uri.toString());
                     })
-                .add<lsp::requests::TextDocument_Definition>(
-                    [&](lsp::requests::TextDocument_Definition::Params &&params) {
-                        return findDefinition(params);
+                .on<lsp::requests::TextDocumentDefinition>(
+                    [&](lsp::requests::TextDocumentDefinition::Params &&params) {
+                        try {
+                            return findDefinition(params);
+                        } catch (const std::exception &e) {
+                            std::cerr << "EXCEPTION: " << e.what() << std::endl;
+                            return lsp::requests::TextDocumentDefinition::Result{};
+                        }
                     })
-                .add<lsp::requests::TextDocument_Diagnostic>(
-                    [&](lsp::requests::TextDocument_Diagnostic::Params &&params) {
-                        auto diagnosticsReport = lsp::requests::TextDocument_Diagnostic::Result();
+                .on<lsp::requests::TextDocumentDiagnostic>(
+                    [&](lsp::requests::TextDocumentDiagnostic::Params &&params) {
+                        auto diagnosticsReport = lsp::requests::TextDocumentDiagnostic::Result();
                         const auto &uri = params.textDocument.uri;
                         // content changes: for Full sync the first change contains whole text
                         const std::string text = m_openDocuments.at(uri.toString()).text;
@@ -429,9 +433,9 @@ void LanguageServer::handleRequest() {
                             std::cerr << "EXCEPTION: " << e.what() << std::endl;
                         }
                         return diagnosticsReport;
-                    }).add<lsp::requests::Workspace_Diagnostic>(
-                    [&](lsp::requests::Workspace_Diagnostic::Params &&params) {
-                        auto diagnosticsReport = lsp::requests::Workspace_Diagnostic::Result();
+                    }).on<lsp::requests::WorkspaceDiagnostic>(
+                    [&](lsp::requests::WorkspaceDiagnostic::Params &&params) {
+                        auto diagnosticsReport = lsp::requests::WorkspaceDiagnostic::Result();
                         std::map<lsp::Uri, lsp::WorkspaceFullDocumentDiagnosticReport> relatedDocuments;
                         for (const auto &[uri, value]: params.previousResultIds) {
                             std::cerr << "Workspace diagnostics requested for uri: " << uri.toString() << "\n";
@@ -451,26 +455,26 @@ void LanguageServer::handleRequest() {
 
                         return diagnosticsReport;
                     })
-                .add<lsp::requests::TextDocument_Completion>(
-                    [&](lsp::requests::TextDocument_Completion::Params &&item) {
+                .on<lsp::requests::TextDocumentCompletion>(
+                    [&](lsp::requests::TextDocumentCompletion::Params &&item) {
                         return findCompletions(item);
-                    }).add<lsp::requests::TextDocument_SemanticTokens_Full>(
-                    [&](lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
+                    }).on<lsp::requests::TextDocumentSemanticTokensFull>(
+                    [&](lsp::requests::TextDocumentSemanticTokensFull::Params &&params) {
                         return semanticTokensFull(std::move(params));
                     })
-                .add<lsp::requests::TextDocument_InlayHint>(
-                    [&](lsp::requests::TextDocument_InlayHint::Params &&params) {
+                .on<lsp::requests::TextDocumentInlayHint>(
+                    [&](lsp::requests::TextDocumentInlayHint::Params &&params) {
                         return resolveInlayHints(std::move(params));
                     })
-                .add<lsp::requests::CompletionItem_Resolve>(
-                    [&](lsp::requests::CompletionItem_Resolve::Params &&params) {
+                .on<lsp::requests::CompletionItemResolve>(
+                    [&](lsp::requests::CompletionItemResolve::Params &&params) {
                         return resolveCompletionItem(std::move(params));
                     });
 
         // Main loop
         while (running) {
             try {
-                messageHandler.processIncomingMessages();
+                messageHandler.processNextMessage();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             } catch (const lsp::MessageError &e) {
                 std::cerr << "LSP Exception: " << e.what() << "\n";
@@ -493,9 +497,9 @@ void LanguageServer::handleRequest() {
     }
 }
 
-lsp::requests::TextDocument_SemanticTokens_Full::Result LanguageServer::semanticTokensFull(const
-    lsp::requests::TextDocument_SemanticTokens_Full::Params &&params) {
-    auto result = lsp::requests::TextDocument_SemanticTokens_Full::Result();
+lsp::requests::TextDocumentSemanticTokensFull::Result LanguageServer::semanticTokensFull(const
+    lsp::requests::TextDocumentSemanticTokensFull::Params &&params) {
+    auto result = lsp::requests::TextDocumentSemanticTokensFull::Result();
     auto startTime = std::chrono::high_resolution_clock::now();
     const auto uri = params.textDocument.uri.toString();
     const auto [documentUri, text] = m_openDocuments.at(uri);
@@ -578,6 +582,12 @@ static void resolveInlayHintForNode(const ast::ASTNode *node, std::vector<lsp::I
             }
             break;
         }
+        case ast::NodeType::STRUCT_DECLARATION: {
+            auto structDecl = const_cast<ast::StructDeclaration *>(dynamic_cast<const ast::StructDeclaration *>(node));
+            for (auto &fun: structDecl->methods()) {
+                resolveInlayHintsForFunction(fun.get(), hints);
+            }
+        }
         default:
             break;
     }
@@ -626,9 +636,9 @@ void resolveInlayHintsForFunction(const ast::FunctionDefinition *funcDef, std::v
     }
 }
 
-lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
-    const lsp::requests::TextDocument_InlayHint::Params &&params) {
-    auto result = lsp::TextDocument_InlayHintResult();
+lsp::TextDocumentInlayHintResult LanguageServer::resolveInlayHints(
+    const lsp::requests::TextDocumentInlayHint::Params &&params) {
+    auto result = lsp::TextDocumentInlayHintResult();
     auto hints = lsp::Array<lsp::InlayHint>();
     const auto uri = params.textDocument.uri.toString();
 
@@ -653,9 +663,9 @@ lsp::TextDocument_InlayHintResult LanguageServer::resolveInlayHints(
     return result;
 }
 
-lsp::requests::CompletionItem_Resolve::Result LanguageServer::resolveCompletionItem(
-    const lsp::requests::CompletionItem_Resolve::Params &move) {
-    auto result = lsp::requests::CompletionItem_Resolve::Result{};
+lsp::requests::CompletionItemResolve::Result LanguageServer::resolveCompletionItem(
+    const lsp::requests::CompletionItemResolve::Params &move) {
+    auto result = lsp::requests::CompletionItemResolve::Result{};
     return move;
 }
 
@@ -720,7 +730,7 @@ static void addCompletionItemForFunction(const ast::FunctionDefinitionBase *func
 }
 
 
-static bool findMemberCompletion(lsp::requests::TextDocument_Completion::Result &result,
+static bool findMemberCompletion(lsp::requests::TextDocumentCompletion::Result &result,
                                  lsp::CompletionList completionList,
                                  std::optional<Token> foundToken, const parser::ParseResult &parseResult) {
     if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
@@ -845,8 +855,8 @@ static std::vector<Token> build_path_from_token_reverse(std::vector<Token> token
     return pathTokens;
 }
 
-lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletionsForMembers(
-    lsp::requests::TextDocument_Completion::Result &result, lsp::CompletionList completionList,
+lsp::requests::TextDocumentCompletion::Result LanguageServer::findCompletionsForMembers(
+    lsp::requests::TextDocumentCompletion::Result &result, lsp::CompletionList completionList,
     std::vector<Token> tokens, std::optional<Token> &foundToken, parser::ParseResult parseResult) const {
     auto previousTokenIt = std::find(tokens.rbegin(), tokens.rend(), foundToken.value());
     if (previousTokenIt != tokens.rend()) {
@@ -896,9 +906,9 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletionsFo
     return result;
 }
 
-lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
-    const lsp::requests::TextDocument_Completion::Params &params) {
-    auto result = lsp::requests::TextDocument_Completion::Result();
+lsp::requests::TextDocumentCompletion::Result LanguageServer::findCompletions(
+    const lsp::requests::TextDocumentCompletion::Params &params) {
+    auto result = lsp::requests::TextDocumentCompletion::Result();
 
     const auto uri = params.textDocument.uri.toString();
     const auto &[_, text] = m_openDocuments.at(uri);
@@ -993,9 +1003,9 @@ lsp::requests::TextDocument_Completion::Result LanguageServer::findCompletions(
 }
 
 
-lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
-    const lsp::requests::TextDocument_Definition::Params &params) {
-    auto result = lsp::requests::TextDocument_Definition::Result();
+lsp::requests::TextDocumentDefinition::Result LanguageServer::findDefinition(
+    const lsp::requests::TextDocumentDefinition::Params &params) {
+    auto result = lsp::requests::TextDocumentDefinition::Result();
     auto uri = params.textDocument.uri.toString();
     const auto [documentUri, text] = m_openDocuments.at(uri);
     auto tokens = lexer::lex_file(uri, text);
@@ -1010,18 +1020,24 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
         std::cerr << "No token found at position\n";
         return result;
     }
+    std::cerr << "found token: '" << foundToken->lexical() << "'\n";
     auto parseResult = parser::parse_tokens(tokens);
+    std::cerr << "parsed tokens\n";
     modules::include_modules(this->m_options.stdlibDirectories, m_moduleCache, this->m_env, parseResult);
     types::TypeCheckResult typeCheckResult;
     types::type_check(parseResult.module, this->m_env, typeCheckResult);
+    std::cerr << "type checking finished\n";
     for (auto &mod: parseResult.module->modules) {
         m_moduleCache.addModule(mod->sourceFilePath.string(), mod);
     }
     for (auto &msg: typeCheckResult.messages) {
         msg.msg(std::cerr, true);
     }
-    if (auto resultPair = parseResult.module->getNodeByToken(foundToken.value())) {
-        std::cerr << "Found node for token " << foundToken.value().lexical() << "\n";
+    std::cerr << "updated cache\n";
+    auto resultPair = parseResult.module->getNodeByToken(foundToken.value());
+    std::cerr << "getNodeByToken finished\n";
+    if (resultPair) {
+        std::cerr << "Found node for token " << foundToken->lexical() << "\n";
 
         auto [parent, node] = resultPair.value();
         std::cerr << "nodetype: " << magic_enum::enum_name(node->nodeType()) << "\n";
@@ -1227,6 +1243,9 @@ lsp::requests::TextDocument_Definition::Result LanguageServer::findDefinition(
                 }
             }
         }
+    } else {
+        std::cerr << "node not found for token: " << foundToken->lexical() << "\n";
+        result = nullptr;
     }
 
     return result;

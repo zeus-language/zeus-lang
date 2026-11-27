@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <set>
 
 #include "dbg_assert.h"
 #include "ast/ExternFunctionDefinition.h"
@@ -27,7 +28,7 @@ namespace modules {
         return buffer;
     }
 
-    void useModuleFile(const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
+    void useModuleFile(const std::set<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
                        parser::ParseResult &result, const env::Environment &env,
                        ast::UseModule *useModule) {
         std::string modulePath;
@@ -167,7 +168,7 @@ namespace modules {
     }
 
     void include_modules(
-        const std::vector<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
+        const std::set<std::filesystem::path> &stdlibDirectories, ModuleCache &moduleCache,
         const env::Environment &env,
         parser::ParseResult &result) {
         types::TypeCheckResult evalResult;

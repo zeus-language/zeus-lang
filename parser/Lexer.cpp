@@ -362,14 +362,20 @@ namespace lexer {
                         continue;
                     }
                     if (source_code[start] == '\'') {
+                        size_t offset = 3;
+                        if (source_code[start + 1] == '\\') {
+                            offset++;
+                        }
+                        size_t end = start + offset - 1;
+
                         SourceLocation source_location = {
-                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = 3,
+                            .filename = file_path, .source = contentPtr, .byte_offset = start, .num_bytes = offset,
                             .row = row,
                             .col = col
                         };
                         tokens.emplace_back(Token::CHAR, std::move(source_location));
-                        col += 3;
-                        start += 2;
+                        col += offset;
+                        start = end;
                         continue;
                     }
 

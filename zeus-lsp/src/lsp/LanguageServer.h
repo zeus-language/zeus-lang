@@ -15,6 +15,11 @@
 #include "parser/module.h"
 #include "parser/Parser.h"
 
+// /home/stefan/projects/zeus-lang/cmake-build-debug/_deps/lsp-src/lsp
+namespace lsp {
+    struct CompletionList;
+}
+
 struct LspDocument {
     std::string uri;
     std::string text;
@@ -27,25 +32,25 @@ class LanguageServer {
     std::map<std::string, LspDocument> m_openDocuments;
     modules::ModuleCache m_moduleCache;
 
-    lsp::requests::TextDocument_Definition::Result findDefinition(
-        const lsp::requests::TextDocument_Definition::Params &params);
+    lsp::requests::TextDocumentDefinition::Result findDefinition(
+        const lsp::requests::TextDocumentDefinition::Params &params);
 
-    lsp::requests::TextDocument_Completion::Result findCompletionsForMembers(
-        lsp::requests::TextDocument_Completion::Result &result,
+    lsp::requests::TextDocumentCompletion::Result findCompletionsForMembers(
+        lsp::requests::TextDocumentCompletion::Result &result,
         lsp::CompletionList completionList, std::vector<Token> tokens,
         std::optional<Token> &foundToken, parser::ParseResult parseResult) const;
 
-    [[nodiscard]] lsp::requests::TextDocument_Completion::Result findCompletions(
-        const lsp::requests::TextDocument_Completion::Params &params);
+    [[nodiscard]] lsp::requests::TextDocumentCompletion::Result findCompletions(
+        const lsp::requests::TextDocumentCompletion::Params &params);
 
-    [[nodiscard]] lsp::requests::TextDocument_SemanticTokens_Full::Result semanticTokensFull(
-        const lsp::requests::TextDocument_SemanticTokens_Full::Params &&params);
+    [[nodiscard]] lsp::requests::TextDocumentSemanticTokensFull::Result semanticTokensFull(
+        const lsp::requests::TextDocumentSemanticTokensFull::Params &&params);
 
-    [[nodiscard]] lsp::TextDocument_InlayHintResult resolveInlayHints(
-        const lsp::requests::TextDocument_InlayHint::Params &&params);
+    [[nodiscard]] lsp::TextDocumentInlayHintResult resolveInlayHints(
+        const lsp::requests::TextDocumentInlayHint::Params &&params);
 
-    lsp::requests::CompletionItem_Resolve::Result resolveCompletionItem(
-        const lsp::requests::CompletionItem_Resolve::Params &move);
+    lsp::requests::CompletionItemResolve::Result resolveCompletionItem(
+        const lsp::requests::CompletionItemResolve::Params &move);
 
 public:
     explicit LanguageServer(lsp::LspOptions options, const env::Environment &env);

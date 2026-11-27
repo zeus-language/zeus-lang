@@ -49,15 +49,15 @@ namespace ast {
         LogicalExpression &operator=(const LogicalExpression &) = delete;
 
         std::optional<ASTNode *> getNodeByToken(const Token &token) const override {
-            auto result = m_lhs ? m_lhs->getNodeByToken(token) : std::nullopt;
-            if (result) {
+            if (m_lhs) {
+                if (const auto result = m_lhs->getNodeByToken(token))
+                    return result;
+            }
+
+            if (const auto result = m_rhs->getNodeByToken(token)) {
                 return result;
             }
-            result = m_rhs->getNodeByToken(token);
-            if (result) {
-                return result;
-            }
-            return std::nullopt;
+            return ASTNode::getNodeByToken(token);
         }
 
         std::shared_ptr<ASTNode> clone() override {
@@ -75,5 +75,3 @@ namespace ast {
         }
     };
 } // ast
-
-

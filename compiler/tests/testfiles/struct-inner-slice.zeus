@@ -1,0 +1,23 @@
+struct Wrapper {
+    slice : [u8]
+
+    pub fn count_non_ws(self: &Wrapper) : i32 {
+        let mut cnt = 0;
+        for i in 0 .. self.slice.length {
+            if self.slice[i] != ' ' {
+                cnt++;
+            }
+        }
+        return cnt;
+    }
+}
+
+
+
+fn main() : i32 {
+    let wrapper = Wrapper {slice: "Hello World" };
+
+    let cnt = wrapper.count_non_ws();
+    println("non ws chars count: ${cnt}");
+    return 0;
+}
