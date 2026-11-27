@@ -35,7 +35,7 @@ TEST_P(PlattformWinTest, Win) {
     std::stringstream ostream;
     std::stringstream erstream;
     compiler::CompilerOptions options;
-    options.stdlibDirectories.emplace_back("stdlib");
+    options.stdlibDirectories.insert("stdlib");
 
     options.runProgram = true;
     options.buildMode = compiler::BuildMode::Debug;
